@@ -27,7 +27,7 @@ Prefix the following paths with /api/maintainer. Use exact bodies and reject cal
 
 Define ReportSummary={id,title,status,priority,reporter:{id,displayName},assignee:null-or-{id,displayName},version,createdAt,updatedAt}. Propose ReportDetail to extend it with description,reproductionSteps,expectedBehavior,actualBehavior,environment,notes,checklist,responses,comments,currentProposal,history using shared DTOs agreed before implementation. Never allow the Maintainer DTO to imply edit ownership of these source fields.
 
-Require expectedVersion/proposalVersion to be nonnegative integers. Trim reason/comment text, reject blank/control characters except newline/tab, and bound reasons to 1Ã¢â‚¬â€œ1000 Unicode code points and comments to 1Ã¢â‚¬â€œ4000. Render stored content as escaped text. Preserve user input on rejection and refresh the eligible-action state after success.
+Require expectedVersion/proposalVersion to be nonnegative integers. Trim reason/comment text, reject blank/control characters except newline/tab, and bound reasons to 1-1000 Unicode code points and comments to 1-4000. Render stored content as escaped text. Preserve user input on rejection and refresh the eligible-action state after success.
 
 ## Version and transaction contract
 
@@ -49,7 +49,7 @@ End the snapshot transaction before any provider call. Reauthorize the session/c
 
 Version the prompt MNT-SUMMARY-1. Give trusted instructions separately from serialized report data, state that all report text is untrusted evidence, forbid following embedded instructions, request supplied IDs for each claim and require uncertainty where evidence is absent. Grant no model tools, retrieval, credentials or actions. Instruct the model not to claim investigations/tests occurred without source support. Do not rely on delimiters or prompting alone for authorization or safe rendering.
 
-Require exact JSON {overview:[Finding],blockers:[Finding],missingInformation:[Finding]}, with Finding={text,reportIds}. Allow 0Ã¢â‚¬â€œ8 findings per array, text 1Ã¢â‚¬â€œ600 code points and 1Ã¢â‚¬â€œ20 unique report IDs per finding. Reject extra keys, wrong types, duplicate/unknown IDs, blank text, output over 32 KiB and total finding text over 8000 code points. Accept IDs only from included inputs. Render all generated text as plain text without HTML/Markdown execution or generated links; construct report links from validated IDs. Evaluate factual grounding separately because structural validation does not prove truth.
+Require exact JSON {overview:[Finding],blockers:[Finding],missingInformation:[Finding]}, with Finding={text,reportIds}. Allow 0-8 findings per array, text 1-600 code points and 1-20 unique report IDs per finding. Reject extra keys, wrong types, duplicate/unknown IDs, blank text, output over 32 KiB and total finding text over 8000 code points. Accept IDs only from included inputs. Render all generated text as plain text without HTML/Markdown execution or generated links; construct report links from validated IDs. Evaluate factual grounding separately because structural validation does not prove truth.
 
 Return SummaryResult={capturedAt,filters,included:[{id,version,truncatedFields}],excluded:[{id,reason}],findings,requiresReview:true,providerMode,promptVersion}. Use an empty deterministic result/providerMode none for an empty queue. Make summary generation read-only: No assignment, priority, proposal, status or investigation mutations can originate from output.
 

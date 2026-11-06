@@ -39,4 +39,4 @@ Coordinate shared DEV-SEC-01 through DEV-SEC-04 and DEV-WF-01 through DEV-WF-04 
 
 ## Execution record
 
-This matrix defines expected outcomes only. No application scaffold, executed feature tests, live SoC runs, deployed candidate or human acceptance to report. Add run results with exact commands/revisions/evidence when execution occurs; keep this design oracle separate from those results.
+This matrix remains the full-role design oracle. Completed only the isolated read-only frontend increment, traced through QR-01 to QR-08 in [the increment specification](READ-ONLY-INCREMENT-SPEC.md). See [execution evidence](../../logs/maintainer/2026-11-07-read-only-increment.md) for 30 deterministic tests, independent review and browser smoke results. This does not mark backend MT cases, mutations, live SoC, database checks, production deployment or human acceptance complete.

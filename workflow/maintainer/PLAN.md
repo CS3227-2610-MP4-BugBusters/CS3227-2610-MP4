@@ -1,6 +1,6 @@
 # Maintainer implementation plan
 
-Status: proposed this SDD task baseline on 7 November 2026; have not implemented or executed application tests.
+Status: task baseline proposed on 7 November 2026. Completed the isolated MNT-P1 frontend increment locally; shared-service integration remains pending. Results are tracked separately below.
 Inputs: [product requirements](PRODUCT-SPEC.md), [technical design](TECHNICAL-SPEC.md), and [test matrix](TEST-MATRIX.md). Identify the reviewed file hashes or Git revision in each task handoff before implementation.
 
 | Task | Dependencies | Work and completion evidence |
@@ -38,3 +38,11 @@ Freeze comparable inputs, model/prompt settings, budgets and rubric before exper
 Record runnable tests under src/, shared agent/evaluation instructions under workflow/ where agreed, sanitized results under logs/, and role documentation/reflection contributions under docs/. Acknowledge permitted external ideas and MP3's document-organization reference; import no previous-MP implementation. Keep execution results separate from the matrix's expected outcomes and report unavailable/inconclusive checks explicitly.
 
 Finish only when the specification-linked checks pass on the release candidate, independent findings are resolved, real SoC usefulness has been assessed, the integrated browser flow is verified, and guides/evidence match the deployed behavior. Do not mark unexecuted tests, pending contract decisions or fake-backed integration as complete.
+
+## Read-only increment
+
+Started MNT-P1 against [READ-ONLY-INCREMENT-SPEC.md](READ-ONLY-INCREMENT-SPEC.md), revision MNT-READ-SPEC-1. Limited implementation to `src/frontend/maintainer/`: an injectable React feature, proposed HTTP adapter and development-only synthetic adapter. This does not implement shared authentication, Java endpoints, persistence, mutations or AI.
+
+Use `npm ci` then `npm run verify` from that package once its tooling exists. Require typecheck, deterministic contract/component tests and production build, followed by independent QR-01 through QR-08 review and browser smoke evidence. Record actual results after execution; backend portions of Q1/MT-01/02/03 remain pending real services.
+
+Completed the isolated frontend implementation and independent QR-01 through QR-08 verification. `npm run verify` passed typecheck, 30 tests and production build after one sorting repair. Chrome demo and production-entry smoke checks also passed. See [execution evidence](../../logs/maintainer/2026-11-07-read-only-increment.md). This completes the fake-backed frontend portion only; shared Java endpoints, trusted sessions and database integration are still separate work.

@@ -1,6 +1,6 @@
 # Maintainer product specification
 
-Status: draft MNT-SPEC-1 for team review, 7 November 2026; no implementation, verification, or team approval claimed. Derive scope from the MP4 assignment and the active project-plan sections 3â€“8. Retain the plan's lifecycle conditions as proposals pending team agreement.
+Status: full-role baseline MNT-SPEC-1 remains a draft for team review, 7 November 2026. The isolated read-only frontend increment is implemented and independently checked; shared-service integration and other role features remain pending. Derive scope from the MP4 assignment and the active project-plan sections 3-8. Retain the plan's lifecycle conditions as proposals pending team agreement.
 
 ## Scope
 
@@ -23,7 +23,7 @@ View all reports and their investigation history, triage reports, discuss them, 
 
 ## Lifecycle integration conditions
 
-Use Submitted, Assigned, In progress, Resolution proposed and Closed as the proposed shared lifecycle. Leave Assigned â†’ In progress and In progress â†’ Resolution proposed to the current assigned Developer. Require current assignment, active account and expected version checks there.
+Use Submitted, Assigned, In progress, Resolution proposed and Closed as the proposed shared lifecycle. Leave Assigned -> In progress and In progress -> Resolution proposed to the current assigned Developer. Require current assignment, active account and expected version checks there.
 
 Require authorized Reporter detail/response/evidence edits and Developer note/checklist edits during Resolution proposed to atomically supersede the proposal and return the report to In progress. Retain the proposal for history. Do not treat clarification requests alone as status changes. Propose keeping priority changes and ordinary comments from invalidating a proposal, while incrementing the report aggregate version so stale closure and summaries still fail conservatively.
 
