@@ -112,6 +112,71 @@ Execution and independent-review evidence remains in
 The active `share-investigation-checklist` change owns CL-04 shared-only checklist
 visibility and CL-05 private Save versus published Share semantics. Do not infer
 their real API, lifecycle or database implementation from this frontend baseline.
-Legacy full-role planning under `workflow/maintainer/` is historical context, not
-an override of the approved checklist decisions. Future behavior changes belong in
-new OpenSpec deltas and follow the current agent/TDD gates.
+Future role requirements, technical decisions, tasks and MT-01 through MT-26 now
+live in `openspec/changes/complete-maintainer-role/`. The historical Maintainer
+workflow documents have been superseded. Follow the current agent/TDD gates and
+the confirmed checklist contract; do not infer completed backend behavior.
+
+## Query contract and QR acceptance detail
+
+Migrated the remaining MNT-READ-SPEC-1 contract details here so no live specification
+depends on the deleted workflow files. The proposed HTTP seam remains distinct
+from confirmed shared-server integration.
+
+### Proposed query seam
+
+Expose `getCurrentUser(signal)`, `listReports(filters, signal)`, `listDevelopers(signal)` and `getReport(id, signal)`. Each returns parsed domain values or a bounded typed error. Support AbortSignal for every operation. Do not derive identity from query parameters, caller-supplied role fields or report authors.
+
+| Request | Proposed response |
+| --- | --- |
+| `GET /api/auth/me` | `{id,displayName,role,active}`; role is `MAINTAINER`, `DEVELOPER` or `REPORTER`, active is boolean |
+| `GET /api/maintainer/reports` | `{items: ReportSummary[], total}` |
+| `GET /api/maintainer/developers` | Active Developer summaries `{id,displayName}[]` |
+| `GET /api/maintainer/reports/{id}` | `ReportDetail` |
+
+Use UUID identifiers and ISO-8601 timestamps. ReportSummary={id,title,status,priority,reporter:{id,displayName},assignee:null-or-{id,displayName},version,createdAt,updatedAt}; ReportDetail extends it with the source and nested fields below. Use statuses `Submitted`, `Assigned`, `In progress`, `Resolution proposed`, `Closed`; priorities `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`. Keep nullable assignee and nonnegative integer version explicit.
+
+Propose these detail shapes so a future adapter can map agreed shared DTOs without spreading uncertainty through components:
+
+- Source: `description`, `reproductionSteps`, `expectedBehavior`, `actualBehavior`, `environment` as strings.
+- `notes: {id,author:{id,displayName},text,createdAt}[]`.
+- `checklist: {id,text,completed:boolean}[]`.
+- `responses: {id,author:{id,displayName},text,createdAt}[]`.
+- `comments: {id,author:{id,displayName},text,createdAt}[]`.
+- `currentProposal: null | {id,version,text,author:{id,displayName},createdAt}`.
+- `history: {id,type,text,actor:{id,displayName},createdAt}[]`, including assignment and status history.
+
+Treat these as a local proposed wire contract, not evidence that another role already supplies it. Parse all HTTP response payloads at runtime, including nested values and current-user data. Reject missing, malformed or oversized structures with a safe contract error; never render partially trusted malformed payloads. Bound collection/text sizes consistently with fixture needs and document parser limits in the package.
+
+### HTTP and fake adapters
+
+Use same-origin relative paths, GET only, `credentials: 'same-origin'`, `cache: 'no-store'`, an Accept JSON header and caller cancellation. Encode IDs and query values. Send no actor, role or request body. Validate filters before transport: optional known status/priority, UUID assigneeId, integer offset >= 0, integer limit 1–100 (default 50). Combine filters by intersection; order `updatedAt` descending then ID ascending. Reject unsupported filter fields.
+
+Map 401 to session-required, 403 to access-denied, 404 detail to report-missing, invalid payloads to safe contract failure, and network/other failures to retryable generic failure where appropriate. Do not display raw server bodies, stack traces, request URLs or provider text. Suppress aborted requests as ordinary cancellation. Use local fixed messages for errors.
+
+Regular `npm start` uses HTTP. `npm run demo` explicitly enables a development-only synthetic adapter and shows a visible synthetic-data label. Permit fake selection only with the development build flag; production builds must not fall back to synthetic data when HTTP fails or configuration is missing. Keep fixtures/fake loading outside the production entry dependency path where practical. Tests may inject controlled responses; add no product debug/scenario controls.
+
+Synthetic fixtures cover all lifecycle states/priorities, unassigned and assigned reports, two or more Developers, equal updatedAt values and more than 50 rows. Include rich detail sections and markup-like strings. Fake sorting, filtering and pagination follow the same contract, with no writes. Simulate empty/error/denial/race cases through test injection.
+
+### UI state and concurrency
+
+Start with an identity check and show no protected content before an active Maintainer is established. Block inactive or wrong-role users without report requests. Refresh rechecks identity before refetching protected data. A 401/403 from any protected operation clears list/detail data, aborts other work and invalidates pending results. Do not retain protected rows underneath a denial message.
+
+Changing filters resets offset and selection, immediately clears stale rows/details and cancels previous requests. Page changes clear selection/details. Show matching total and page navigation without crossing bounds. Selecting a report clears the previous detail immediately. Sequence requests or associate them with an identity/filter/selection generation so obsolete responses cannot repopulate content, even if an adapter ignores cancellation. Retry only the current failed operation and retain current filters. Distinguish initial loading, list empty, list failure, detail loading, detail missing, detail failure and access/session denial.
+
+Render every source, author, comment, proposal and history value as escaped text. Use no raw HTML or interpreted Markdown; never construct navigation from untrusted generated links. Provide labelled filters, semantic buttons and headings, and readable status announcements. Show no editing or AI action controls in this increment.
+
+### Acceptance and verification
+
+| ID | Required observable evidence |
+| --- | --- |
+| QR-01 | Active-Maintainer queue and detail render all specified read-only sections; no mutation or AI requests. Trace Q1/MT-01. |
+| QR-02 | Every filter and combined intersection, stable tie ordering, default 50, cap 100, offset and unmatched queue produce correct results. Trace Q1/MT-01/03. |
+| QR-03 | HTTP requests use exact GET paths/query/session/cache/cancellation rules; malformed filters fail before fetch, malformed nested DTOs fail safely. Trace MT-03. |
+| QR-04 | Initial inactive/wrong-role/unauthenticated identity prevents protected reads; protected 401/403 clears existing data and blocks late results; refresh rechecks identity. Trace MT-02/13. This verifies UI handling only. |
+| QR-05 | Loading, empty, network failure/retry, detail missing and safe errors remain distinct; no raw upstream body appears. Trace MT-03/13. |
+| QR-06 | Deferred responses delivered out of order after filter, selection, refresh and access changes cannot overwrite current state, including cancellation-ignoring adapters. Trace MT-13. |
+| QR-07 | Markup-like fixture content renders as text with no script, injected element or interpreted link execution; controls have accessible names. Trace Q1/MT-13. |
+| QR-08 | Default startup selects HTTP; demo is visibly synthetic and gated to development; production has no automatic fake fallback. Build and adapter-wiring checks support the boundary. |
+
+The existing package verification command is `npm run verify`; record new execution results separately from this oracle. Use deterministic adapter and component tests for QR-01–08, including request construction, payload validation and deferred race tests. A browser smoke check verifies the rendered demo and responsive layout where available. Independent verification reports PASS/FAIL/PARTIAL by ID; backend authorization, PostgreSQL and real shared-service integration remain explicitly pending.

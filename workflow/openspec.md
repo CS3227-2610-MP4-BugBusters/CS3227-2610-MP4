@@ -34,9 +34,12 @@ Never mark a task complete merely because its artifact files exist.
 
 For the Maintainer frontend, run `npm run verify` from `src/frontend/maintainer`.
 The current [report-browser baseline](../openspec/specs/maintainer-report-browser/spec.md)
-documents the existing isolated frontend. The older Maintainer documents retain
-the original requirement IDs, proposed contracts and historical evidence; use
-OpenSpec for new changes and coordinate shared checklist decisions with their owner.
+documents the existing isolated frontend, its DTOs and QR-01 through QR-08.
+The [complete-maintainer-role change](../openspec/changes/complete-maintainer-role/proposal.md)
+contains the remaining role requirements, design, unchecked tasks and MT-01 through
+MT-26 in verification.md. The old Maintainer workflow specifications are removed;
+historical logs/commits remain evidence, not active requirement dependencies.
+Coordinate shared checklist decisions with their owner.
 
 Record actual commands, revisions, agent handoffs, findings and unavailable
 measurements under `logs/`. Keep application code and tests under `src/`.

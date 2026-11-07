@@ -19,7 +19,7 @@ npm run verify
 
 Mount `<App queries={queries} />` with the `Queries` interface in `src/domain.ts`. `src/http.ts` supplies the proposed GET adapter. All methods receive cancellation signals. Refresh rechecks current identity before protected data. Query generations also reject stale results from cancellation-ignoring adapters. The UI guard does not prove server authorization: real endpoints must independently authorize every request.
 
-Proposed payloads follow `workflow/maintainer/READ-ONLY-INCREMENT-SPEC.md`. Parse all nested values before display. Bound HTTP responses to 2,000,000 UTF-8 bytes while streaming; cancel oversized streams. Strings are bounded to 20,000 UTF-16 code units, titles/names/type to 200, timestamps to 40 and UUIDs to 36. Bound each detail collection and developer list to 500 entries and page items to 100; versions/counts must be nonnegative safe integers. Projection discards unknown response properties. Filters reject unknown properties before transport, with a default limit of 50 and cap of 100. Render source content as escaped plain text.
+Proposed payloads follow `openspec/specs/maintainer-report-browser/spec.md`. Parse all nested values before display. Bound HTTP responses to 2,000,000 UTF-8 bytes while streaming; cancel oversized streams. Strings are bounded to 20,000 UTF-16 code units, titles/names/type to 200, timestamps to 40 and UUIDs to 36. Bound each detail collection and developer list to 500 entries and page items to 100; versions/counts must be nonnegative safe integers. Projection discards unknown response properties. Filters reject unknown properties before transport, with a default limit of 50 and cap of 100. Render source content as escaped plain text.
 
 ## Verification and limits
 
