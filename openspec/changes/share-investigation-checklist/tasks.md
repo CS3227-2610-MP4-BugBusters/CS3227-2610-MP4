@@ -14,6 +14,8 @@
 
 - [ ] 2.4 (CL-05, MT-11) Enforce lifecycle guards and separate draft revisions from the report version. Verify allowed and denied states, private Save and unchanged Share during review, and changed Share racing with closure in both commit orders using real API and database tests. Check that the persisted checklist, proposal status, and report version match the winning operation.
 
+Local progress: The [checklist migration and private Save](../../../src/backend/developer/README.md) passed PostgreSQL integration checks with a minimal report fixture. The approved current-revision HTTP test also passed in the local harness. Independent verification and the security repair are recorded in the [cycle evidence](../../../logs/developer/2026-11-07-checklist-save-http-cycle-1.md). The stale-revision and former-assignee Save HTTP regression tests also passed in the local synthetic harness. Shared routing and authentication, integrated authorization tests, Share, and the closure race remain open.
+
 ## 3. Report detail screens
 
 - [ ] 3.1 (CL-01) Add checklist editing with distinct Save and Share actions to the assigned Developer's report detail screen. Verify that saved steps survive reopening the report and that sharing uses the persisted steps. Verify that the empty-share feedback tells the Developer to add at least one step before sharing.
