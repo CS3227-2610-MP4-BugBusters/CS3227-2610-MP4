@@ -17,8 +17,11 @@
   that the contract, fixtures, and runner needed for the selected test are
   available.
 - Use the named roles in `.codex/agents/`. Spawn `test_designer` and then
-  a fresh `baseline_verifier`. Wait for a verified Red and feature owner
-  approval before spawning `implementer`. After implementation, spawn a
+  a fresh `baseline_verifier`. After the verifier confirms Red, summarize
+  its verdict and any open decisions, then ask the feature owner whether
+  to proceed with implementation. The verifier checks the tests and
+  evidence. Treat a clear go-ahead as approval to use that baseline.
+  After implementation, spawn a
   fresh `candidate_verifier`. Authorization and AI security changes also
   require a separate `security_reviewer`.
 - Give specialists the task ID, relevant paths, starting revision, allowed

@@ -16,9 +16,11 @@ Spawn a fresh `baseline_verifier` with the approved spec and contract, test and 
 
 The baseline verifier reports a verdict and evidence. It does not edit tests, logs, or application code. Send findings to the test designer for correction and repeat verification before requesting approval. An unreproduced or setup-blocked Red cannot pass this gate.
 
-## 3. Approve the test baseline
+## 3. Ask the feature owner whether to proceed
 
-Stop for the feature owner's approval of the verified assertions and expected results. Record the approved test commit or checksum, including any fixtures and runner settings that affect the verdict. Changes to the approved tests require a new baseline review and owner approval.
+Summarize the agreed behavior, the verifier's verdict, and any remaining decisions in plain language. Ask, “The verifier confirmed Red for this behavior. Do you want me to proceed with implementation?” Link the evidence for reference. The independent verifier reviews the tests, fixtures, and hashes. The feature owner decides whether to proceed and resolves any open product decisions.
+
+Treat the feature owner's clear go-ahead as approval to implement against that verified baseline. Record the approved test commit or checksum, including any fixtures and runner settings that affect the verdict. Changes to the approved tests require a new baseline review and owner approval.
 
 ## 4. Green and refactor
 
