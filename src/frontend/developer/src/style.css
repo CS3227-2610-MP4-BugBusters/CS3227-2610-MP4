@@ -1,0 +1,43 @@
+body {
+  margin: 0;
+  color: #18212b;
+  background: #f6f8fb;
+  font: 1rem/1.5 system-ui, sans-serif;
+}
+
+main {
+  max-width: 42rem;
+  margin: auto;
+  padding: 1.5rem;
+}
+
+section {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: .5rem;
+  background: white;
+}
+
+.demo {
+  color: #475569;
+}
+
+label, textarea {
+  display: block;
+}
+
+textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+}
+
+button, select, textarea {
+  padding: .5rem;
+  font: inherit;
+}
+
+button + button {
+  margin-left: .5rem;
+}
