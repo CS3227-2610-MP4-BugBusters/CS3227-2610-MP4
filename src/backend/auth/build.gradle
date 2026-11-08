@@ -1,0 +1,51 @@
+plugins {
+    id 'java'
+}
+
+group = 'mp4'
+version = '0.1.0-SNAPSHOT'
+
+description = 'Authentication module and operator provisioning command'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+dependencies {
+    implementation platform('org.springframework.boot:spring-boot-dependencies:4.0.9')
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    implementation 'org.springframework.session:spring-session-jdbc'
+    implementation 'org.postgresql:postgresql'
+    implementation 'org.flywaydb:flyway-core'
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    doFirst { systemProperty 'mp4.auth.command.classpath', sourceSets.main.runtimeClasspath.asPath }
+    // Each setup run owns a new database; never reuse a result from an older one.
+    outputs.upToDateWhen { false }
+    outputs.doNotCacheIf('Disposable database setup must execute on every run') { true }
+}
+
+tasks.register('provisionAccount', JavaExec) {
+    description = 'Runs the team-operated account provisioning command'
+    group = 'application'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'mp4.auth.AccountProvisioningCommand'
+    standardInput = System.in
+}

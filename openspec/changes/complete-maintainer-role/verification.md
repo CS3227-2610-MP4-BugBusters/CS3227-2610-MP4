@@ -40,3 +40,13 @@ Coordinate shared DEV-SEC-01 through DEV-SEC-04 and DEV-WF-01 through DEV-WF-04 
 ## Execution record
 
 This matrix remains the full-role design oracle. Completed only the isolated read-only frontend increment, traced through QR-01 to QR-08 in [the implemented baseline](../../specs/maintainer-report-browser/spec.md). See [execution evidence](../../../logs/maintainer/2026-11-07-read-only-increment.md) for 30 deterministic tests, independent review and browser smoke results. This does not mark backend MT cases, mutations, live SoC, database checks, production deployment or human acceptance complete.
+
+## Source-audit follow-up
+
+Corrected the active ownership table separately from the crossed-out allocation.
+Use AUTH-01 through AUTH-07 in `add-shared-authentication` for the auth foundation;
+MT-02 alone does not verify provisioning or login/logout. Verify shared investigation
+evidence and private-note omission together under MNT-READ-EVIDENCE. MT-26 includes
+Maintainer-owned deployment implementation and Developer-owner review, not only
+coordination. Follow section 12's frozen repetition/scoring protocol for experiments;
+record justified revisions explicitly. No new execution result is claimed here.

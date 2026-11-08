@@ -11,6 +11,13 @@ fresh candidate_verifier and separate security_reviewer for authorization/AI.
 Record actual fixture/runner/spec and candidate references, commands and outcomes.
 An unavailable contract, fixture or runner is BLOCKED, not a passing Red.
 
+## 0. Shared foundation first
+
+- [ ] 0.1 Deliver the `add-shared-authentication` change as Maintainer owner, with Reporter-owner review. Publish the fixed-role provisioning, login/logout, CSRF and trusted-current-user contracts; verify real sessions and denial controls before claiming identity integration. Follow its bounded TDD tasks; do not treat fake actors as completion.
+- [ ] 0.2 Integrate the authenticated actor with Developer-owned shared API/routing and role services, preserving existing handler contracts and feature-owner file boundaries. Verify a real-session protected read and denial for missing, inactive and wrong-role accounts. Prioritize this team dependency before further isolated Maintainer UI work.
+
+- [ ] 0.3 Establish the Maintainer-owned development Render/GitHub Actions environment early, with Developer-owner review and shared migration tooling. Verify a known revision deploys only after checks, configuration is environment-scoped, and the deployment host can reach the development database and agreed SoC endpoint without logging secrets. Record unavailable credentials/connectivity as blocked; reserve production release checks for 6.2.
+
 ## 1. Contracts and real read integration (MNT-P0 / remaining MNT-P1)
 
 - [ ] 1.1 Review the proposed query/mutation/error/identity DTOs and remaining policies with their component owners, preserving confirmed CL-04/05. Verify a recorded contract decision and example fixtures for each seam before its real adapter is implemented; isolate fakes meanwhile.
@@ -47,8 +54,8 @@ An unavailable contract, fixture or runner is BLOCKED, not a passing Red.
 ## 6. Release verification (MNT-P6)
 
 - [ ] 6.1 Run the full cross-role browser/API flow against real services with separate role sessions. Verify MT-25 state/history/denial controls and independently reviewed candidate checks; record revision and separate controlled AI from live trials.
-- [ ] 6.2 Coordinate assigned release owners to verify separate dev/production databases, users, secrets/configuration, actual deployment protection, deployed commit and login/read/wrong-role smoke checks. Verify MT-26, reconcile main/master submission targeting and retain sanitized evidence; do not infer shared ownership from the old allocation.
-- [ ] 6.3 Complete release-specific UserGuide, DeveloperGuide and Reflections contributions, acknowledgements and verified interaction summaries. Verify documentation matches deployed behavior, workflow files are explained, shared assembly has an owner and GitHub Pages remains a distinct team deliverable.
+- [ ] 6.2 Implement team-managed Render deployment, GitHub Actions and environment settings as Maintainer owner, with Developer-owner review. Use the shared database/migration owner's tooling; configure distinct dev/production databases, users and secrets, run the repository verification command before deployment, and verify actual protection/approval settings, deployed commit and login/read/wrong-role smoke checks in both environments. Verify MT-26, document rollback and reconcile main/master submission targeting. Test a development deployment and host connectivity early; do not defer the first deployment until final release.
+- [ ] 6.3 Contribute Maintainer, authentication and deployment material to UserGuide, DeveloperGuide and Reflections, including acknowledgements and verified interaction summaries. Review the coordinated documentation/evidence with the Reporter owner. Verify deployed behavior, workflow-file explanations, the separate GitHub Pages deliverable and actual submission readiness; do not claim guide assembly from the cancelled allocation.
 
 ## Workflow follow-up
 

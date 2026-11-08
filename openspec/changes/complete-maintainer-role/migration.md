@@ -36,7 +36,11 @@ verification result is changed by this migration.
   no-op, and changed Share uses draft/report revisions and the shared report lock.
 - Current `workflow/tdd.md` and `.codex/agents/` replace the older review sequence
   where they are stricter. Verified Red and feature-owner approval remain required.
-- Shared authentication/provisioning, deployment and guide assembly remain separate
-  ownership decisions. Nothing from the cancelled allocation is reinstated.
+- Corrected ownership after rechecking the source PDF on 8 November: the active
+  page-2 table assigns auth/provisioning and deployment to the Maintainer owner.
+  Earlier migration wording incorrectly excluded these with the crossed-out
+  pages 17-19 allocation. Database/shared frontend ownership remains with the
+  Developer owner; documentation/evaluation coordination remains with Reporter.
+  The historical migration review did not establish source-level completeness.
 - Historical logs may name removed files and record earlier hashes. They describe
   the old revision and are not active links or current implementation oracles.

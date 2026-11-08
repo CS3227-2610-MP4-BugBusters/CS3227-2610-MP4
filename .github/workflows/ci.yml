@@ -64,6 +64,33 @@ jobs:
           POSTGRES_JDBC_JAR: /usr/share/java/postgresql.jar
         run: src/backend/developer/test/run-assigned-reports.sh
 
+  auth-setup:
+    name: Auth setup / Java ${{ matrix.java }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['17', '21']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      - name: Install disposable PostgreSQL prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql postgresql-client
+          echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
+      - name: Check pinned Gradle wrapper JAR
+        run: |
+          echo "76805e32c009c0cf0dd5d206bddc9fb22ea42e84db904b764f3047de095493f3  src/backend/auth/gradle/wrapper/gradle-wrapper.jar" | sha256sum --check --strict
+      - name: Verify isolated auth setup
+        run: |
+          postgres --version
+          python3 src/backend/auth/test/run_setup.py
+
   openspec:
     name: OpenSpec validation
     runs-on: ubuntu-24.04
