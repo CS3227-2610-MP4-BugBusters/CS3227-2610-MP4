@@ -46,6 +46,8 @@ export function App({
     [devRetry, setDevRetry] = useState(0),
     [detailRetry, setDetailRetry] = useState(0);
   const epoch = useRef(0),
+    authActionGeneration = useRef(0),
+    activeAuthController = useRef<AbortController | undefined>(undefined),
     listEpoch = useRef(0),
     detailEpoch = useRef(0),
     devEpoch = useRef(0),
@@ -56,6 +58,10 @@ export function App({
     return c;
   };
   const clear = () => {
+    authActionGeneration.current++;
+    activeAuthController.current?.abort();
+    activeAuthController.current = undefined;
+    setAuthBusy(undefined);
     controllers.current.forEach((c) => c.abort());
     controllers.current.clear();
     listEpoch.current++;
@@ -218,42 +224,55 @@ export function App({
     if (!authActions || authBusy || authError?.code !== "session") return;
     setAuthBusy("signIn");
     setAuthActionError(undefined);
+    const action = ++authActionGeneration.current;
     const c = control();
+    activeAuthController.current = c;
     try {
       await authActions.signIn(username, password, c.signal);
-      if (!c.signal.aborted) {
+      if (!c.signal.aborted && action === authActionGeneration.current) {
         setPassword("");
         setIdentity(undefined);
         controllers.current.delete(c);
+        activeAuthController.current = undefined;
+        setAuthBusy(undefined);
         reload();
       }
     } catch (e) {
-      if (!c.signal.aborted) {
+      if (!c.signal.aborted && action === authActionGeneration.current) {
         setPassword("");
         setAuthActionError(failure(e));
       }
     } finally {
       controllers.current.delete(c);
-      if (!c.signal.aborted) setAuthBusy(undefined);
+      if (action === authActionGeneration.current) {
+        activeAuthController.current = undefined;
+        setAuthBusy(undefined);
+      }
     }
   };
   const signOut = async () => {
     if (!authActions || authBusy) return;
-    setAuthBusy("signOut");
     setAuthActionError(undefined);
     epoch.current++;
     clear();
     setAuthError(new QueryError("session"));
     setAuth("error");
     setIdentity(undefined);
+    setAuthBusy("signOut");
+    const action = ++authActionGeneration.current;
     const c = control();
+    activeAuthController.current = c;
     try {
       await authActions.signOut(c.signal);
     } catch (e) {
-      if (!c.signal.aborted) setAuthActionError(failure(e));
+      if (!c.signal.aborted && action === authActionGeneration.current)
+        setAuthActionError(failure(e));
     } finally {
       controllers.current.delete(c);
-      if (!c.signal.aborted) setAuthBusy(undefined);
+      if (action === authActionGeneration.current) {
+        activeAuthController.current = undefined;
+        setAuthBusy(undefined);
+      }
     }
   };
   return (
