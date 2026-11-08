@@ -51,7 +51,9 @@ does not enable approval protection.
 
 ## Verification status
 
-Have not deployed this Blueprint or created Render resources. The repository has no
+Verified image build and packaged health/frontend/revision checks in GitHub CI
+run `42512619045` on source candidate `61cb733`. Have not deployed this Blueprint
+or created Render resources. The repository has no
 Render deploy hook or GitHub environment secrets available to this work, and Docker
 is unavailable in the current machine. A live deployed revision, host-to-database
 connectivity, login/read/wrong-role smoke checks, production setup and rollback have
