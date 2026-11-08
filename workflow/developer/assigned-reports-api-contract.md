@@ -14,7 +14,7 @@ The status wire values are `SUBMITTED`, `ASSIGNED`, `IN_PROGRESS`, `RESOLUTION_P
 
 `GET /api/developer/reports` accepts optional `search`, `status`, `page`, and `pageSize` query parameters, each at most once. No request body is required. Server-side filtering by `assignee_id = actor.id` applies before search, status filter, pagination and totals. Recheck assignment for every request. Concurrent changes between requests can shift pages; a previously delivered response cannot be recalled.
 
-- `search`: trim leading and trailing whitespace; empty means no filter. Otherwise match a case-insensitive literal title substring OR a case-insensitive exact complete report UUID. Wildcard characters have no special meaning.
+- `search`: trim leading and trailing whitespace; empty means no filter. Otherwise match a case-insensitive literal title substring OR a case-insensitive exact complete report UUID. Title matching uses locale-independent, Unicode code-point case comparison without multi-character expansions (for example, `ß` and `ẞ` compare as one character, while `ß` does not match `ss` or a partial `s`). UUID matching is case-insensitive ASCII. Wildcard characters have no special meaning.
 - `status`: if present, exactly one of the uppercase values above. Combine it with search using AND.
 - `page`: positive decimal integer, default 1. `pageSize`: positive decimal integer, default 20, maximum 100. Reject invalid, repeated or unknown parameters with 400 `VALIDATION_FAILED`.
 - Sort by UUID `id` ascending. Apply pagination after access and filters. The count and items in one response reflect the same database snapshot. A page beyond the last page has empty `items` and retains the true filtered `totalItems`.

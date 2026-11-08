@@ -25,6 +25,7 @@ See the [focused feature plan](features/assigned-report-list.md) for acceptance 
 - **Dependencies:** Feature 1 and the same OpenSpec change.
 - **Plan:** Test title, complete ID, whitespace, literal wildcard characters and another Developer's matching report; implement; independently verify.
 - **Done when:** Search matches the contract and never returns an unassigned report, including after reassignment.
+- **Current state:** Local synthetic-session search and independent authorization, Unicode and existing list regressions passed. Real shared integration remains open. See the [search evidence](../../logs/developer/2026-11-08-assigned-report-search.md).
 
 ## Feature 3: Status filter
 
@@ -32,6 +33,7 @@ See the [focused feature plan](features/assigned-report-list.md) for acceptance 
 - **Dependencies:** Feature 1; combined search cases also depend on Feature 2.
 - **Plan:** Test each status, invalid values and combined filters; implement; independently verify.
 - **Done when:** Results contain only matching assignments and invalid statuses produce the specified safe error.
+- **Current state:** Local status, combined-search, authorization and regression checks passed with synthetic sessions and disposable PostgreSQL; integrated checks remain open. See the [context and resource evidence](../../logs/developer/2026-11-08-status-filter-context-resource.md).
 
 ## Feature 4: Pagination and list validation
 

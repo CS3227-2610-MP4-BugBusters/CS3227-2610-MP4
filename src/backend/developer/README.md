@@ -39,3 +39,19 @@ java --add-modules jdk.httpserver -cp "$build_dir:$classpath" \
 The launcher prints its loopback origin and stays running. Set `MP4_TEST_ORIGIN` to that origin, `MP4_TEST_SESSION_HEADERS` to the JSON header object `{"Authorization":"Bearer $MP4_TEST_SESSION_TOKEN"}`, and the fixture/snapshot variables described in the HTTP evaluation instructions. Run `python3 -B src/backend/developer/test/checklist_save_api_test.py` from the repository root. Reset the fixture before rerunning.
 
 With the same settings and a fresh fixture, run `python3 -B src/backend/developer/test/checklist_save_text_validation_test.py` to check that invalid text leaves stored data intact and valid supplementary characters round-trip.
+
+## Assigned-report list tests
+
+Run the list, search, status and security checks with JDK 17+, Python 3,
+OpenSSL, PostgreSQL server/client tools (`initdb`, `pg_ctl`, `createdb`,
+`psql`) on PATH, and a PostgreSQL JDBC driver jar:
+
+```sh
+export POSTGRES_JDBC_JAR=/absolute/path/to/postgresql.jar
+src/backend/developer/test/run-assigned-reports.sh
+```
+
+The runner creates a temporary password-protected PostgreSQL cluster and a
+synthetic-session HTTP server on loopback, then stops them and removes the
+cluster. It does not connect to the shared database. Tests use a synthetic
+schema and sessions; real application integration requires separate checks.
