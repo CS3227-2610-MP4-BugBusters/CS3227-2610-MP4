@@ -1,8 +1,9 @@
 # Tasks
 
 Status: the isolated Gradle/PostgreSQL setup control has passed locally. Added a
-CI setup job; its remote result is not yet available. No provisioning/login behaviour
-has passed Red or implementation checks. Complete this foundation before further
+CI setup job; PR #6 revision `a17abc5` passed all nine remote jobs, including auth
+setup on Java 17 and 21. Added a fail-closed command entry for the provisioning
+baseline; no account creation/login behaviour has passed implementation checks. Complete this foundation before further
 fake-backed Maintainer UI increments. Keep boxes open until all stated checks pass;
 Reporter-owner review remains distinct from agents.
 

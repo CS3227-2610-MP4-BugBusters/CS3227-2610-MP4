@@ -239,17 +239,25 @@ The implementation must return success only after transaction commit. Do not
 silently upsert or treat all SQL failures as duplicates. Verify a generated password
 canary through Spring's encoder and captured outputs without publishing it.
 
-Propose auth-owned Flyway resources under `src/backend/auth/src/main/resources/db/auth/`
-with `V100__create_auth_accounts.sql`, creating only `app_accounts` (UUID primary key,
-unique normalized username, display name, encoded password, constrained role, active
-and nonnegative auth_generation). This is a migration reservation request, not a
-claim that V100 or this location is registered/approved by the schema owner. Shared
-reports/checklist SQL remains unchanged. Before real registration, the Developer
-owner must confirm the shared discovery locations/history table and that V100 is
-available, or provide the canonical replacement. Update this contract before
-freezing a migration test if the owner chooses another reservation.
+Use auth-owned Flyway resources under `src/backend/auth/src/main/resources/db/auth/`
+with `V100__create_auth_accounts.sql`. The validated operator create command applies
+these migrations using the dedicated `mp4_auth_schema_history` table, baseline 99
+for a nonempty existing schema, before the account transaction. This avoids claiming
+or altering the shared Flyway registry, version history or existing reports/checklist
+SQL. Create only `app_accounts` and auth migration metadata. Do not add foreign keys,
+rename existing records or import prior MP code. Shared application startup can
+register this auth initializer later; that integration remains a separate task.
 
-Current setup has no production command entry or registered account migration.
+Validate command/password/connection configuration before migration. A rejected
+command must not bootstrap schema or write account data. Migration is its own
+transaction and may remain after a later account transaction failure; never describe
+schema initialization and account creation as one atomic transaction. Return account
+success only after the account commit. The dedicated history isolates auth initialization from the shared migration
+registry; shared application integration remains a separate task. No other owner's
+acceptance or shared migration reservation is claimed.
+
+The baseline command entry is deliberately fail-closed (NOT_IMPLEMENTED, exit 5);
+no account schema or creation logic is supplied by that setup.
 Before behaviour Red, establish an executable fail-closed command boundary and
 migration discovery/fixture contract without implementing account creation. Missing
 class/import/configuration failures are setup blockers. After setup controls pass,
