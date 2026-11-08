@@ -4,6 +4,28 @@ The first backend increment saves a private checklist draft through JDBC. It loc
 
 The [migration](migrations/create_investigation_checklists.sql) expects the shared `reports` table. The integration test uses a minimal fixture for that table until the shared migration lands. Actor data in the test is synthetic. The application will obtain it from the server's authentication layer.
 
+## Private notes storage migration
+
+The [private-notes migration](migrations/create_developer_private_notes.sql) also expects the shared `reports` table. Apply the shared reports migration before it on a fresh database. Its storage test uses a disposable PostgreSQL database and checks the table defaults and constraints; it does not establish API, authentication, transaction-locking, or production schema integration. See the [local private-notes contract](../../../workflow/developer/private-notes-api-contract.md) for the agreed storage shape and integration dependencies.
+
+The local private-notes HTTP adapter and JDBC service can be exercised with a
+disposable database and synthetic session. With JDK 17+, Python 3, OpenSSL,
+PostgreSQL server and client tools on PATH, set `POSTGRES_JDBC_JAR`,
+`JACKSON_CORE_JAR`, `JACKSON_DATABIND_JAR`, and `JACKSON_ANNOTATIONS_JAR`
+to the corresponding JAR paths, then run from the repository root:
+
+```sh
+sh src/backend/developer/test/run-private-notes-baseline.sh
+```
+
+The runner creates and removes a temporary database and loopback server. It
+does not verify real sessions, account eligibility and revocation, CSRF,
+shared routing, or production integration. Its lifecycle-first tests wait
+for the notes write to block on a report lock; its notes-first cases run
+sequentially, not as concurrent races. See the
+[service review](../../../logs/developer/2026-11-08-private-notes-service-review.md)
+for the tested behavior and remaining work.
+
 ## Verify locally
 
 Use a fresh, disposable PostgreSQL database. With its connection URI and a PostgreSQL JDBC driver JAR, run this from the Developer backend directory:

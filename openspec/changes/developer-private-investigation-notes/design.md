@@ -12,11 +12,11 @@ Allow changes in Assigned, In progress and Resolution proposed. A currently assi
 
 Private saves and clears—including during Resolution proposed—update only notes and notes revision. They do not increment the aggregate report version, change the status, or invalidate, replace or supersede a resolution proposal. This follows the owner's decision for private notes and the existing CL-05 private checklist Save. The merged Maintainer change already reflects CL-05 for checklists, but its investigation-note invalidation wording needs reconciliation for this newly defined private field before implementation. A separate revision is required so private notes do not silently overwrite one another.
 
-Use the report-first lock order shared by reassignment and closure. Recheck active role, assignment, eligible report state and expected notes revision under the transaction before committing a notes change. If reassignment or closure commits first, reject a stale writer as appropriate; if the notes write commits first, it must not change the proposal or report version. Never let a denied or stale request mutate notes.
+Follow the shared eligibility lock order: actor/account locks come before the report; the report lock comes before notes or proposal rows. Never acquire an account lock after the report lock. Recheck active role, assignment, eligible report state and expected notes revision under the transaction before committing a notes change. Reassignment and closure must follow the same report-before-child order. If reassignment or closure commits first, reject a stale writer as appropriate; if the notes write commits first, it must not change the proposal or report version. Never let a denied or stale request mutate notes.
 
 ## API and UI boundary
 
-The exact route, length limits, error representation, and shared application wiring must follow the final shared API contract; they are not fixed by this change. Regardless of UI, unauthorized direct requests must be denied. Display notes as plain text, not executable markup. Real session, shared database and report detail integration require separate tests from synthetic fixtures.
+The [local API and storage contract](../../../workflow/developer/private-notes-api-contract.md) specifies the proposed route, payload, limits and errors for test preparation. Shared session and application wiring remain integration dependencies; reconcile the local contract with the final shared API before integration. Regardless of UI, unauthorized direct requests must be denied. Display notes as plain text, not executable markup. Real session, shared database and report detail integration require separate tests from synthetic fixtures.
 
 ## Proposed alignment with merged Maintainer change
 
