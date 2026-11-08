@@ -56,6 +56,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql postgresql-client libpostgresql-jdbc-java
           echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
+      - name: Verify shared report migration
+        if: matrix.java == '17'
+        run: src/backend/shared/test/run-shared-report-storage.sh
       - name: Verify assigned reports with disposable PostgreSQL
         env:
           POSTGRES_JDBC_JAR: /usr/share/java/postgresql.jar
