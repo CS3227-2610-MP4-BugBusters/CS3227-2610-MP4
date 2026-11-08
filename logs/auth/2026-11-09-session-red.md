@@ -136,3 +136,25 @@ companion normalized UTF-8/LF manifest freezes this increment's ten input files.
 Earlier provisioning manifests describe their historical increments: this new build
 adds platform sources and existing Developer classes, while all prior provisioning
 test assertions and the disposable runner remain unchanged.
+
+## Independent baseline verdict
+
+A fresh configured baseline_verifier (gpt-6-luna/low) verified exact revision
+`e5c4a1440e79cf6732ae763f59d18b4cc5880cc0`. All ten normalized manifest inputs
+matched. With the specified Java 21/PostgreSQL 17 configuration, reran the actual
+runner: 24 tests, 11 passes and 13 expected behaviour failures. Existing account
+creation and real server setup passed; no feature Green is inferred from assertions
+that remain behind the failing CSRF/command checks.
+
+The first independent attempt had an invalid inherited JAVA_HOME, then a stale
+Windows Gradle output-file lock. No Java process remained; cleared only the single
+generated output.bin and reran sequentially. The hash comparison initially had a
+PowerShell quoting error; a reviewed byte-normalizing helper reproduced all ten
+matches. These environment/checker issues were corrected without changing source,
+tests, build inputs or the runner. Final verdict PASS for valid Red.
+
+Proceed with the feature-owner-authorized implementation of this login/session,
+account recovery and real-role integration proposal against the frozen tests.
+No routine product decision remains open for this scope. Additional checks for
+atomic admission, per-address limits, cleanup and unavailable storage must accompany
+implementation before claiming those broader acceptance criteria complete.
