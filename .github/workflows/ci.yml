@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend ${{ matrix.frontend }} / Node ${{ matrix.node }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        frontend: [developer, maintainer]
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: src/frontend/${{ matrix.frontend }}/package-lock.json
+      - name: Install dependencies
+        working-directory: src/frontend/${{ matrix.frontend }}
+        run: npm ci
+      - name: Typecheck, test and build
+        working-directory: src/frontend/${{ matrix.frontend }}
+        run: npm run verify
+
+  assigned-reports:
+    name: Assigned reports / Java ${{ matrix.java }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['17', '21']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      - name: Install PostgreSQL tools and JDBC driver
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql postgresql-client libpostgresql-jdbc-java
+          echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
+      - name: Verify shared report migration
+        if: matrix.java == '17'
+        run: src/backend/shared/test/run-shared-report-storage.sh
+      - name: Verify assigned reports with disposable PostgreSQL
+        env:
+          POSTGRES_JDBC_JAR: /usr/share/java/postgresql.jar
+        run: src/backend/developer/test/run-assigned-reports.sh
+
+  openspec:
+    name: OpenSpec validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned OpenSpec
+        run: npm install --global @fission-ai/openspec@1.16.0
+      - name: Validate changes and specifications
+        run: openspec validate --all --strict --no-interactive

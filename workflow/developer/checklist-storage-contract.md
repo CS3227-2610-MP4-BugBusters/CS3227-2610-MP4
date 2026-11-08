@@ -1,6 +1,6 @@
 # Report and checklist storage contract
 
-Status: The Developer owner confirmed the shared identity, versioning, and transaction rules on 7 November 2026. The first checklist migration and private Save were verified locally against a PostgreSQL report fixture. Shared schema integration, HTTP endpoints, and Share remain pending.
+Status: The Developer owner confirmed the shared identity, versioning, and transaction rules on 7 November 2026. The checklist migration and current-revision private Save passed local HTTP and PostgreSQL verification using a synthetic Developer session. The stale-revision HTTP regression also passed locally. Shared routing, authentication and schema integration, and Share remain pending.
 
 ## Shared records
 

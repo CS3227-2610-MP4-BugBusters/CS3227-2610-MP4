@@ -34,8 +34,10 @@ and retain prior proposals and history.
 
 ### Requirement: MNT-RES-02 Atomic proposal invalidation
 
-Authorized detail, response, evidence or investigation-note edits during Resolution
-proposed SHALL atomically supersede the proposal and return the report to In progress.
+Authorized shared detail, response, evidence or shared investigation-note edits during
+Resolution proposed SHALL atomically supersede the proposal and return the report to
+In progress. Developer private notes are distinct: saving or clearing them updates
+only their independent revision and preserves the proposal, status and report version.
 Checklist publication SHALL follow CL-05: private Save and unchanged Share preserve
 the proposal/version; changed Share atomically invalidates the proposal.
 
@@ -57,6 +59,14 @@ the proposal/version; changed Share atomically invalidates the proposal.
 - **WHEN** the Developer privately saves B or shares unchanged A
 - **THEN** the Maintainer still sees A and the proposal/report version stay intact
 - **AND** a later changed Share must check the draft revision and report version atomically
+
+#### Scenario: MT-11 Private Developer notes during review
+
+- **GIVEN** a pending proposal and an active assigned Developer
+- **WHEN** the Developer saves or clears private notes using the current notes revision
+- **THEN** only the private notes and their revision change
+- **AND** the proposal, report status and aggregate report version remain unchanged
+- **AND** Maintainer responses omit the private notes and their revision
 
 ### Requirement: MNT-DISC-01 Read-only evidence and plain-text discussion
 

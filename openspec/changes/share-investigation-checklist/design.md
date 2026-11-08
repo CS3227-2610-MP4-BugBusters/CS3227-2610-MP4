@@ -4,6 +4,8 @@
 
 The Maintainer branch has a demo-backed read-only frontend. Its shared application contracts are still proposed. See [the proposal](proposal.md) for the prerequisites and [the checklist spec](specs/investigation-checklist/spec.md) for the behavior contract. The design assumes the application will provide authenticated identity and persisted report ownership and assignment.
 
+See the [storage and transaction contract](../../../workflow/developer/checklist-storage-contract.md) for the shared identity, field, version, and locking decisions confirmed by the Developer owner, plus the integration tests.
+
 ## Goals / Non-Goals
 
 Keep draft and shared content separate and enforce the same report-specific access rules for UI and API requests. AI drafting and assessment are outside this change.

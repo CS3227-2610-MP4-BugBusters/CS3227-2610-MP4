@@ -1,0 +1,18 @@
+# Shared report storage: TDD and verification
+
+## Human-readable summary
+
+- **Goal:** Give the three roles a common report storage foundation.
+- **Built:** A fresh-database migration for report details, ownership, assignment, status and version, with instructions for applying the checklist migration afterward.
+- **Checks:** Independent PostgreSQL tests passed for defaults, constraints, checklist compatibility and two version-checked updates competing for the same report.
+- **Review and fix:** A security reviewer found that the original race test relied on timing. The test was revised to confirm the second writer was waiting on a database lock; two independent reviewers reran it successfully.
+- **Still open:** Real authentication and authorization, identity and proposal foreign keys, migration tracking and upgrades, and the integrated three-role flow. The version race was tested using direct SQL, not application services.
+
+## Technical evidence
+
+- Scope: SR-01–03, fresh PostgreSQL report migration; starting HEAD `99f20e715d62f30b0402a909a529511bd71b8714`. New change artifacts and code were uncommitted. Context was limited to shared report, Developer checklist and Maintainer draft contracts.
+- Requirements analyst `shared_schema_review` (GPT-6 Luna low) identified confirmed shared report fields and the absent canonical account/proposal schemas. The proposed description field and migration defaults are documented in the OpenSpec design; no account/proposal foreign keys are asserted.
+- Test designer `shared_report_test_designer` (GPT-6 Luna low) created the disposable PostgreSQL runner and test. Independent baseline verifier `shared_report_baseline_verifier` (GPT-6 Luna low) reproduced a missing migration failure at HEAD after database setup controls passed. This was a missing-artifact baseline, not proof of each future constraint. Original verified test SHA-256 `d1b354502518b0bf5fd21e2d3994b801a63c08d9f842ab7dbe6be34df0f1ece9`; runner `5fcf2ed2a36d5dda25335b604da963969e6f49cbb343204f40fe0d2986b7129f`. The user authorized design and implementation in the initial request.
+- Implementer `shared_report_implementer` (GPT-6 Luna high) added the fresh-schema migration and README. Independent security reviewer `shared_report_security_review` (GPT-6.1 Sol medium) identified that the initial sleep-based concurrency test did not prove the second writer waited. The designer changed the test to wait for PostgreSQL to report a lock-waiting second writer before releasing the first. This changed the verified test baseline; the earlier Red applies to the original test, not the revised hash.
+- Independent candidate verifier `shared_report_candidate_verify` (GPT-6 Luna low) and security reviewer independently reran `src/backend/shared/test/run-shared-report-storage.sh` on the revised test and migration. Both passed. The test observed writer two waiting on a lock, then updating zero rows after writer one committed; it also checked defaults, constraints and the checklist migration. Revised test SHA `b8e4ea1a1440b651b74562197a0e53d9fd9de5cdbced117b16090d55f52bb358`; migration SHA `68923ecce73402177c761d02a52e608442ec13d590b7ba9a393c6b0afe0cbb70`; runner unchanged.
+- Limits: disposable PostgreSQL and direct SQL with synthetic UUIDs. No authenticated API, status transition logic, identity/proposal FK, migration tracker, upgrade from an existing schema, or cross-role flow is established. CAS succeeds only when services use version-guarded writes; the schema does not enforce that automatically. Tests required escalation for localhost. Per-agent token/cost measurements unavailable; no savings claim.

@@ -27,7 +27,7 @@ An unavailable contract, fixture or runner is BLOCKED, not a passing Red.
 
 - [ ] 3.1 Implement explicit review, return, close and reopen actions against the lifecycle seam. Verify R1/MT-08/09/10 and recoverable UI conflicts; update lifecycle/reason instructions with the implementation.
 - [ ] 3.2 Integrate plain-text discussion through its owner's interface, without source/note/checklist edit ownership. Verify D1/MT-12/13, safe rendering and the agreed Closed-report comment policy; document limits and user behavior.
-- [ ] 3.3 Integrate source/proposal invalidation with the confirmed checklist contract. Verify MT-11/SEC-09: private Save and unchanged Share preserve proposal/version; changed Share or other invalidating edit versus closure yields one atomic result in both PostgreSQL commit orders. Verify stale draft/report versions and empty Share preserve both copies; update integration documentation.
+- [ ] 3.3 Integrate source/proposal invalidation with the confirmed checklist contract. Verify MT-11/SEC-09: private checklist Save, unchanged Share and private Developer note save/clear preserve proposal/version and private notes are omitted from Maintainer reads; changed Share or other invalidating shared edit versus closure yields one atomic result in both PostgreSQL commit orders. Verify stale draft/report versions and empty Share preserve both copies; update integration documentation.
 
 ## 4. Advisory queue summary (MNT-P4)
 
