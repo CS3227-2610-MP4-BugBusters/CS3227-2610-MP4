@@ -44,7 +44,15 @@ lifecycle, discussion, database and AI adapters. The current change affects only
 specifications, planning references and migration evidence. Existing synthetic
 data is unchanged. Shared services and live SoC checks remain pending.
 
-Authentication/provisioning, hosting and document assembly are not silently
-assigned to the Maintainer owner. Confirm shared ownership before taking those
-separate work packages. Exclude repository integration, code execution, file
+Own authentication/account provisioning and Render deployment/GitHub Actions/environment
+settings as the Maintainer owner, following the active ownership table in the
+original plan (section 2, page 2). Deliver authentication through
+[add-shared-authentication](../add-shared-authentication/proposal.md) before further
+isolated role UI increments. The Reporter owner reviews authentication; the
+Developer owner reviews deployment. The Developer owner owns database schema,
+migrations/version checks and shared frontend/API handling; review and integrate
+those interfaces without taking over their modules. The Reporter owner coordinates
+documentation/site/evidence and evaluation; contribute role material and review
+rather than claim final guide assembly or experiment leadership from the cancelled
+bottom workload split. Exclude repository integration, code execution, file
 attachments, email, automatic fixes and previous-MP implementation reuse.
