@@ -238,7 +238,12 @@ export function App({
       selectedRef.current === reportId &&
       !controller.signal.aborted;
     try {
-      await update(reportId, { expectedVersion, priority }, controller.signal);
+      await update.call(
+        queries,
+        reportId,
+        { expectedVersion, priority },
+        controller.signal,
+      );
       if (!isCurrent()) return;
       listEpoch.current++;
       detailEpoch.current++;
