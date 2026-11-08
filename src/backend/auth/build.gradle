@@ -29,13 +29,21 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+sourceSets.main.java {
+    srcDir '../platform/src/main/java'
+    srcDir '../developer/src'
+    include 'mp4/**', 'AssignedReportStore.java', 'AssignedReportListHttpHandler.java', 'ChecklistDraftStore.java'
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.release = 17
+    options.compilerArgs += ['--add-modules', 'jdk.httpserver']
     options.encoding = 'UTF-8'
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+    jvmArgs '--add-modules=jdk.httpserver'
     doFirst { systemProperty 'mp4.auth.command.classpath', sourceSets.main.runtimeClasspath.asPath }
     // Each setup run owns a new database; never reuse a result from an older one.
     outputs.upToDateWhen { false }
@@ -48,4 +56,12 @@ tasks.register('provisionAccount', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'mp4.auth.AccountProvisioningCommand'
     standardInput = System.in
+}
+
+tasks.register('runAuth', JavaExec) {
+    description = 'Runs the shared authentication web application'
+    group = 'application'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'mp4.platform.AuthApplication'
+    jvmArgs '--add-modules=jdk.httpserver'
 }

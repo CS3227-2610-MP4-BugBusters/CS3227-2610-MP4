@@ -263,3 +263,40 @@ migration discovery/fixture contract without implementing account creation. Miss
 class/import/configuration failures are setup blockers. After setup controls pass,
 expected creation/duplicate/hash assertions must fail at missing provisioning
 behaviour; only then request independent Red review and implementation approval.
+
+
+## Web application and account recovery implementation
+
+Run the shared Spring MVC/Tomcat entry `mp4.platform.AuthApplication` with the auth
+module's `runAuth` Gradle task. Keep a non-sensitive `/api/health` endpoint for setup
+and deployment checks. Reuse the three existing Developer classes from their source
+location without editing them; a servlet/HttpExchange adapter passes the trusted
+current account to the existing assigned-list handler, preserving its query/error
+and assignment rules.
+
+Initialize auth-owned V100 accounts, V101 JDBC sessions and V102 login-attempt storage
+through the same private history. Use `public.mp4_auth_session` and its attributes
+table, not generic session table names. Existing account provisioning may initialize
+these additional auth-owned tables as migrations are added; no shared report SQL or
+migration history is changed. Register this auth initializer with the running app;
+keep shared report/bootstrap registration as a separate integration concern.
+
+Use `mp4.auth.jdbc-url`, `mp4.auth.db-user`, `mp4.auth.db-password` and
+`mp4.auth.rate-limit-secret` properties (environment aliases `MP4_AUTH_JDBC_URL`,
+`MP4_AUTH_DB_USER`, `MP4_AUTH_DB_PASSWORD`, `MP4_AUTH_RATE_LIMIT_SECRET`). Supply the
+limiter HMAC secret from environment-scoped configuration, at least 32 UTF-8 bytes;
+never supply a default production secret or log its value. Default to Secure cookies.
+Explicit `mp4.auth.local=true` permits HTTP cookies only on a loopback bind. Ignore
+untrusted forwarded headers; proxy-specific trust needs release configuration.
+Inject Clock for expiry, admission and tests rather than sleeping or weakening limits.
+
+Extend the operator command with `disable --username VALUE` and
+`reset-password --username VALUE --password-stdin`. Apply the existing username and
+password validation. Both preserve UUID, fixed role and display name. Disable keeps
+the current hash, marks inactive and increments auth_generation atomically; repeated
+successful disable calls also increment it. Reset replaces only the hash and
+increments generation, preserving active/inactive state. Return safe JSON
+`{code,id,role}` with ACCOUNT_DISABLED or PASSWORD_RESET and process exit 0 only after
+commit. An unknown account returns ACCOUNT_NOT_FOUND/exit 6 with no mutation; invalid
+commands remain VALIDATION_FAILED/2 and storage errors STORAGE_UNAVAILABLE/4. No web
+account-management or public password-reset endpoint is added.
