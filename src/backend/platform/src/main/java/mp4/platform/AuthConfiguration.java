@@ -23,9 +23,13 @@ import org.springframework.session.jdbc.config.annotation.web.http.EnableJdbcHtt
 import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.session.web.http.DefaultCookieSerializer;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 
 @Configuration(proxyBeanMethods = false)
 @EnableJdbcHttpSession(tableName = "mp4_auth_session", maxInactiveIntervalInSeconds = 1800)
+@EnableScheduling
 public class AuthConfiguration {
     @Bean DataSource authDataSource(@Value("${mp4.auth.jdbc-url}") String url,
             @Value("${mp4.auth.db-user}") String user, @Value("${mp4.auth.db-password}") String password) {
@@ -44,8 +48,32 @@ public class AuthConfiguration {
     @Bean DelegatingPasswordEncoder authPasswordEncoder() {
         return new DelegatingPasswordEncoder("bcrypt", Map.of("bcrypt", new BCryptPasswordEncoder(12)));
     }
-    @Bean AuthProvider authProvider(DataSource ds, DelegatingPasswordEncoder encoder) { return new AuthProvider(ds, encoder); }
+    @Bean AuthAccountRepository authAccountRepository(DataSource ds) { return new AuthAccountRepository(ds); }
+    @Bean AuthProvider authProvider(AuthAccountRepository accounts, DelegatingPasswordEncoder encoder) { return new AuthProvider(accounts, encoder); }
+    @Bean LoginAttemptStore loginAttemptStore(DataSource ds, Clock clock,
+            @Value("${mp4.auth.rate-limit-secret}") String secret) { return new LoginAttemptStore(ds, clock, secret); }
     @Bean AuthenticationManager authManager(AuthProvider provider) { return new ProviderManager(provider); }
+    @Bean AuthSessionFreshnessFilter authSessionFreshnessFilter(AuthAccountRepository accounts, Clock clock) {
+        return new AuthSessionFreshnessFilter(accounts, clock);
+    }
+    @Bean FilterRegistrationBean<AuthSessionFreshnessFilter> disableContainerFreshnessRegistration(AuthSessionFreshnessFilter filter) {
+        FilterRegistrationBean<AuthSessionFreshnessFilter> registration = new FilterRegistrationBean<>();
+        registration.setFilter(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+    @Bean FilterRegistrationBean<SessionFailureBoundaryFilter> sessionFailureBoundary() {
+        FilterRegistrationBean<SessionFailureBoundaryFilter> registration = new FilterRegistrationBean<>();
+        registration.setFilter(new SessionFailureBoundaryFilter());
+        registration.setOrder(org.springframework.core.Ordered.HIGHEST_PRECEDENCE + 10);
+        return registration;
+    }
+    @Bean FilterRegistrationBean<EagerSessionReadFilter> eagerSessionRead() {
+        FilterRegistrationBean<EagerSessionReadFilter> registration = new FilterRegistrationBean<>();
+        registration.setFilter(new EagerSessionReadFilter());
+        registration.setOrder(org.springframework.core.Ordered.HIGHEST_PRECEDENCE + 60);
+        return registration;
+    }
     @Bean SessionAuthenticationStrategy authSessionStrategy(HttpSessionCsrfTokenRepository csrf) {
         return new org.springframework.security.web.authentication.session.CompositeSessionAuthenticationStrategy(
             java.util.List.of(new ChangeSessionIdAuthenticationStrategy(), new CsrfAuthenticationStrategy(csrf)));
@@ -53,7 +81,8 @@ public class AuthConfiguration {
     @Bean HttpSessionCsrfTokenRepository csrfRepository() {
         HttpSessionCsrfTokenRepository repo = new HttpSessionCsrfTokenRepository(); repo.setHeaderName("X-CSRF-TOKEN"); return repo;
     }
-    @Bean SecurityFilterChain security(HttpSecurity http, HttpSessionCsrfTokenRepository csrf) throws Exception {
+    @Bean SecurityFilterChain security(HttpSecurity http, HttpSessionCsrfTokenRepository csrf,
+            AuthSessionFreshnessFilter freshness) throws Exception {
         return http.csrf(c -> c.csrfTokenRepository(csrf))
             .authorizeHttpRequests(r -> r.requestMatchers("/api/health", "/api/auth/**", "/", "/index.html", "/assets/**").permitAll()
                 .requestMatchers("/api/developer/**").hasRole("DEVELOPER")
@@ -65,6 +94,7 @@ public class AuthConfiguration {
                     boolean csrfFailure=ex instanceof org.springframework.security.web.csrf.CsrfException;
                     AuthHttp.error(res,403,csrfFailure?"CSRF_INVALID":"FORBIDDEN",csrfFailure?"Request denied":"Access denied");
                 }))
+            .addFilterAfter(freshness, SecurityContextHolderFilter.class)
             .build();
     }
 }
