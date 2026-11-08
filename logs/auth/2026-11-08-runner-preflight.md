@@ -70,3 +70,21 @@ registration/history, production deployment, cross-role real sessions and behavi
 security checks remain separate work. The runner refuses missing tools/settings
 instead of skipping. No shared database, existing service, production configuration,
 application source or teammate-owned migration was changed.
+
+## Independent final setup verdict
+
+A fresh configured `candidate_verifier` (gpt-6-luna/low, read-only, five-minute scope)
+verified the exact candidate `17a6b4bd2a65ca605b4c3aa6c288acd6f3eee633`.
+Ran the prescribed Python runner with local Java 21 and PostgreSQL 17: PASS.
+Confirmed `:test` executed and XML recorded one test, zero skips/failures/errors;
+no owned fixture directory remained. Checked wrapper integrity values against the
+recorded candidate, executable Git mode 100755, setup safety and strict OpenSpec
+validation (7/7 PASS). The coordinator's official-checksum comparison is recorded
+above; the verifier did not repeat the external downloads. No files were edited.
+
+Task 1.2 is a task ID inside `add-shared-authentication`, not a separate change path.
+This PASS is limited to the isolated runner and fixtures. Have not established
+canonical migration registration, real application hosting or auth behaviour, and
+have not checked either integration/setup task complete. Framework/server selection
+is settled by the feature owner's instruction; the owner handoff still concerns
+concrete cross-module routing and migration registration, not selecting a new stack.
