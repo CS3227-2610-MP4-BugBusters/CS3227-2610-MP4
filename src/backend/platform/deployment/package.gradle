@@ -1,0 +1,49 @@
+allprojects {
+    afterEvaluate { project ->
+        if (!project.plugins.hasPlugin('java')) return
+
+        project.tasks.register('authDistribution') {
+            group = 'distribution'
+            description = 'Packages the auth application classes and runtime JARs without Gradle at runtime.'
+            dependsOn(project.tasks.named('classes'))
+
+            doLast {
+                def destination = project.layout.buildDirectory.dir('auth-distribution').get().asFile
+                project.delete(destination)
+
+                def classesDirectory = new File(destination, 'classes')
+                def libraryDirectory = new File(destination, 'lib')
+                classesDirectory.mkdirs()
+                libraryDirectory.mkdirs()
+
+                project.copy {
+                    from project.sourceSets.main.output
+                    into classesDirectory
+                }
+                project.copy {
+                    from project.configurations.runtimeClasspath.filter {
+                        it.isFile() && it.name.toLowerCase(Locale.ROOT).endsWith('.jar')
+                    }
+                    into libraryDirectory
+                }
+
+                def frontend = project.providers.gradleProperty('frontendDist').orNull
+                if (frontend == null || !new File(frontend).isDirectory()) {
+                    throw new GradleException('Frontend distribution is unavailable.')
+                }
+                project.copy {
+                    from frontend
+                    into new File(classesDirectory, 'static')
+                }
+
+                def revision = project.providers.gradleProperty('buildRevision').orElse('unknown').get()
+                if (!(revision ==~ /[A-Za-z0-9._-]{1,128}/)) {
+                    throw new GradleException('Build revision is invalid.')
+                }
+                def revisionFile = new File(classesDirectory, 'static/assets/revision.txt')
+                revisionFile.parentFile.mkdirs()
+                revisionFile.setText(revision + '\n', 'UTF-8')
+            }
+        }
+    }
+}
