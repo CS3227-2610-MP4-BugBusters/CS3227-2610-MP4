@@ -1,12 +1,10 @@
 package mp4.platform;
 
-import java.time.Clock;
 import java.util.Map;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
 import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
-import org.springframework.context.annotation.Bean;
 
 /** Executable web setup; authentication is denied until its tested implementation is supplied. */
 @SpringBootApplication(exclude = {DataSourceAutoConfiguration.class, UserDetailsServiceAutoConfiguration.class})
@@ -17,7 +15,4 @@ public class AuthApplication {
                 "spring.main.banner-mode", "off"));
         app.run(args);
     }
-
-    @Bean
-    Clock authClock() { return Clock.systemUTC(); }
 }

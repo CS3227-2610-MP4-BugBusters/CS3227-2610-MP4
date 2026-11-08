@@ -40,6 +40,24 @@ final class AccountProvisioningService {
         }
     }
 
+    Lifecycle change(String command, String username, byte[] password) throws SQLException {
+        String hash = password == null ? null : encoder.encode(new String(password, java.nio.charset.StandardCharsets.UTF_8));
+        try (Connection connection = DriverManager.getConnection(config.url(), config.user(), config.password())) {
+            connection.setAutoCommit(false);
+            try (var update = connection.prepareStatement(command.equals("disable")
+                    ? "UPDATE public.app_accounts SET active=FALSE,auth_generation=auth_generation+1 WHERE username=? RETURNING id,role"
+                    : "UPDATE public.app_accounts SET password_hash=?,auth_generation=auth_generation+1 WHERE username=? RETURNING id,role")) {
+                if (command.equals("disable")) update.setString(1, username);
+                else { update.setString(1, hash); update.setString(2, username); }
+                try (var row = update.executeQuery()) {
+                    if (!row.next()) { connection.rollback(); throw new AccountNotFound(); }
+                    Lifecycle result = new Lifecycle(row.getObject(1, UUID.class), row.getString(2));
+                    connection.commit(); return result;
+                }
+            } catch (SQLException | RuntimeException e) { try { connection.rollback(); } catch (SQLException ignored) {} throw e; }
+        }
+    }
+
     private static boolean isKnownDuplicate(SQLException error) {
         for (SQLException current = error; current != null; current = current.getNextException()) {
             if ("23505".equals(current.getSQLState()) && current instanceof org.postgresql.util.PSQLException pg
@@ -50,5 +68,7 @@ final class AccountProvisioningService {
     }
 
     record Created(UUID id, String role) { }
+    record Lifecycle(UUID id, String role) { }
     static final class DuplicateAccount extends RuntimeException { }
+    static final class AccountNotFound extends RuntimeException { }
 }
