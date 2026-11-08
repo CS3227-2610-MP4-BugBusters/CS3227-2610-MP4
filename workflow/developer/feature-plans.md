@@ -1,6 +1,6 @@
 # Developer feature plans
 
-This is the Developer owner's working plan. Each feature is a separate workstream with its own scope and completion checks. The order below is a recommendation, not a claim that the underlying shared application already exists. Use the linked OpenSpec change as the source of accepted behavior; features without an OpenSpec change need one before implementation.
+This is the Developer owner's working plan. The [Developer journey decisions](developer-journey-decisions.md) record agreed behavior and outstanding shared decisions. Each feature is a separate workstream with its own scope and completion checks. The order below is a recommendation, not a claim that the underlying shared application already exists. Use the linked OpenSpec change as the source of accepted behavior; features without an OpenSpec change need one before implementation.
 
 ## Shared prerequisite: application test and integration foundation
 
@@ -45,7 +45,7 @@ See the [focused feature plan](features/assigned-report-list.md) for acceptance 
 
 ## Feature 5: Developer dashboard presentation
 
-- **Scope:** Display the assigned list, search and filters with appropriate loading, error, no-assignment, no-match and out-of-range states.
+- **Scope:** Display assigned report statuses, list, search and filters with appropriate loading, error, no-assignment, no-match and out-of-range states. Dashboard notifications are a separate feature in the journey decisions.
 - **Dependencies:** Features 1–4, a shared dashboard template and the agreed frontend/API integration. Template and visual decisions remain pending.
 - **Plan:** Apply shared components; connect the real API; test normal and error/empty states and responsive behavior under the team's template.
 - **Done when:** A Developer can use the list and filters, states are distinguishable, and frontend and integration checks pass. The existing checklist demo remains a synthetic preview.

@@ -13,6 +13,8 @@ The system SHALL summarize authorized unresolved reports matching the selected
 queue, with supporting report IDs, blockers, missing information and uncertainty.
 It SHALL show included/excluded reports and field truncation, and SHALL NOT change
 assignment, priority, investigation, proposal or status from generated content.
+Developer private notes and their revision SHALL NOT enter provider context, summary
+responses or reusable summary cache entries.
 
 #### Scenario: S1 Generate a bounded summary
 
@@ -20,6 +22,13 @@ assignment, priority, investigation, proposal or status from generated content.
 - **THEN** only authorized bounded fields reach SoC and every reference belongs to supplied reports
 - **AND** the UI displays capture time, review label and server-computed included/excluded IDs
 - **AND** the summary makes no unsupported claim that tests or investigations occurred
+
+#### Scenario: S1 Private notes excluded
+
+- **GIVEN** a selected report has Developer private notes containing a unique fixture marker
+- **WHEN** the Maintainer generates or reuses a summary
+- **THEN** the provider input, returned summary and reusable cache entry contain neither the private notes nor their revision
+- **AND** ordinary authorized summary generation remains available
 
 #### Scenario: S1 Empty queue
 

@@ -30,14 +30,14 @@ eligibility, expected versions and state atomically and reject stale writes with
 
 The real read service SHALL provide authorized report lists, detail/history and
 eligible Developer queries through agreed safe projections. Maintainer report
-detail SHALL omit private checklist drafts and draft revisions, including when
-checklist data is embedded in another response.
+detail SHALL omit private checklist drafts and draft revisions, as well as Developer
+private notes and their revision, including when nested in another response.
 
 #### Scenario: Q1 Query real report evidence
 
 - **WHEN** a current active Maintainer uses valid filters or opens a report
 - **THEN** persisted matching data, stable ordering and safe detail fields are returned
-- **AND** malformed queries fail safely and no private checklist draft is disclosed
+- **AND** malformed queries fail safely and no private checklist draft or Developer private notes or revision are disclosed
 
 ### Requirement: MNT-INTEGRATE-01 Real adapters and environment separation
 

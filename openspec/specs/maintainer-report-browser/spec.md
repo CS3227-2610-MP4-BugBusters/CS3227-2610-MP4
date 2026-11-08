@@ -15,7 +15,9 @@ the implemented frontend. The HTTP DTOs remain proposed integration contracts.
 The frontend SHALL display report summaries and selected report details through
 an injected query adapter. Details SHALL include source fields, investigation
 notes, checklist, responses, discussion, current proposal and history as read-only
-text. It SHALL expose no mutation or AI controls in this increment.
+text. These investigation notes are shared evidence, not the separately defined
+private Developer notes; private notes and their revision SHALL NOT be disclosed.
+It SHALL expose no mutation or AI controls in this increment.
 
 #### Scenario: Inspect a report
 
