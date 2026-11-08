@@ -30,6 +30,9 @@
 
 - For Developer frontend changes, run `npm run verify` from
   `src/frontend/developer`.
+- For Maintainer frontend changes, read the
+  [OpenSpec baseline](openspec/specs/maintainer-report-browser/spec.md), then
+  run `npm run verify` from `src/frontend/maintainer`.
 - For checklist persistence changes, use the disposable PostgreSQL setup in
   `src/backend/developer/README.md` when the backend is present.
 - Record the checks run, the revision tested, and any blocked checks using

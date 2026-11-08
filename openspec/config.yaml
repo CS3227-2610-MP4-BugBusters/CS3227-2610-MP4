@@ -1,5 +1,19 @@
 schema: spec-driven
 
+context: |
+  MP4 is a new project; previous MPs must not supply application implementation.
+  Application AI must use SoC LLM. Team-managed deployment must separate development
+  and production; agent-provided build-and-host services are prohibited.
+  OpenSpec complements the team's specialized-agent workflow; it does not replace
+  the independently verified Red baseline or feature-owner approval before Green.
+
+operations:
+  apply:
+    guidance:
+      - Follow AGENTS.md and workflow/tdd.md, including the configured agent roles.
+      - Obtain feature-owner approval of the independently verified Red baseline before implementation.
+      - Keep synthetic UI results distinct from real authentication, persistence and AI verification.
+
 # Project context (optional)
 # Add only constraints that should guide OpenSpec artifacts and workflows.
 # Include constraints an agent cannot infer by reading the code.
