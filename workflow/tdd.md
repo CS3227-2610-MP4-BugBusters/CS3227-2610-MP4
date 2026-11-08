@@ -34,4 +34,4 @@ For authorization or AI security changes, spawn `security_reviewer` on the same 
 
 ## Evidence
 
-Keep a sanitized record in `logs/` with the run ID, agent role, actual model and reasoning effort, task and revision, context supplied and retrieved, exact checks and outcomes, and any fix and recheck. Record token usage when the trace exposes it. Record missing measurements as unavailable.
+Start each evidence record with a short, plain-language summary that a teammate can understand without reading hashes: the goal, what changed, checks and outcomes, review findings and fixes, and what remains open. Below it, retain a technical evidence section with the sanitized run ID, agent role, actual model and reasoning effort, task and revision, context supplied and retrieved, exact checks and outcomes, file hashes where needed, and any fix and recheck. Record token usage when the trace exposes it. Record missing measurements as unavailable.

@@ -35,6 +35,9 @@
   `src/frontend/developer`.
 - For checklist persistence changes, use the disposable PostgreSQL setup in
   `src/backend/developer/README.md` when the backend is present.
+- Start evidence logs with a plain-language summary of the goal, changes,
+  checks and results, review findings and fixes, and remaining limitations.
+  Put commands, revisions, hashes, and agent details afterward for reviewers.
 - Record the checks run, the revision tested, and any blocked checks using
   the evidence format in the TDD workflow. Mark an OpenSpec task complete
   only when its stated checks have passed.
