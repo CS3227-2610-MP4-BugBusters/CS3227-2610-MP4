@@ -58,3 +58,16 @@ SHALL be identifiable and verification SHALL distinguish deterministic and live 
 - **WHEN** a known revision is deployed through team-managed automation
 - **THEN** authorized login/read and wrong-role denial succeed as specified in each environment
 - **AND** sanitized evidence identifies distinct environments and the revision without secret values
+
+### Requirement: MNT-READ-EVIDENCE Shared investigation evidence
+
+The Maintainer detail SHALL retain authorized shared investigation notes/history
+required by the report plan. Additional Developer private notes SHALL remain a
+separate field and SHALL NOT replace the shared evidence contract.
+
+#### Scenario: Shared and private notes coexist
+
+- **GIVEN** a report has shared investigation evidence and separate private notes
+- **WHEN** an active Maintainer opens its detail
+- **THEN** authorized shared evidence is readable and private text/revision are absent
+- **AND** any change to the shared evidence contract is reconciled with its owner before implementation

@@ -16,8 +16,15 @@ prompts/context separate from shared provider mechanics. Permit isolated fixture
 while real adapters are incomplete; require real service checks before integration.
 No application changes are authorized by this migration.
 
-Do not assign authentication, database bootstrap, hosting or final document assembly
-through the cancelled workload allocation. Confirm those separate shared assignments.
+Use the active ownership table in section 2 (page 2) of the original plan, not the
+crossed-out workload split on pages 17-19. Own authentication/provisioning and
+Render/GitHub Actions/environment configuration. The Reporter owner reviews auth;
+the Developer owner reviews deployment. The Developer owner owns shared database
+schema/migrations/version checks and shared frontend/API handling; review and
+coordinate compatibility. The Reporter owner coordinates documentation/site/evidence
+and evaluation; contribute and review without assuming final document assembly.
+Prioritize [shared authentication](../add-shared-authentication/design.md) and
+trusted-actor integration before another fake-backed role UI increment.
 Reporter-owned source, Developer-owned investigation/checklists and the shared AI
 provider retain their implementation boundaries. Use React, Java and PostgreSQL
 per the plan; keep controllers free of SQL and lifecycle rules.
@@ -126,6 +133,12 @@ reflection comparisons. Contribute two legitimate Maintainer examples to the tea
 context experiment: full permitted context versus selected bounded fields using
 the same model/prompt. Use the agreed grounding/completeness/usefulness rubric,
 record unsupported claims and safety failures, and separate availability failures.
+Follow the original plan section 12 protocol: the Reporter owner coordinates six
+synthetic examples (two per role), three runs per condition per example within the
+confirmed quota, and human scores of 0-2 each for grounding, completeness and
+usefulness (total 0-6). Contribute the two Maintainer examples in both conditions.
+Freeze this protocol before runs; if the quota cannot support it, record the
+constraint and an explicit revised protocol rather than silently reduce repeats.
 
 Compare valid unchanged-result reuse with regeneration, then independently change
 report content, assignment, membership, permissions, prompt/context policy and model.
