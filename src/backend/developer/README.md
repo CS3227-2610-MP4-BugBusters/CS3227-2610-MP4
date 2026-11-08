@@ -55,3 +55,11 @@ The runner creates a temporary password-protected PostgreSQL cluster and a
 synthetic-session HTTP server on loopback, then stops them and removes the
 cluster. It does not connect to the shared database. Tests use a synthetic
 schema and sessions; real application integration requires separate checks.
+
+## Pull request checks
+
+The repository CI runs this synthetic-session test runner on Java 17 and 21,
+validates OpenSpec, and verifies both role frontends on Node 22 and 24. These
+checks do not deploy the application or establish real authentication,
+shared-schema integration, browser coverage, or production approval settings.
+GitHub branch protection must be configured separately to require CI checks.
