@@ -17,3 +17,14 @@ raise SystemExit(result.returncode)
 ```
 
 The dedicated `mp4_auth_schema_history` table owns V100 only and baselines a nonempty schema at 99. Account insertion is a separate transaction; success is printed only after commit. Existing rows are never replaced. Output is one JSON line: `ACCOUNT_CREATED` (exit 0), `VALIDATION_FAILED` (2), `ACCOUNT_EXISTS` (3), or `STORAGE_UNAVAILABLE` (4). Gradle may itself return its build-failure status for a nonzero Java process exit; the JSON code records the command result. Never put secrets in shell history, command arguments, URLs, logs or committed files.
+
+
+## Verified scope
+
+Implemented account creation and duplicate rejection against PostgreSQL. Validate
+passwords through Spring's BCrypt encoder; no plaintext account password is stored.
+Use the disposable runner in `test/README.md` for acceptance and validation checks.
+Have not added login, sessions, reset/disable, a provisioning web endpoint or shared
+application startup wiring. Creating an account does not yet provide browser login.
+
+Keep db/auth resources on the dedicated auth migration history; do not also register them under a shared Flyway history. Shared application startup integration needs its own reviewed migration handoff.

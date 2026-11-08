@@ -1,11 +1,12 @@
 # Tasks
 
-Status: the isolated Gradle/PostgreSQL setup control has passed locally. Added a
-CI setup job; PR #6 revision `a17abc5` passed all nine remote jobs, including auth
-setup on Java 17 and 21. Added a fail-closed command entry for the provisioning
-baseline; no account creation/login behaviour has passed implementation checks. Complete this foundation before further
-fake-backed Maintainer UI increments. Keep boxes open until all stated checks pass;
-Reporter-owner review remains distinct from agents.
+Status: implemented the bounded operator-create slice: persisted fixed-role accounts,
+duplicate rejection, validation and BCrypt hashes. The frozen provisioning baseline
+and added regressions pass locally; login, reset/disable, sessions/CSRF and shared
+application integration remain future work. Full tasks 2.1/2.2 stay open beyond this
+bounded slice. PR #6's foundation revision `a17abc5` passed all nine remote jobs,
+including setup on Java 17/21; updated-head CI is tracked separately. Reporter-owner
+review remains distinct from agents.
 
 For behaviour slices use `workflow/tdd.md`: test_designer, fresh baseline_verifier,
 feature-owner approval, implementer, fresh candidate_verifier and separate
@@ -17,7 +18,7 @@ per bounded slice; scope specialists to one writer per file.
 ## 1. Integration contract and executable setup
 
 - [ ] 1.1 Publish the proposed endpoint/actor contract and record the Developer owner's routing/migration adapter decision plus Reporter-owner auth review. Verify all existing actor/DTO/error contracts map without replacing feature authorization; resolve conflicting specs/contracts before affected code. Deliver the agreed adapter paths and request/response fixtures with no secret values, including display names at 200 UTF-16 units and an over-limit supplementary-character fixture rejected consistently by provisioning and the Maintainer DTO boundary.
-- [ ] 1.2 Establish a pinned Java-17-compatible Spring/Gradle wrapper runner and disposable PostgreSQL fixture under the agreed application boundary. Verify dependency resolution, wrapper integrity, fresh fixture migration/cleanup and a passing runner/setup control. Document exact local/CI commands and prereqs; do not claim an absent app/import/database as Red. No auth behaviour is complete from scaffolding.
+- [x] 1.2 Establish a pinned Java-17-compatible Spring/Gradle wrapper runner and disposable PostgreSQL fixture under the agreed application boundary. Verify dependency resolution, wrapper integrity, fresh fixture migration/cleanup and a passing runner/setup control. Document exact local/CI commands and prereqs; do not claim an absent app/import/database as Red. No auth behaviour is complete from scaffolding.
 
 ## 2. Accounts and controlled provisioning
 
