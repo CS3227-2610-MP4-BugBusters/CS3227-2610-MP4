@@ -1,8 +1,10 @@
 # Tasks
 
-Status: proposed foundation work; no implementation checks have run. Complete this
-foundation before further fake-backed Maintainer UI increments. Keep all boxes open
-until their stated checks pass. Reporter-owner review remains distinct from agents.
+Status: the isolated Gradle/PostgreSQL setup control has passed locally. Added a
+CI setup job; its remote result is not yet available. No provisioning/login behaviour
+has passed Red or implementation checks. Complete this foundation before further
+fake-backed Maintainer UI increments. Keep boxes open until all stated checks pass;
+Reporter-owner review remains distinct from agents.
 
 For behaviour slices use `workflow/tdd.md`: test_designer, fresh baseline_verifier,
 feature-owner approval, implementer, fresh candidate_verifier and separate

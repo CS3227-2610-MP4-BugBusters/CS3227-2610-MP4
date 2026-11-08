@@ -15,7 +15,7 @@ python src/backend/auth/test/run_setup.py
 ```
 
 Prerequisites: Python 3.10+, JDK 17 or newer (Java 17 compilation target), network access for first Gradle dependency
-resolution, and PostgreSQL 17 client/server binaries (`initdb`, `pg_ctl`, `psql`).
+resolution, and PostgreSQL client/server binaries (locally verified with 17) (`initdb`, `pg_ctl`, `psql`).
 Set `MP4_POSTGRES_BIN` to their `bin` directory or make them available on `PATH`.
 The runner also checks the standard PostgreSQL 17 Windows install path. On Linux,
 the tools must be on `PATH` or configured explicitly.
@@ -51,3 +51,11 @@ Disabled Gradle test result reuse because each run supplies a different temporar
 database. Missing settings fail rather than skip the test. If JAVA_HOME points to
 an old installation, set it to a valid JDK for the shell running this command; no
 system-wide environment change is required.
+
+## Repository CI
+
+Added an `Auth setup` matrix for Java 17 and 21 using this same Python runner.
+The job installs Ubuntu's PostgreSQL package, prints its actual version and checks
+the pinned wrapper JAR before running. Local evidence uses PostgreSQL 17 on Windows;
+have not inferred Linux or Java 17 runtime results from that run. The CI job is a
+setup check and does not establish provisioning, login or shared Flyway registration.
