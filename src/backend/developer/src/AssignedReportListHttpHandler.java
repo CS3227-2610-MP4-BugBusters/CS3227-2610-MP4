@@ -14,7 +14,7 @@ import java.util.Set;
 import java.util.UUID;
 import mp4.developer.AssignedReportStore.Page;
 
-/** HTTP adapter for the first, unfiltered assigned-report list page. */
+/** HTTP adapter for the assigned-report list. */
 public final class AssignedReportListHttpHandler {
     private static final String PATH = "/api/developer/reports";
     private static final Set<String> STATUSES = Set.of(
@@ -51,7 +51,8 @@ public final class AssignedReportListHttpHandler {
             return;
         }
         try {
-            Page page = store.searchPage(actor.id(), filters.search(), filters.status());
+            Page page = store.searchPage(actor.id(), filters.search(), filters.status(),
+                    filters.page(), filters.pageSize());
             sendJson(exchange, 200, page);
         } catch (SQLException failure) {
             sendError(exchange, 500, "INTERNAL_ERROR", "Request could not be completed");
@@ -59,7 +60,7 @@ public final class AssignedReportListHttpHandler {
     }
 
     private static QueryFilters parseFilters(String query) {
-        if (query == null || query.isEmpty()) return new QueryFilters(null, null);
+        if (query == null || query.isEmpty()) return new QueryFilters(null, null, 1, 20);
         Map<String, String> parameters = new HashMap<>();
         for (String part : query.split("&", -1)) {
             int separator = part.indexOf('=');
@@ -68,7 +69,8 @@ public final class AssignedReportListHttpHandler {
             if (key.indexOf('\0') >= 0 || value.indexOf('\0') >= 0) {
                 throw new IllegalArgumentException("NUL is not allowed in query parameters");
             }
-            if ((!key.equals("search") && !key.equals("status"))
+            if ((!key.equals("search") && !key.equals("status")
+                    && !key.equals("page") && !key.equals("pageSize"))
                     || parameters.putIfAbsent(key, value) != null) {
                 throw new IllegalArgumentException("Unsupported or repeated query parameter");
             }
@@ -82,10 +84,30 @@ public final class AssignedReportListHttpHandler {
         if (status != null && !STATUSES.contains(status)) {
             throw new IllegalArgumentException("Unsupported status");
         }
-        return new QueryFilters(search, status);
+        int page = parsePositiveInteger(parameters.get("page"), 1);
+        int pageSize = parsePositiveInteger(parameters.get("pageSize"), 20);
+        if (pageSize > 100) throw new IllegalArgumentException("Page size exceeds maximum");
+        return new QueryFilters(search, status, page, pageSize);
     }
 
-    private record QueryFilters(String search, String status) {}
+    private static int parsePositiveInteger(String value, int defaultValue) {
+        if (value == null) return defaultValue;
+        if (value.isEmpty()) throw new IllegalArgumentException("Empty pagination value");
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) < '0' || value.charAt(i) > '9') {
+                throw new IllegalArgumentException("Pagination value must be decimal");
+            }
+        }
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed <= 0) throw new IllegalArgumentException("Pagination value must be positive");
+            return parsed;
+        } catch (NumberFormatException overflow) {
+            throw new IllegalArgumentException("Pagination value is too large", overflow);
+        }
+    }
+
+    private record QueryFilters(String search, String status, int page, int pageSize) {}
 
     private static String decodeQueryComponent(String component) {
         var bytes = new ByteArrayOutputStream();

@@ -13,7 +13,7 @@ public final class AssignedReportStore {
     public record Report(UUID id, String title, String status) {}
     public record Page(List<Report> items, int page, int pageSize, long totalItems) {}
 
-    private static final int PAGE_SIZE = 20;
+    private static final int DEFAULT_PAGE_SIZE = 20;
     private final DataSource database;
 
     public AssignedReportStore(DataSource database) {
@@ -21,14 +21,21 @@ public final class AssignedReportStore {
     }
 
     public Page firstPage(UUID developerId) throws SQLException {
-        return searchPage(developerId, null);
+        return searchPage(developerId, null, null, 1, DEFAULT_PAGE_SIZE);
     }
 
     public Page searchPage(UUID developerId, String search) throws SQLException {
-        return searchPage(developerId, search, null);
+        return searchPage(developerId, search, null, 1, DEFAULT_PAGE_SIZE);
     }
 
     public Page searchPage(UUID developerId, String search, String status) throws SQLException {
+        return searchPage(developerId, search, status, 1, DEFAULT_PAGE_SIZE);
+    }
+
+    public Page searchPage(UUID developerId, String search, String status, int page, int pageSize)
+            throws SQLException {
+        long offset = ((long) page - 1) * pageSize;
+        long pageEnd = offset + pageSize;
         try (Connection connection = database.getConnection()) {
             connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
             connection.setAutoCommit(false);
@@ -45,9 +52,10 @@ public final class AssignedReportStore {
                         }
                     }
                     try (var query = connection.prepareStatement(
-                            "SELECT id, title, status FROM reports WHERE assignee_id = ? ORDER BY id LIMIT ?")) {
+                            "SELECT id, title, status FROM reports WHERE assignee_id = ? ORDER BY id LIMIT ? OFFSET ?")) {
                         query.setObject(1, developerId);
-                        query.setInt(2, PAGE_SIZE);
+                        query.setInt(2, pageSize);
+                        query.setLong(3, offset);
                         try (var rows = query.executeQuery()) {
                             while (rows.next()) items.add(readReport(rows));
                         }
@@ -66,15 +74,16 @@ public final class AssignedReportStore {
                                         || report.id().toString().equalsIgnoreCase(search);
                                 boolean matchesStatus = status == null || status.equals(report.status());
                                 if (matchesSearch && matchesStatus) {
+                                    long matchIndex = total;
                                     total++;
-                                    if (items.size() < PAGE_SIZE) items.add(report);
+                                    if (matchIndex >= offset && matchIndex < pageEnd) items.add(report);
                                 }
                             }
                         }
                     }
                 }
                 connection.commit();
-                return new Page(List.copyOf(items), 1, PAGE_SIZE, total);
+                return new Page(List.copyOf(items), page, pageSize, total);
             } catch (SQLException | RuntimeException failure) {
                 try {
                     connection.rollback();

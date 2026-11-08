@@ -44,5 +44,6 @@ export MP4_TEST_ORIGIN=$(cat "$scratch/origin")
 python3 -B "$base/test/assigned_report_search_api_test.py"
 python3 -B "$base/test/assigned_report_search_security_test.py"
 python3 -B "$base/test/assigned_report_status_filter_test.py"
+python3 -B "$base/test/assigned_report_pagination_api_test.py"
 python3 -B "$base/test/assigned_reports_al_api_test.py"
 python3 -B "$base/test/assigned_report_cache_header_test.py"
