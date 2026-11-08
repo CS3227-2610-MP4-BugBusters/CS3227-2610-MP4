@@ -203,3 +203,55 @@ while cross-owner adapter/migration implementation is not yet approved:
 The isolated setup runner applies the current reports/checklist scripts directly to
 its own disposable database. That is a fixture setup control, not proof of canonical
 Flyway registration, production startup or agreement from another role owner.
+
+## First provisioning slice: command and migration handoff
+
+Prepared the following contract for the first AUTH-01 create/duplicate/hash slice.
+Keep reset/disable/revocation and HTTP signup-denial verification in their later
+slices; this does not complete task 2.1 or AUTH-02 by itself.
+
+Propose an operator-only Gradle JavaExec task `provisionAccount` under the auth
+module, with entry `mp4.auth.AccountProvisioningCommand`. Accept exact arguments
+`create --username VALUE --display-name VALUE --role ROLE --password-stdin`, plus
+optional `--id UUID` for explicit fixture identity. Reject unknown/repeated flags,
+password arguments, malformed UUIDs and unsupported roles. Generate a UUID when
+omitted. Read password bytes from standard input until EOF, maximum 72 UTF-8 bytes;
+do not trim or remove newline bytes. Interactive console input can be added under
+a separately tested contract; it is not required for this bounded slice.
+
+Connect via `MP4_AUTH_JDBC_URL`, `MP4_AUTH_DB_USER` and `MP4_AUTH_DB_PASSWORD` from
+the environment; do not accept credentials in command arguments or JDBC URL query
+parameters. Accept only a PostgreSQL JDBC URL with host/port/database and no userinfo
+or query string. Do not print connection strings, passwords or encoded hashes.
+
+The command writes one JSON line with only `{code,id?,role?}`. Return process exit
+0 and `ACCOUNT_CREATED` with the stored id/role after commit; exit 2 and
+`VALIDATION_FAILED` for invalid input; exit 3 and `ACCOUNT_EXISTS` for a duplicate
+normalized username or explicit UUID, preserving every existing row; exit 4 and
+`STORAGE_UNAVAILABLE` for database/transaction failure without internal detail.
+A nonfunctional bootstrap must return exit 5 and `NOT_IMPLEMENTED`, never success.
+It must perform no account write or password hashing; tests must not mistake that
+placeholder for completed provisioning. Standard error may contain a fixed safe
+usage message only. No default account, public endpoint or role-change command.
+
+Use the existing normalization, display-name UTF-16 and BCrypt cost-12 rules above.
+The implementation must return success only after transaction commit. Do not
+silently upsert or treat all SQL failures as duplicates. Verify a generated password
+canary through Spring's encoder and captured outputs without publishing it.
+
+Propose auth-owned Flyway resources under `src/backend/auth/src/main/resources/db/auth/`
+with `V100__create_auth_accounts.sql`, creating only `app_accounts` (UUID primary key,
+unique normalized username, display name, encoded password, constrained role, active
+and nonnegative auth_generation). This is a migration reservation request, not a
+claim that V100 or this location is registered/approved by the schema owner. Shared
+reports/checklist SQL remains unchanged. Before real registration, the Developer
+owner must confirm the shared discovery locations/history table and that V100 is
+available, or provide the canonical replacement. Update this contract before
+freezing a migration test if the owner chooses another reservation.
+
+Current setup has no production command entry or registered account migration.
+Before behaviour Red, establish an executable fail-closed command boundary and
+migration discovery/fixture contract without implementing account creation. Missing
+class/import/configuration failures are setup blockers. After setup controls pass,
+expected creation/duplicate/hash assertions must fail at missing provisioning
+behaviour; only then request independent Red review and implementation approval.
