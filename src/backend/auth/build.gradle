@@ -1,0 +1,42 @@
+plugins {
+    id 'java'
+}
+
+group = 'mp4'
+version = '0.1.0-SNAPSHOT'
+
+description = 'Isolated authentication setup control; no application entry point'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+dependencies {
+    testImplementation platform('org.springframework.boot:spring-boot-dependencies:4.0.9')
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security'
+    testImplementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    testImplementation 'org.springframework.session:spring-session-jdbc'
+    testImplementation 'org.postgresql:postgresql'
+    testImplementation 'org.flywaydb:flyway-core'
+    testRuntimeOnly 'org.flywaydb:flyway-database-postgresql'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    // Each setup run owns a new database; never reuse a result from an older one.
+    outputs.upToDateWhen { false }
+    outputs.doNotCacheIf('Disposable database setup must execute on every run') { true }
+}

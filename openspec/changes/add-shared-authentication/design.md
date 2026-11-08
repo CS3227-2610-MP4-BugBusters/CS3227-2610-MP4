@@ -5,7 +5,7 @@
 Inspected the Developer JDBC stores, JDK `HttpExchange` handlers and synthetic-session
 harnesses, the shared reports migration, CI and the Maintainer `parseUser` consumer.
 No production application/auth scaffold exists. Java 17 is the existing compilation
-target (local Java 21); Maven is absent from the current shell. Keep existing role
+target (local Java 21). Keep existing role
 tests and contracts intact. See proposal.md for ownership and motivation.
 
 Status: proposed implementation decisions; no authenticated endpoint, migration,
@@ -22,10 +22,19 @@ Developer-owned shared shell/database tooling or implement report lifecycle rule
 
 ### Library and integration seam
 
-Propose Spring Boot with Spring Security's servlet support, Spring Session JDBC,
-JDBC account access and PostgreSQL. Use the Boot-managed compatible dependency set,
-pin an exact supported version and Maven wrapper/checksums in the runner task, and
-compile for Java 17. Choose established session/CSRF/password infrastructure over
+Use Spring Boot MVC with embedded Tomcat, Spring Security, JDBC and PostgreSQL,
+following the MP3 framework/server as directed by the feature owner. MP2 is a
+JavaFX desktop application and supplies no web-server precedent. Checked only the
+predecessor build/configuration and architecture documentation; no prior application
+code, schema or tests are copied into MP4.
+
+Pin Spring Boot's 4.0.9 dependency set (a patch update within MP3's 4.0 line) and
+Gradle 9.1.0 with the official distribution SHA-256. Generate the third-party Gradle
+wrapper from its official tool; do not copy a previous MP's project files. Compile
+for Java 17 to preserve current MP4 compatibility rather than inherit MP3's Java 25.
+Use Spring Session JDBC for MP4's shared-session requirement. Flyway follows MP3's
+migration approach, but registration/naming of existing MP4 SQL files still needs
+the Developer owner's handoff; library choice does not authorize editing their SQL. Choose established session/CSRF/password infrastructure over
 custom cryptography or browser-stored bearer tokens. The official Boot requirements
 support Java 17; the library's session and CSRF rules are integration obligations,
 not proof that defaults alone satisfy this spec.
@@ -172,7 +181,25 @@ claimed by this proposal.
 Checked official documentation for the library proposal; pin the exact version and
 recheck version-specific guidance when implementing:
 
-- [Boot system requirements](https://docs.spring.io/spring-boot/system-requirements.html)
+- [Boot 4.0 system requirements](https://docs.spring.io/spring-boot/4.0/system-requirements.html)
+- [Boot servlet web stack](https://docs.spring.io/spring-boot/4.0/reference/web/servlet.html)
 - [Spring Security CSRF and SPA integration](https://docs.spring.io/spring-security/reference/servlet/exploits/csrf.html)
 - [Session management](https://docs.spring.io/spring-security/reference/7.0/servlet/authentication/session-management.html)
 - [Password storage](https://docs.spring.io/spring-security/reference/features/authentication/password-storage.html)
+
+## Integration handoff to the shared API/database owner
+
+Prepared this concrete boundary for review; framework selection is settled above,
+while cross-owner adapter/migration implementation is not yet approved:
+
+| Boundary | Proposed handoff | Preserved behaviour |
+| --- | --- | --- |
+| Application hosting | Spring Boot MVC/Tomcat entry under `src/backend/platform/`; auth under `src/backend/auth/` | One application; keep Developer's JDK harnesses as isolated regressions |
+| Trusted identity | Server-resolved UUID/role/active/generation adapted to `ChecklistDraftStore.Actor` | Existing store ownership/assignment checks; never caller-selected identity |
+| Developer HTTP route | Thin MVC adapter invokes existing list store through its agreed service boundary | Existing list DTO/query/error contract and tests; no reference fake |
+| Schema registration | Auth-owned additive account/session/limiter migrations registered with shared Flyway startup | Existing shared SQL and records unchanged; owner selects canonical sequence/locations |
+| Current-user response | `GET /api/auth/me` returns `{id,displayName,role,active}` | Existing Maintainer parser, including its 200 UTF-16-unit display-name bound |
+
+The isolated setup runner applies the current reports/checklist scripts directly to
+its own disposable database. That is a fixture setup control, not proof of canonical
+Flyway registration, production startup or agreement from another role owner.

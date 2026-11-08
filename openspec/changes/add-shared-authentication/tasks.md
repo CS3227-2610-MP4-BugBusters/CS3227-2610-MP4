@@ -14,7 +14,7 @@ per bounded slice; scope specialists to one writer per file.
 ## 1. Integration contract and executable setup
 
 - [ ] 1.1 Publish the proposed endpoint/actor contract and record the Developer owner's routing/migration adapter decision plus Reporter-owner auth review. Verify all existing actor/DTO/error contracts map without replacing feature authorization; resolve conflicting specs/contracts before affected code. Deliver the agreed adapter paths and request/response fixtures with no secret values, including display names at 200 UTF-16 units and an over-limit supplementary-character fixture rejected consistently by provisioning and the Maintainer DTO boundary.
-- [ ] 1.2 Establish a pinned Java-17-compatible Spring/Maven wrapper runner and disposable PostgreSQL fixture under the agreed application boundary. Verify dependency resolution, wrapper integrity, fresh fixture migration/cleanup and a passing runner/setup control. Document exact local/CI commands and prereqs; do not claim an absent app/import/database as Red. No auth behaviour is complete from scaffolding.
+- [ ] 1.2 Establish a pinned Java-17-compatible Spring/Gradle wrapper runner and disposable PostgreSQL fixture under the agreed application boundary. Verify dependency resolution, wrapper integrity, fresh fixture migration/cleanup and a passing runner/setup control. Document exact local/CI commands and prereqs; do not claim an absent app/import/database as Red. No auth behaviour is complete from scaffolding.
 
 ## 2. Accounts and controlled provisioning
 
