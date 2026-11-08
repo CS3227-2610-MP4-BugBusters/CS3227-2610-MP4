@@ -1,6 +1,7 @@
 import {
   checkedFilters,
   QueryError,
+  uuid,
   type Queries,
   type Detail,
   type Person,
@@ -71,6 +72,8 @@ export const reports: Detail[] = Array.from({ length: 63 }, (_, i) => {
 export function createDemoQueries(
   source: readonly Detail[] = reports,
 ): Queries {
+  // Each adapter owns a private copy; demo writes never mutate the exported fixtures.
+  const state = source.map(cloneDetail);
   const check = (s: AbortSignal) => {
     if (s.aborted) throw new QueryError("cancelled");
   };
@@ -86,7 +89,7 @@ export function createDemoQueries(
     async listReports(f, s) {
       check(s);
       const q = checkedFilters(f);
-      const items = source
+      const items = state
         .filter(
           (r) =>
             (!q.status || r.status === q.status) &&
@@ -99,15 +102,117 @@ export function createDemoQueries(
             a.id.localeCompare(b.id),
         );
       return {
-        items: items.slice(q.offset, q.offset + q.limit),
+        items: items.slice(q.offset, q.offset + q.limit).map(summary),
         total: items.length,
       };
     },
     async getReport(id, s) {
       check(s);
-      const r = source.find((x) => x.id === id);
+      const r = state.find((x) => x.id === id);
       if (!r) throw new QueryError("missing");
-      return r;
+      return cloneDetail(r);
     },
+    async updatePriority(id, input, s) {
+      check(s);
+      if (
+        typeof id !== "string" ||
+        !uuid.test(id) ||
+        !Number.isSafeInteger(input?.expectedVersion) ||
+        input.expectedVersion < 0 ||
+        !(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).includes(
+          input?.priority,
+        )
+      )
+        throw new QueryError("contract");
+      const report = state.find((x) => x.id === id);
+      if (!report) throw new QueryError("missing");
+      if (report.version !== input.expectedVersion) {
+        const conflict = new Error(
+          "The report changed. Reload it and reconcile your change.",
+        ) as Error & {
+          status: number;
+          code: string;
+        };
+        conflict.status = 409;
+        conflict.code = "STALE_VERSION";
+        throw conflict;
+      }
+      if (report.version >= Number.MAX_SAFE_INTEGER)
+        throw new QueryError("contract");
+      check(s);
+      const before = report.priority;
+      const updatedAt = new Date().toISOString();
+      report.priority = input.priority;
+      report.version += 1;
+      report.updatedAt = updatedAt;
+      report.history = [
+        ...report.history,
+        {
+          id: crypto.randomUUID(),
+          type: "Priority changed",
+          text: `Priority changed from ${before} to ${input.priority}.`,
+          actor: { ...author },
+          createdAt: updatedAt,
+        },
+      ];
+      check(s);
+      return summary(report);
+    },
+  };
+}
+
+function summary(report: Detail) {
+  const {
+    id,
+    title,
+    status,
+    priority,
+    reporter,
+    assignee,
+    version,
+    createdAt,
+    updatedAt,
+  } = report;
+  return {
+    id,
+    title,
+    status,
+    priority,
+    reporter: { ...reporter },
+    assignee: assignee ? { ...assignee } : null,
+    version,
+    createdAt,
+    updatedAt,
+  };
+}
+
+function cloneDetail(report: Detail): Detail {
+  return {
+    ...report,
+    reporter: { ...report.reporter },
+    assignee: report.assignee ? { ...report.assignee } : null,
+    notes: report.notes.map((entry) => ({
+      ...entry,
+      author: { ...entry.author },
+    })),
+    responses: report.responses.map((entry) => ({
+      ...entry,
+      author: { ...entry.author },
+    })),
+    comments: report.comments.map((entry) => ({
+      ...entry,
+      author: { ...entry.author },
+    })),
+    checklist: report.checklist.map((item) => ({ ...item })),
+    currentProposal: report.currentProposal
+      ? {
+          ...report.currentProposal,
+          author: { ...report.currentProposal.author },
+        }
+      : null,
+    history: report.history.map((entry) => ({
+      ...entry,
+      actor: { ...entry.actor },
+    })),
   };
 }

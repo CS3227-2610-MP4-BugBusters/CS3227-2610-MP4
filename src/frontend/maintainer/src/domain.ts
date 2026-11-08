@@ -80,6 +80,11 @@ export interface Queries {
   listReports(filters: Filters, signal: AbortSignal): Promise<Page>;
   listDevelopers(signal: AbortSignal): Promise<Person[]>;
   getReport(id: string, signal: AbortSignal): Promise<Detail>;
+  updatePriority?(
+    reportId: string,
+    input: { expectedVersion: number; priority: Summary["priority"] },
+    signal: AbortSignal,
+  ): Promise<Summary>;
 }
 export const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

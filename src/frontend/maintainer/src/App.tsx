@@ -10,6 +10,7 @@ import {
   type Person,
   type Queries,
 } from "./domain";
+import { PriorityEditor } from "./PriorityEditor";
 type Load<T> = {
   state: "loading" | "ready" | "error";
   data?: T;
@@ -41,6 +42,9 @@ export function App({
     listEpoch = useRef(0),
     detailEpoch = useRef(0),
     devEpoch = useRef(0),
+    writeEpoch = useRef(0),
+    selectedRef = useRef<string | undefined>(undefined),
+    writeController = useRef<AbortController | undefined>(undefined),
     controllers = useRef(new Set<AbortController>());
   const control = () => {
     const c = new AbortController();
@@ -48,6 +52,10 @@ export function App({
     return c;
   };
   const clear = () => {
+    writeEpoch.current++;
+    writeController.current?.abort();
+    writeController.current = undefined;
+    selectedRef.current = undefined;
     controllers.current.forEach((c) => c.abort());
     controllers.current.clear();
     listEpoch.current++;
@@ -185,15 +193,23 @@ export function App({
     };
   }, [queries, auth, session, selected, detailRetry]);
   const change = (next: Filters) => {
+    writeEpoch.current++;
+    writeController.current?.abort();
+    writeController.current = undefined;
     listEpoch.current++;
     detailEpoch.current++;
     setList(loading());
+    selectedRef.current = undefined;
     setSelected(undefined);
     setDetail(loading());
     setFilters(next);
   };
   const select = (id: string) => {
     if (selected === id) return;
+    writeEpoch.current++;
+    writeController.current?.abort();
+    writeController.current = undefined;
+    selectedRef.current = id;
     detailEpoch.current++;
     setDetail(loading());
     setSelected(id);
@@ -203,6 +219,61 @@ export function App({
     clear();
     setAuth("loading");
     setRefresh((v) => v + 1);
+  };
+  const savePriority = async (
+    reportId: string,
+    expectedVersion: number,
+    priority: (typeof priorities)[number],
+  ) => {
+    const update = queries.updatePriority;
+    if (!update || auth !== "ready" || selectedRef.current !== reportId)
+      throw new Error("Priority update is unavailable.");
+    const sessionEpoch = epoch.current;
+    const operation = ++writeEpoch.current;
+    const controller = control();
+    writeController.current = controller;
+    const isCurrent = () =>
+      sessionEpoch === epoch.current &&
+      operation === writeEpoch.current &&
+      selectedRef.current === reportId &&
+      !controller.signal.aborted;
+    try {
+      await update(reportId, { expectedVersion, priority }, controller.signal);
+      if (!isCurrent()) return;
+      listEpoch.current++;
+      detailEpoch.current++;
+      setListRetry((value) => value + 1);
+      setDetailRetry((value) => value + 1);
+    } catch (cause) {
+      const status =
+        cause !== null && typeof cause === "object"
+          ? (cause as { status?: unknown }).status
+          : undefined;
+      const error = failure(cause);
+      if (sessionEpoch !== epoch.current) return;
+      if (
+        status === 401 ||
+        status === 403 ||
+        error.code === "session" ||
+        error.code === "denied"
+      ) {
+        deny(
+          error.code === "session" || error.code === "denied"
+            ? error
+            : new QueryError(status === 401 ? "session" : "denied"),
+          sessionEpoch,
+        );
+        throw error.code === "session" || error.code === "denied"
+          ? error
+          : new QueryError(status === 401 ? "session" : "denied");
+      }
+      if (!isCurrent()) return;
+      throw cause;
+    } finally {
+      controllers.current.delete(controller);
+      if (writeController.current === controller)
+        writeController.current = undefined;
+    }
   };
   return (
     <main>
@@ -374,7 +445,19 @@ export function App({
                   retry={() => setDetailRetry((v) => v + 1)}
                 />
               ) : (
-                <Report detail={detail.data!} />
+                <Report
+                  detail={detail.data!}
+                  onSavePriority={
+                    queries.updatePriority
+                      ? (priority) =>
+                          savePriority(
+                            detail.data!.id,
+                            detail.data!.version,
+                            priority,
+                          )
+                      : undefined
+                  }
+                />
               )}
             </section>
           </div>
@@ -391,13 +474,20 @@ function ErrorView({ error, retry }: { error: QueryError; retry: () => void }) {
     </div>
   );
 }
-function Report({ detail: r }: { detail: Detail }) {
+function Report({
+  detail: r,
+  onSavePriority,
+}: {
+  detail: Detail;
+  onSavePriority?: (priority: (typeof priorities)[number]) => Promise<void>;
+}) {
   return (
     <article>
       <h2>{r.title}</h2>
       <p>
         {r.status} · {r.priority} · version {r.version}
       </p>
+      {onSavePriority && <PriorityEditor report={r} onSave={onSavePriority} />}
       <dl>
         <dt>Report ID</dt>
         <dd>{r.id}</dd>

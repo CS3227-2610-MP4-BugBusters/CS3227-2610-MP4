@@ -149,6 +149,24 @@ dd {
   overflow-wrap: anywhere;
   line-height: 1.6;
 }
+.priority-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #dce5e7;
+  border-radius: 8px;
+  background: #f8fbfb;
+}
+.priority-editor h3 {
+  flex-basis: 100%;
+  margin: 0;
+}
+.priority-editor [role="alert"] {
+  flex-basis: 100%;
+  margin: 0;
+}
 [role="alert"] {
   background: #fff0ed;
   padding: 14px;
