@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { createHttpQueries } from "./http";
+import { createHttpAuthActions } from "./auth-client";
 import "./style.css";
 async function start() {
   const synthetic = import.meta.env.DEV && import.meta.env.MODE === "demo";
@@ -8,7 +9,11 @@ async function start() {
     ? (await import("./demo")).createDemoQueries()
     : createHttpQueries();
   createRoot(document.getElementById("root")!).render(
-    <App queries={queries} synthetic={synthetic} />,
+    <App
+      queries={queries}
+      synthetic={synthetic}
+      authActions={synthetic ? undefined : createHttpAuthActions()}
+    />,
   );
 }
 void start();
