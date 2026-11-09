@@ -43,12 +43,17 @@ public final class SharedSchemaBootstrap {
                 Map.entry("id", "uuid!"), Map.entry("title", "text!"), Map.entry("description", "text!"),
                 Map.entry("reporter_id", "uuid!"), Map.entry("assignee_id", "uuid"), Map.entry("status", "text!"),
                 Map.entry("version", "int8!"), Map.entry("current_proposal_id", "uuid")));
+        requireDefault(c, "reports", "status", "'SUBMITTED'::text");
+        requireDefault(c, "reports", "version", "0");
         requirePrimaryKey(c, "reports", "id");
         requireCheck(c, "reports", "status", "SUBMITTED", "ASSIGNED", "IN_PROGRESS", "RESOLUTION_PROPOSED", "CLOSED");
         requireCheck(c, "reports", "version", "version >= 0");
         if (checklists) {
             requireColumns(c, "investigation_checklists", Map.of(
                     "report_id", "uuid!", "draft_steps", "_text!", "draft_revision", "int8!", "shared_steps", "_text!"));
+            requireDefault(c, "investigation_checklists", "draft_steps", "'{}'::text[]");
+            requireDefault(c, "investigation_checklists", "draft_revision", "0");
+            requireDefault(c, "investigation_checklists", "shared_steps", "'{}'::text[]");
             requirePrimaryKey(c, "investigation_checklists", "report_id");
             requireForeignKey(c, "investigation_checklists", "report_id", "reports", "id");
             requireCheck(c, "investigation_checklists", "draft_revision", "draft_revision >= 0");
@@ -60,6 +65,21 @@ public final class SharedSchemaBootstrap {
             requireForeignKey(c, "resolution_proposals", "report_id", "reports", "id");
         }
         return checklists ? 2 : 1;
+    }
+
+    private static void requireDefault(Connection c, String table, String column, String expected) throws SQLException {
+        String actual = null;
+        try (var statement = c.prepareStatement(
+                "SELECT column_default FROM information_schema.columns " +
+                        "WHERE table_schema = 'public' AND table_name = ? AND column_name = ?")) {
+            statement.setString(1, table);
+            statement.setString(2, column);
+            try (ResultSet rows = statement.executeQuery()) {
+                if (rows.next()) actual = rows.getString("column_default");
+            }
+        }
+        if (!expected.equals(actual))
+            throw new IllegalStateException("incompatible shared schema default: " + table + "." + column);
     }
 
     private static void requireColumns(Connection c, String table, Map<String, String> expected) throws SQLException {

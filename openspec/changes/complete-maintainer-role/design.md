@@ -39,6 +39,15 @@ I propose a React Maintainer feature and Java Maintainer controllers/DTOs, query
 
 Require trusted actor identity/current session from authentication, not request bodies. Require an active MAINTAINER for every endpoint, rechecked at writes and AI delivery. Propose cookie-session CSRF protection for unsafe methods, UUID identifiers, ISO-8601 UTC timestamps, JSON camelCase and Cache-Control: no-store. Reject unknown body/query fields, invalid enums/IDs and request bodies over 64 KiB. Expose no credentials, session identifiers or provider secrets in DTOs/logs.
 
+### Legacy shared-schema compatibility
+
+Validate required defaults as well as types, nullability and constraints before
+baselining manually created report/checklist tables. Require canonical Submitted/
+zero report defaults and empty-array/zero checklist defaults. Reject incompatible
+schemas before recording shared history or applying additive migrations; do not
+evaluate arbitrary default expressions or silently repair another owner's schema.
+Keep the canonical Developer SQL and any uncommitted resolution migration unchanged.
+
 ### Proposed HTTP and DTO contracts
 
 Prefix the following paths with /api/maintainer. Use exact bodies and reject caller-supplied actor/role/status overrides. Return a safe error {code,message,requestId}, without stack/provider traces. Propose 401 UNAUTHENTICATED, 403 FORBIDDEN, 404 NOT_FOUND, 400 VALIDATION_FAILED, 409 STALE_VERSION/INVALID_STATE and 503 TEMPORARILY_UNAVAILABLE for exhausted database waits; do not silently retry writes.

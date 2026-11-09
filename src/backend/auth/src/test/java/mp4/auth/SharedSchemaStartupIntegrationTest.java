@@ -9,6 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -130,6 +131,58 @@ class SharedSchemaStartupIntegrationTest {
             }
             assertThrows(RuntimeException.class, () -> { try (Server ignored = new Server(db)) { /* close any unexpected successful startup */ } },
                     "startup must reject a partial manual reports schema instead of silently baselining it");
+        }
+    }
+
+    @Test void startupRejectsManualSharedTablesMissingCanonicalWriteDefaultsWithoutMutation() throws Exception {
+        UUID reportId = UUID.randomUUID();
+        for (String missingDefault : List.of("investigation_checklists.shared_steps", "reports.status", "reports.version",
+                "investigation_checklists.draft_steps", "investigation_checklists.draft_revision")) {
+            try (Database db = Database.create()) {
+                db.initializeAuthOnly();
+                try (Connection c = db.connect(); Statement s = c.createStatement()) {
+                    s.execute("CREATE TABLE reports (id uuid PRIMARY KEY, title text NOT NULL, description text NOT NULL, " +
+                            "reporter_id uuid NOT NULL, assignee_id uuid, status text NOT NULL DEFAULT 'SUBMITTED' " +
+                            "CHECK (status IN ('SUBMITTED','ASSIGNED','IN_PROGRESS','RESOLUTION_PROPOSED','CLOSED')), " +
+                            "version bigint NOT NULL DEFAULT 0 CHECK (version >= 0), current_proposal_id uuid)");
+                    s.execute("CREATE TABLE investigation_checklists (report_id uuid PRIMARY KEY REFERENCES reports(id), " +
+                            "draft_steps text[] NOT NULL DEFAULT '{}', draft_revision bigint NOT NULL DEFAULT 0 CHECK (draft_revision >= 0), " +
+                            "shared_steps text[] NOT NULL DEFAULT '{}')");
+                    String[] target = missingDefault.split("\\.");
+                    s.execute("ALTER TABLE " + target[0] + " ALTER COLUMN " + target[1] + " DROP DEFAULT");
+                    s.execute("INSERT INTO reports(id,title,description,reporter_id,assignee_id,status,version) " +
+                            "VALUES ('" + reportId + "','legacy title','legacy description','" + UUID.randomUUID() + "','" +
+                            UUID.randomUUID() + "','ASSIGNED',7)");
+                    s.execute("INSERT INTO investigation_checklists(report_id,draft_steps,draft_revision,shared_steps) " +
+                            "VALUES ('" + reportId + "',ARRAY['private draft'],11,ARRAY['published step'])");
+                }
+
+                assertThrows(RuntimeException.class, () -> { try (Server ignored = new Server(db)) { /* close unexpected success */ } },
+                        "startup must reject a manual shared schema missing " + missingDefault + " default");
+
+                try (Connection c = db.connect(); Statement s = c.createStatement()) {
+                    assertFalse(tableExists(c, "mp4_shared_schema_history"),
+                            "rejected manual schema must not receive a history baseline");
+                    assertFalse(columns(c, "reports").contains("priority"),
+                            "rejected manual schema must not receive partial V3 columns");
+                    assertFalse(tableExists(c, "resolution_proposals"),
+                            "rejected manual schema must not receive partial V3 tables");
+                    try (ResultSet row = s.executeQuery("SELECT title,status,version FROM reports WHERE id='" + reportId + "'")) {
+                        assertTrue(row.next());
+                        assertEquals("legacy title", row.getString("title"));
+                        assertEquals("ASSIGNED", row.getString("status"));
+                        assertEquals(7, row.getLong("version"));
+                        assertFalse(row.next());
+                    }
+                    try (ResultSet row = s.executeQuery("SELECT draft_steps,draft_revision,shared_steps FROM investigation_checklists WHERE report_id='" + reportId + "'")) {
+                        assertTrue(row.next());
+                        assertArrayEquals(new String[]{"private draft"}, (String[]) row.getArray("draft_steps").getArray());
+                        assertEquals(11, row.getLong("draft_revision"));
+                        assertArrayEquals(new String[]{"published step"}, (String[]) row.getArray("shared_steps").getArray());
+                        assertFalse(row.next());
+                    }
+                }
+            }
         }
     }
 

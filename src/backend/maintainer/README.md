@@ -9,6 +9,9 @@ the same transaction.
 Registered canonical report/checklist SQL and the additive Maintainer migration
 under `mp4_shared_schema_history`, separately from authentication migrations.
 Verified fresh startup, compatible manual schemas and restart preservation.
+Reject missing or incompatible canonical defaults before registering a manual
+schema. Reconcile those defaults with the shared migration owner before restarting;
+startup does not silently repair them or rewrite existing rows.
 
 ## Summary integration
 
