@@ -1,6 +1,7 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MarkdownView } from "./index";
+import type { Mock, MockInstance } from "vitest";
+import { MarkdownView } from "../src/index";
 
 function allAttributeNames(root: Element): string[] {
   const names: string[] = [];
@@ -46,8 +47,8 @@ describe("MDR-03 Images are never loaded", () => {
   // Request instrumentation below is supplementary: jsdom does not load resources by default.
   let fetchStub: ReturnType<typeof vi.fn>;
   let imageCtor: ReturnType<typeof vi.fn>;
-  let srcSetter: ReturnType<typeof vi.fn>;
-  let setAttrSpy: ReturnType<typeof vi.spyOn>;
+  let srcSetter: Mock<(v: unknown) => void>;
+  let setAttrSpy: MockInstance<Element["setAttribute"]>;
   let originalSrc: PropertyDescriptor | undefined;
 
   beforeEach(() => {

@@ -2,7 +2,7 @@ import { cleanup, render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { MarkdownView } from "./index";
+import { MarkdownView } from "../src/index";
 
 afterEach(cleanup);
 
