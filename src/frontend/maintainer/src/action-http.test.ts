@@ -8,9 +8,10 @@ const csrf = () => new Response(JSON.stringify({ token: "session-csrf", headerNa
 
 describe("Maintainer mutation HTTP boundary", () => {
   it("sends an exact versioned payload with session CSRF and validates the updated summary", async () => {
+    const updated = { ...reports[0], version: 5, priority: "HIGH" as const };
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(csrf())
-      .mockResolvedValueOnce(new Response(JSON.stringify(reports[0]), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify(updated), { status: 200 }));
     const queries = withHttpActions(createHttpQueries(fetcher), fetcher);
     await queries.updatePriority({ reportId: reports[0].id, expectedVersion: 4, priority: "HIGH" });
     expect(fetcher).toHaveBeenCalledTimes(2);
@@ -37,5 +38,46 @@ describe("Maintainer mutation HTTP boundary", () => {
     const queries = withHttpActions(createHttpQueries(fetcher), fetcher);
     await expect(queries.updatePriority({ reportId: "bad", expectedVersion: 0, priority: "HIGH" })).rejects.toBeInstanceOf(QueryError);
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("rejects a successful summary for another report or the wrong version", async () => {
+    const wrong = { ...reports[1], version: 5, priority: "HIGH" as const };
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(csrf()).mockResolvedValueOnce(new Response(JSON.stringify(wrong), { status: 200 }));
+    const queries = withHttpActions(createHttpQueries(fetcher), fetcher);
+    await expect(queries.updatePriority({ reportId: reports[0].id, expectedVersion: 4, priority: "HIGH" })).rejects.toMatchObject({ code: "contract" });
+  });
+
+  it("settles a forbidden response without consuming its unending error stream", async () => {
+    const hanging = new Response(new ReadableStream<Uint8Array>({ start() { /* intentionally never closes */ } }), { status: 403 });
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(csrf()).mockResolvedValueOnce(hanging);
+    const queries = withHttpActions(createHttpQueries(fetcher), fetcher);
+    await expect(queries.reopenReport({ reportId: reports[4].id, expectedVersion: 2, reason: "Regression" })).rejects.toMatchObject({ code: "denied" });
+  });
+
+  it("settles caller cancellation while a response reader ignores cancellation and sends no later request", async () => {
+    const hanging = new Response(new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new TextEncoder().encode("{")); } }), { status: 200 });
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(csrf()).mockResolvedValueOnce(hanging);
+    const queries = withHttpActions(createHttpQueries(fetcher), fetcher);
+    const controller = new AbortController();
+    const pending = queries.updatePriority({ reportId: reports[0].id, expectedVersion: 0, priority: "HIGH" }, controller.signal);
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ code: "cancelled" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("enforces the end-to-end deadline while reading an unending conflict body", async () => {
+    vi.useFakeTimers();
+    try {
+      const hanging = new Response(new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(new TextEncoder().encode("{")); } }), { status: 409 });
+      const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(csrf()).mockResolvedValueOnce(hanging);
+      const queries = withHttpActions(createHttpQueries(fetcher), fetcher);
+      const pending = queries.reopenReport({ reportId: reports[4].id, expectedVersion: 2, reason: "Regression" });
+      const rejection = expect(pending).rejects.toMatchObject({ code: "network" });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(10_000);
+      await rejection;
+    } finally { vi.useRealTimers(); }
   });
 });

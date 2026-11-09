@@ -591,8 +591,8 @@ function ActionControls({ r, developers, queries, pending, error, runAction, cle
     [reopenReason, setReopenReason] = useState(""), [comment, setComment] = useState(""), [ack, setAck] = useState("");
   const proposalKey = r.currentProposal ? [r.id, r.version, r.currentProposal.id, r.currentProposal.version].join(":") : "";
   const acknowledged = !!proposalKey && ack === proposalKey;
-  const reasonValid = (s: string) => { const t = s.trim(); return [...t].length >= 1 && [...t].length <= 1000 && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(t); };
-  const commentValid = (s: string) => { const t = s.trim(); return [...t].length >= 1 && [...t].length <= 4000 && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(t); };
+  const reasonValid = (s: string) => { const t = s.trim(); return [...t].length >= 1 && [...t].length <= 1000 && !/[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f]/.test(t); };
+  const commentValid = (s: string) => { const t = s.trim(); return [...t].length >= 1 && [...t].length <= 4000 && !/[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f]/.test(t); };
   const submit = async (kind: ActionName, input: ActionInput, reset: () => void) => { clearError(); if (await runAction(kind, input)) reset(); };
   const assignmentEligible = r.status === "Submitted" || r.status === "Assigned" || r.status === "In progress";
   const isReassignment = r.status === "Assigned" || r.status === "In progress";
