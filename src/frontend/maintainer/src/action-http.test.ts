@@ -1,0 +1,41 @@
+import { describe, expect, it, vi } from "vitest";
+import { createHttpQueries } from "./http";
+import { withHttpActions } from "./action-http";
+import { reports } from "./demo";
+import { QueryError } from "./domain";
+
+const csrf = () => new Response(JSON.stringify({ token: "session-csrf", headerName: "X-CSRF-TOKEN" }), { status: 200 });
+
+describe("Maintainer mutation HTTP boundary", () => {
+  it("sends an exact versioned payload with session CSRF and validates the updated summary", async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(new Response(JSON.stringify(reports[0]), { status: 200 }));
+    const queries = withHttpActions(createHttpQueries(fetcher), fetcher);
+    await queries.updatePriority({ reportId: reports[0].id, expectedVersion: 4, priority: "HIGH" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    const [csrfPath, csrfInit] = fetcher.mock.calls[0];
+    expect(csrfPath).toBe("/api/auth/csrf");
+    expect(csrfInit).toMatchObject({ method: "GET", credentials: "same-origin", cache: "no-store" });
+    const [path, init] = fetcher.mock.calls[1];
+    expect(path).toBe(`/api/maintainer/reports/${reports[0].id}/priority`);
+    expect(init).toMatchObject({ method: "PUT", credentials: "same-origin", cache: "no-store", headers: { Accept: "application/json", "Content-Type": "application/json", "X-CSRF-TOKEN": "session-csrf" } });
+    expect(JSON.parse(String(init?.body))).toEqual({ expectedVersion: 4, priority: "HIGH" });
+  });
+
+  it("maps stale writes safely and does not retry them", async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(csrf())
+      .mockResolvedValueOnce(new Response(JSON.stringify({ code: "STALE_VERSION", message: "raw details omitted" }), { status: 409 }));
+    const queries = withHttpActions(createHttpQueries(fetcher), fetcher);
+    await expect(queries.reopenReport({ reportId: reports[4].id, expectedVersion: 2, reason: "Regression" })).rejects.toMatchObject({ code: "conflict" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("requires a valid report identity before any network request", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const queries = withHttpActions(createHttpQueries(fetcher), fetcher);
+    await expect(queries.updatePriority({ reportId: "bad", expectedVersion: 0, priority: "HIGH" })).rejects.toBeInstanceOf(QueryError);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+});
