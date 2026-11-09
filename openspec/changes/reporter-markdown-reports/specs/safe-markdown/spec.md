@@ -74,11 +74,11 @@ The editor SHALL offer accessible Write and Preview tabs. Write SHALL edit the r
 
 ### Requirement: MDR-07 Consistent rendering across roles
 
-Every Reporter, Developer and Maintainer view that displays the Reporter-authored `description`, `reproductionSteps`, `expectedBehavior`, `actualBehavior` or `environment` SHALL use the shared renderer. Titles and all other text SHALL remain escaped plain text.
+Every Reporter, Developer and Maintainer view that displays a report's Reporter-authored `description` SHALL use the shared renderer. Titles and all other text SHALL remain escaped plain text.
 
 #### Scenario: Same source, same output in every role
 - **GIVEN** a report whose description contains a list, a table and `<b>x</b>`
-- **WHEN** the Maintainer browser and the Developer source panel display it
+- **WHEN** the Maintainer browser and the Developer description panel display it
 - **THEN** both show the same formatted list and table, and the literal text `<b>x</b>`
 
 #### Scenario: Title stays plain text

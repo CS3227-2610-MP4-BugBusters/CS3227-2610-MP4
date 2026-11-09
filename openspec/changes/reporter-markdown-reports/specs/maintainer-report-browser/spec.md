@@ -5,16 +5,15 @@
 ### Requirement: MNT-READ-05 Safe and distinct display states
 
 The frontend SHALL distinguish access checking, list/detail loading, empty results,
-safe failure/retry and missing-detail states. The Reporter-authored source fields
-`description`, `reproductionSteps`, `expectedBehavior`, `actualBehavior` and
-`environment` SHALL render through the shared `safe-markdown` renderer. Every other
-value, including the title, SHALL render as escaped text without interpreted HTML
-or Markdown. Filters and buttons SHALL have accessible names, and the layout SHALL
+safe failure/retry and missing-detail states. The Reporter-authored `description`
+SHALL render through the shared `safe-markdown` renderer. Every other value,
+including the title and the remaining source fields, SHALL render as escaped text
+without interpreted HTML or Markdown. Filters and buttons SHALL have accessible names, and the layout SHALL
 support narrow mobile viewports without horizontal overflow.
 
 #### Scenario: Show source markup as text
 
-- **WHEN** a report's title, notes, comments, checklist, responses, proposal or history contain markup-like or Markdown text
+- **WHEN** a report's title, other source fields, notes, comments, checklist, responses, proposal or history contain markup-like or Markdown text
 - **THEN** the literal text is displayed without creating an injected element or formatting
 
 #### Scenario: Render Reporter Markdown safely

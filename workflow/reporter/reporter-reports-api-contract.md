@@ -21,21 +21,21 @@ Identity or role in the body, query or headers never selects the actor.
 
 ## Fields
 
+A report has exactly two Reporter-authored fields:
+
 | JSON field | Column | Create | Rules |
 | --- | --- | --- | --- |
-| `title` | `title` | required | Non-blank. At most 200 UTF-16 code units. No `\r` or `\n`. |
-| `description` | `description` | required | Non-blank. At most 20,000 code units. |
-| `reproductionSteps` | `reproduction_steps` | optional, default `""` | At most 20,000 code units |
-| `expectedBehavior` | `expected_behavior` | optional, default `""` | At most 20,000 code units |
-| `actualBehavior` | `actual_behavior` | optional, default `""` | At most 20,000 code units |
-| `environment` | `environment` | optional, default `""` | At most 20,000 code units |
+| `title` | `title` | required | Non-blank. At most 200 UTF-16 code units. No `\r` or `\n`. Plain text. |
+| `description` | `description` | required | Non-blank. At most 20,000 code units. Markdown source. |
 
-- Every field is a JSON string. `null` or any other type is a validation failure.
-- No field may contain U+0000 or an unpaired surrogate.
+- Both fields are JSON strings. `null` or any other type is a validation failure.
+- Neither field may contain U+0000 or an unpaired surrogate.
 - "Blank" means empty, or made only of Unicode whitespace.
 - Values are stored and returned **exactly as submitted**, with no trimming,
-  normalisation or rendering. Long-text fields are Markdown source. The server
-  never emits HTML.
+  normalisation or rendering. The server never emits HTML.
+- Reproduction steps, expected and actual behavior, and environment are **not**
+  report fields. The future improve-report AI feature may suggest them as
+  missing information for the Reporter to add to the description.
 
 ## Endpoints
 
@@ -49,11 +49,27 @@ an object also returns 400 `VALIDATION_FAILED`. Nothing is stored on any failure
 **201** with the created detail, and `Location: /api/reporter/reports/{id}`:
 
 ```json
-{"id":"7d3c…","title":"Login fails","description":"## Steps\n1. Open /login","reproductionSteps":"","expectedBehavior":"","actualBehavior":"","environment":"","status":"SUBMITTED","version":0,"createdAt":"2026-11-09T05:00:00.000Z","updatedAt":"2026-11-09T05:00:00.000Z"}
+{"id":"7d3c…","title":"Login fails","description":"## Steps\n1. Open /login","status":"SUBMITTED","version":0,"createdAt":"2026-11-09T05:00:00.000Z","updatedAt":"2026-11-09T05:00:00.000Z"}
 ```
 
 The server sets `id` (random UUID), `reporter_id` (the actor), status
 `SUBMITTED`, version 0, no assignee, and both timestamps to the same instant.
+
+#### Rate limit: 3 reports per minute per Reporter
+
+- A Reporter can create at most **3 reports in any rolling 60-second window**.
+- The window is counted from that Reporter's stored `created_at` values. Only
+  successful creates count; requests rejected for any reason don't.
+- A 4th create inside the window returns **429 `RATE_LIMITED`** and stores
+  nothing. The response sends `Retry-After` with the whole seconds (rounded up,
+  minimum 1) until the oldest create in the window is 60 seconds old.
+- The check and the insert are atomic per Reporter. Concurrent creates can never
+  bring the window above 3.
+- Each Reporter has their own limit, so one Reporter hitting it doesn't affect
+  another.
+- Order of checks: session, then validation, then rate limit. An invalid request
+  gets 400 even when the Reporter is over the limit.
+- List and read requests are not rate-limited by this rule.
 
 ### `GET /api/reporter/reports`
 
@@ -91,7 +107,8 @@ Other methods on these paths return 405 `METHOD_NOT_ALLOWED`.
 ```
 
 - Codes: `VALIDATION_FAILED` 400, `UNAUTHENTICATED` 401, `FORBIDDEN` 403,
-  `REPORT_NOT_FOUND` 404, `METHOD_NOT_ALLOWED` 405, `INTERNAL_ERROR` 500.
+  `REPORT_NOT_FOUND` 404, `METHOD_NOT_ALLOWED` 405, `RATE_LIMITED` 429,
+  `INTERNAL_ERROR` 500.
 - Messages are fixed per code. The body never echoes submitted text and never
   includes report content, SQL or a stack trace.
 - Error responses don't say which field failed. This keeps the envelope identical
@@ -102,5 +119,6 @@ Other methods on these paths return 405 `METHOD_NOT_ALLOWED`.
 
 ## Not covered
 
-Editing, lifecycle transitions, assignee details, discussion, checklist responses
-and AI.
+Editing, lifecycle transitions, assignee details, discussion, checklist responses,
+and AI, including the AI suggestions for reproduction steps, expected and actual
+behavior, and environment.

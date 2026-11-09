@@ -4,7 +4,10 @@
 
 - The shared `reports` table (`src/backend/shared/migrations/001_create_reports.sql`)
   has id, title, description, reporter, assignee, status, version and proposal
-  reference. It has no detail fields and no timestamps.
+  reference. It has no timestamps. Title and description are the only
+  Reporter-authored fields (feature-owner decision, 9 Nov). The Maintainer DTO's
+  `reproductionSteps`, `expectedBehavior`, `actualBehavior` and `environment` are
+  not supplied by this backend.
 - There are two backend patterns:
   - Developer: framework-free JDBC store + `com.sun.net.httpserver` handler, a
     synthetic-session test harness, and black-box Python API tests.
@@ -104,11 +107,11 @@ the browser never runs a pathological render.
   the auth accounts table. Deferred.
 
 ### D7 Additive Reporter migration
-`src/backend/reporter/migrations/002_add_report_details.sql`:
-- Adds `reproduction_steps`, `expected_behavior`, `actual_behavior`,
-  `environment` (text, NOT NULL, DEFAULT '').
+`src/backend/reporter/migrations/002_add_report_timestamps.sql`:
 - Adds `created_at` and `updated_at` (timestamptz, NOT NULL, DEFAULT now()).
-- Adds an index on `(reporter_id, created_at DESC, id)`.
+- Adds an index on `(reporter_id, created_at DESC, id)`. It serves both the
+  newest-first list and the rate-limit window count.
+- Adds no new text columns.
 - Applied after `001` and before the checklist migration, on fresh databases only
   (the same policy as SR-01).
 - Length limits are enforced by the service, not by `CHECK` constraints, because
@@ -116,15 +119,45 @@ the browser never runs a pathological render.
 - Needs Developer owner sign-off because it alters the shared table.
 
 ### D8 Text limits match the Maintainer parser
-20,000 UTF-16 code units per long field equals MNT-READ-03's general text bound,
-so every report the Reporter can create is one the Maintainer adapter accepts.
-Title is capped at 200 code units, on a single line.
+20,000 UTF-16 code units for `description` equals MNT-READ-03's general text
+bound, so every report the Reporter can create is one the Maintainer adapter
+accepts. Title is capped at 200 code units, on a single line.
 
-### D9 Developer source panel
-Add a read-only `ReportSourcePanel` to the Developer app. It renders the five
-source fields through `MarkdownView`, with a test page using fixture data. It
-connects to the Developer report detail once that screen exists. This needs
-Developer owner approval.
+### D9 Developer description panel
+Add a read-only `ReportDescriptionPanel` to the Developer app. It shows the title
+as plain text and the description through `MarkdownView`, with a test page using
+fixture data. It connects to the Developer report detail once that screen exists.
+This needs Developer owner approval.
+
+### D10 Rate limit counted from stored rows, locked per Reporter
+Inside the create transaction:
+1. `SELECT pg_advisory_xact_lock(<64-bit hash of reporter_id>)`
+2. `SELECT count(*), min(created_at) FROM reports WHERE reporter_id = ? AND
+   created_at > now() - interval '60 seconds'`
+3. If the count is 3 or more, roll back and return 429. `Retry-After` is
+   `ceil(min(created_at) + 60s - now())`, at least 1. Otherwise insert and commit.
+
+Why this approach:
+- The lock serialises one Reporter's creates (the RPT-08 concurrency scenario)
+  without blocking other Reporters.
+- Counting stored rows means only successful creates count, the limit survives
+  restarts, and it holds across instances. No extra table or cache is needed.
+- `created_at` uses the database clock (`now()`), so the window doesn't depend on
+  the app server's clock.
+
+Alternatives considered:
+- An in-memory token bucket per Reporter. Rejected because it resets on restart
+  and breaks with more than one instance.
+- A separate rate-limit table. Rejected because it duplicates what `created_at`
+  already records.
+- Checking the limit before validation. Rejected so that an over-limit Reporter
+  still gets the more useful 400 for a malformed request. The contract fixes the
+  order: session → validation → rate limit.
+
+Testing: the rollover scenario seeds R1's three earlier reports straight into the
+fixture database with `created_at = now() - interval '61 seconds'` (and 59 s for
+the still-limited case). This avoids a 60-second sleep and needs no production
+clock hook. The concurrency scenario uses real parallel HTTP requests.
 
 ## Risks / Trade-offs
 
@@ -148,7 +181,7 @@ Developer owner approval.
 
 ## Migration Plan
 
-Fresh-database only, like SR-01. Apply `001` → `002_add_report_details` →
+Fresh-database only, like SR-01. Apply `001` → `002_add_report_timestamps` →
 checklist migration. Rollback means rebuilding the disposable database.
 Frontend rollback means reverting the dependency and component swap. No stored
 data changes shape.

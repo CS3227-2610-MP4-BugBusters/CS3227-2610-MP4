@@ -11,18 +11,19 @@ can run in parallel in separate worktrees. Groups 4 and 5 depend on group 3.
 
 ## 1. Approvals and scaffolding
 
-- [ ] 1.1 Get Maintainer owner approval for the MNT-READ-05 delta and Developer owner approval for the D7 migration and the D9 source panel. Verify by recording each approver and date in `logs/reporter/`. Groups 4 and 5 and task 2.2 do not start without the matching approval.
+- [ ] 1.1 Get Maintainer owner approval for the MNT-READ-05 delta and Developer owner approval for the D7 timestamp migration and the D9 description panel. Verify by recording each approver and date in `logs/reporter/`. Groups 4 and 5 and task 2.2 do not start without the matching approval.
 - [x] 1.2 Scaffold `src/frontend/shared/markdown/` (package.json with React peer dependency, pinned `react-markdown` and `remark-gfm`, vitest + jsdom, tsconfig, `npm run verify`). Verify that `npm install` and `npm run verify` run with one placeholder test.
 - [ ] 1.3 Scaffold `src/backend/reporter/` (README, `migrations/`, `src/`, `test/`) and a disposable-PostgreSQL runner modelled on `src/backend/shared/test/run-shared-report-storage.sh`. Verify that the runner creates and drops a fresh database applying `001_create_reports.sql`.
 
 ## 2. Reporter backend (`reporter-reports`)
 
-- [ ] 2.1 Write `workflow/reporter/reporter-reports-api-contract.md` from RPT-01..07 and design D6 (paths, body/response JSON, validation codes, 404 equivalence, error envelope, `no-store`). Verify that the feature owner approves it before 2.2 Red starts. It is read-only for every agent.
-- [ ] 2.2 Red/Green the D7 migration: detail fields default to `''`, timestamps are set, `001` → `002` → checklist migration applies cleanly on a fresh database. Verify with a migration test via the 1.3 runner, plus the existing shared-report-storage and checklist tests still passing.
-- [ ] 2.3 **[sec]** Red/Green RPT-01, RPT-02 and RPT-03 (create, validation, source fidelity) through the HTTP handler and synthetic-session harness. Verify with `create_report_api_test.py` and `create_report_validation_test.py` covering every RPT-01..03 scenario, including the 20,000 and 20,001 boundaries and the U+0000 and unpaired-surrogate cases.
+- [ ] 2.1 Write `workflow/reporter/reporter-reports-api-contract.md` from RPT-01..08 and design D6 and D10 (paths, two-field body and response JSON, validation codes, 404 equivalence, error envelope, `no-store`, 3-per-minute rate limit with `Retry-After`). Verify that the feature owner approves it before 2.2 Red starts. It is read-only for every agent.
+- [ ] 2.2 Red/Green the D7 migration: `created_at` and `updated_at` are set by default, the `(reporter_id, created_at DESC, id)` index exists, no other columns are added, `001` → `002` → checklist migration applies cleanly on a fresh database. Verify with a migration test via the 1.3 runner, plus the existing shared-report-storage and checklist tests still passing.
+- [ ] 2.3 **[sec]** Red/Green RPT-01, RPT-02 and RPT-03 (create, validation, source fidelity) through the HTTP handler and synthetic-session harness. Verify with `create_report_api_test.py` and `create_report_validation_test.py` covering every RPT-01..03 scenario, including the title 200/201 and description 20,000/20,001 boundaries, rejection of `reproductionSteps` and other extra keys, and the U+0000 and unpaired-surrogate cases.
 - [ ] 2.4 **[sec]** Red/Green RPT-04 and RPT-05 (list own, read own, R1/R2 isolation, 404 equivalence, pagination validation). Verify with `list_own_reports_api_test.py` and `read_own_report_api_test.py`, including a byte-for-byte comparison of the 404 bodies for "other Reporter's report" and "nonexistent ID" (excluding `requestId`).
 - [ ] 2.5 **[sec]** Red/Green RPT-06 and RPT-07 across all three endpoints (401, 403 for inactive, Developer and Maintainer actors, ignored identity in body/query/header, safe error body, `Cache-Control: no-store`). Verify with `reporter_access_api_test.py`.
-- [ ] 2.6 Document build and run steps in `src/backend/reporter/README.md` and verify that a fresh clone following them reproduces 2.2–2.5 passing.
+- [ ] 2.6 **[sec]** Red/Green RPT-08 (3 creates per rolling 60 s per Reporter, 429 `RATE_LIMITED` with `Retry-After` >= 1, rollover, 5 concurrent creates leaving exactly 3, per-Reporter isolation, invalid and 429 requests not counted, check order session → validation → limit). Verify with `create_report_rate_limit_test.py`, using backdated fixture rows for rollover (D10) and real parallel requests for concurrency.
+- [ ] 2.7 Document build and run steps in `src/backend/reporter/README.md` and verify that a fresh clone following them reproduces 2.2–2.6 passing.
 
 ## 3. Shared safe Markdown (`safe-markdown`)
 
@@ -35,13 +36,13 @@ can run in parallel in separate worktrees. Groups 4 and 5 depend on group 3.
 ## 4. Maintainer adoption (MNT-READ-05 delta)
 
 - [ ] 4.1 Add the `file:` dependency to `src/frontend/maintainer` and verify that `npm install` and `npm run verify` still pass with no behavior change.
-- [ ] 4.2 **[sec]** Red/Green the modified MNT-READ-05: the five source fields go through `MarkdownView`, and the title, notes, comments, checklist, responses, proposal and history stay escaped. Verify with updated QR-07 tests in `App.test.tsx` (Markdown renders, `<img onerror>` and image URL inert, title `**bold**` literal) and the narrow-viewport overflow scenario. All existing QR-01..08 tests must still pass under `npm run verify`.
+- [ ] 4.2 **[sec]** Red/Green the modified MNT-READ-05: the `description` goes through `MarkdownView`, and the title, the other source fields, notes, comments, checklist, responses, proposal and history stay escaped. Verify with updated QR-07 tests in `App.test.tsx` (Markdown renders, `<img onerror>` and image URL inert, title `**bold**` literal) and the narrow-viewport overflow scenario. All existing QR-01..08 tests must still pass under `npm run verify`.
 - [ ] 4.3 Add Markdown and injection examples to the demo fixtures in `demo.ts` and verify them visually in `npm run demo` at mobile and desktop widths. Record screenshots or notes in `logs/reporter/`.
 
 ## 5. Developer adoption (MDR-07)
 
 - [ ] 5.1 Add the `file:` dependency to `src/frontend/developer` and verify that `npm install` and `npm run verify` still pass.
-- [ ] 5.2 **[sec]** Red/Green a read-only `ReportSourcePanel` (D9) rendering the five fields through `MarkdownView`, with the title as plain text. Verify with a vitest test asserting the same DOM as the Maintainer for the MDR-07 fixture, and `npm run verify` in `src/frontend/developer`.
+- [ ] 5.2 **[sec]** Red/Green a read-only `ReportDescriptionPanel` (D9) rendering the description through `MarkdownView`, with the title as plain text. Verify with a vitest test asserting the same DOM as the Maintainer for the MDR-07 fixture, and `npm run verify` in `src/frontend/developer`.
 
 ## 6. Cross-role integration
 

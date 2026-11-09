@@ -2,45 +2,44 @@
 
 ## Purpose
 
-Lets a Reporter file bug reports and read back only the reports they filed, with long-text fields kept as Markdown source exactly as written.
+Lets a Reporter file bug reports with a plain-text title and a Markdown description, at a bounded rate, and read back only the reports they filed.
 
 ## ADDED Requirements
 
 ### Requirement: RPT-01 Reporter creates a report
 
-The system SHALL let an active Reporter create a report with `title`, `description`, `reproductionSteps`, `expectedBehavior`, `actualBehavior` and `environment`. Title and description SHALL be required. The other four SHALL be optional and default to an empty string. The server SHALL assign the ID, Reporter identity, status `SUBMITTED`, version 0, no assignee and creation/update timestamps, then return the created report.
+The system SHALL let an active Reporter create a report with exactly two Reporter-authored fields: `title` and `description`, both required. The server SHALL assign the ID, Reporter identity, status `SUBMITTED`, version 0, no assignee and creation/update timestamps, then return the created report.
 
 #### Scenario: Valid submission
 - **GIVEN** an active Reporter session
-- **WHEN** the Reporter posts a non-blank title and description and two optional fields
+- **WHEN** the Reporter posts a non-blank title and description
 - **THEN** the response is 201 with the stored report, status `SUBMITTED`, version 0 and no assignee
-- **AND** omitted optional fields read back as empty strings
 - **AND** the report appears in that Reporter's list
 
-#### Scenario: Server-owned fields cannot be supplied
-- **WHEN** the request body contains `id`, `reporterId`, `status`, `version`, `assigneeId` or any other unknown field
+#### Scenario: Server-owned or unsupported fields cannot be supplied
+- **WHEN** the request body contains `id`, `reporterId`, `status`, `version`, `assigneeId`, `reproductionSteps`, `environment` or any other key besides `title` and `description`
 - **THEN** the response is 400 `VALIDATION_FAILED` and no report is stored
 
 ### Requirement: RPT-02 Report field validation
 
-The server SHALL reject a create request with 400 `VALIDATION_FAILED`, and store nothing, when title or description is missing or blank, when title is longer than 200 UTF-16 code units or contains a line break, when any long-text field is longer than 20,000 UTF-16 code units, or when any field contains U+0000 or an unpaired surrogate.
+The server SHALL reject a create request with 400 `VALIDATION_FAILED`, and store nothing, when title or description is missing, not a string, or blank, when title is longer than 200 UTF-16 code units or contains a line break, when description is longer than 20,000 UTF-16 code units, or when either field contains U+0000 or an unpaired surrogate.
 
 #### Scenario: Missing or blank required field
-- **WHEN** the title or description is absent, empty or whitespace-only
+- **WHEN** the title or description is absent, null, empty or whitespace-only
 - **THEN** the response is 400 `VALIDATION_FAILED` and the Reporter's report count is unchanged
 
 #### Scenario: Oversized field
-- **WHEN** a long-text field has 20,001 UTF-16 code units
+- **WHEN** the description has 20,001 UTF-16 code units, or the title has 201
 - **THEN** the response is 400 `VALIDATION_FAILED`
-- **AND** a field of exactly 20,000 code units is accepted
+- **AND** a description of exactly 20,000 and a title of exactly 200 code units are accepted
 
 #### Scenario: Text PostgreSQL cannot store faithfully
-- **WHEN** any field contains U+0000 or an unpaired surrogate
+- **WHEN** either field contains U+0000 or an unpaired surrogate
 - **THEN** the response is 400 `VALIDATION_FAILED` and nothing is stored
 
 ### Requirement: RPT-03 Markdown source fidelity
 
-The server SHALL store and return every Reporter-authored text field exactly as submitted, without trimming, normalising, rendering or converting it. No Reporter API response SHALL contain server-generated HTML.
+The server SHALL store and return `title` and `description` exactly as submitted, without trimming, normalising, rendering or converting them. No Reporter API response SHALL contain server-generated HTML.
 
 #### Scenario: Markdown and markup round-trip unchanged
 - **GIVEN** a description containing a fenced code block, a table, trailing spaces and `<script>alert(1)</script>`
@@ -62,11 +61,11 @@ The system SHALL return only reports whose stored Reporter is the session actor.
 
 ### Requirement: RPT-05 Reporter reads own report
 
-The system SHALL return the full detail, including all six text fields, status, version and timestamps, only when the requested report's stored Reporter is the session actor. A report filed by someone else SHALL be indistinguishable from a missing report.
+The system SHALL return `id`, `title`, `description`, `status`, `version`, `createdAt` and `updatedAt` only when the requested report's stored Reporter is the session actor. A report filed by someone else SHALL be indistinguishable from a missing report.
 
 #### Scenario: Read own report
 - **WHEN** a Reporter requests a report they filed
-- **THEN** the response is 200 with every source field as stored
+- **THEN** the response is 200 with title and description as stored
 
 #### Scenario: Another Reporter's report
 - **WHEN** Reporter R2 requests report A filed by R1
@@ -86,5 +85,30 @@ Every Reporter endpoint SHALL resolve the actor from the server-side session. A 
 Error responses SHALL use the shared envelope `{ code, message, requestId }` with a non-empty fixed message and no report content, SQL, stack trace or submitted text. Every Reporter response SHALL send `Cache-Control: no-store`.
 
 #### Scenario: Failure response is safe
-- **WHEN** any Reporter request fails validation, authorization or lookup
+- **WHEN** any Reporter request fails validation, authorization, rate limiting or lookup
 - **THEN** the body contains only `code`, `message` and `requestId`, and the response is marked `no-store`
+
+### Requirement: RPT-08 Report creation rate limit
+
+A Reporter SHALL be able to create at most 3 reports in any rolling 60-second window, counted from their stored creation times. A further valid create SHALL return 429 `RATE_LIMITED` with a `Retry-After` header in whole seconds, and store nothing. The check and insert SHALL be atomic per Reporter. Rejected requests SHALL NOT count.
+
+#### Scenario: Fourth report within a minute
+- **GIVEN** Reporter R1 created 3 reports in the last 60 seconds
+- **WHEN** R1 posts a fourth valid report
+- **THEN** the response is 429 `RATE_LIMITED` with `Retry-After` of at least 1, and R1's report count is still 3
+
+#### Scenario: Window rolls over
+- **GIVEN** R1's oldest of 3 creates in the window becomes more than 60 seconds old
+- **WHEN** R1 posts a valid report
+- **THEN** the response is 201
+
+#### Scenario: Concurrent creates cannot exceed the limit
+- **GIVEN** R1 has 2 creates in the current window
+- **WHEN** R1 sends 5 valid creates concurrently
+- **THEN** exactly 1 returns 201, 4 return 429, and R1 has exactly 3 reports in the window
+
+#### Scenario: Limits are per Reporter and ignore failed requests
+- **GIVEN** R1 is at the limit
+- **WHEN** R2 posts a valid report, and separately R1 posts an invalid report
+- **THEN** R2 gets 201, and R1 gets 400 `VALIDATION_FAILED` rather than 429
+- **AND** neither the invalid request nor any 429 adds to R1's window
