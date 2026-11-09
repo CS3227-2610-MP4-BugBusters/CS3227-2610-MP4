@@ -38,8 +38,9 @@ public final class ChecklistDraftHttpHandler {
             sendError(exchange, 404, "NOT_FOUND", "Resource not found");
             return;
         }
-        if (!exchange.getRequestMethod().equals("PUT")) {
-            exchange.getResponseHeaders().set("Allow", "PUT");
+        String method = exchange.getRequestMethod();
+        if (!method.equals("GET") && !method.equals("PUT")) {
+            exchange.getResponseHeaders().set("Allow", "GET, PUT");
             sendError(exchange, 405, "METHOD_NOT_ALLOWED", "Method not allowed");
             return;
         }
@@ -58,6 +59,24 @@ public final class ChecklistDraftHttpHandler {
             reportId = UUID.fromString(id);
         } catch (IllegalArgumentException invalidId) {
             sendError(exchange, 400, "INVALID_REQUEST", "Invalid report ID");
+            return;
+        }
+
+        if (method.equals("GET")) {
+            exchange.getResponseHeaders().set("Cache-Control", "no-store");
+            try {
+                var result = store.read(actor, reportId);
+                if (result == null) {
+                    sendError(exchange, 403, "FORBIDDEN", "Access denied");
+                } else {
+                    var body = JSON.createObjectNode();
+                    body.set("steps", JSON.valueToTree(result.steps()));
+                    body.put("draftRevision", result.draftRevision());
+                    sendJson(exchange, 200, body);
+                }
+            } catch (SQLException | RuntimeException failure) {
+                sendError(exchange, 500, "INTERNAL_ERROR", "Request could not be completed");
+            }
             return;
         }
 

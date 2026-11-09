@@ -12,12 +12,62 @@ public final class ChecklistDraftStore {
     public enum Outcome { SAVED, FORBIDDEN, INVALID_STATE, STALE_VERSION }
 
     public record Actor(UUID id, Role role, boolean active) {}
+    public record DraftReadResult(List<String> steps, long draftRevision) {}
     public record SaveResult(Outcome outcome, Long draftRevision) {}
 
     private final DataSource database;
 
     public ChecklistDraftStore(DataSource database) {
         this.database = database;
+    }
+
+    public DraftReadResult read(Actor actor, UUID reportId) throws SQLException {
+        if (actor == null || !actor.active() || actor.id() == null || actor.role() != Role.DEVELOPER) {
+            return null;
+        }
+
+        try (Connection connection = database.getConnection()) {
+            connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+            connection.setAutoCommit(false);
+            try {
+                try (var report = connection.prepareStatement(
+                        "SELECT assignee_id FROM reports WHERE id = ? FOR UPDATE")) {
+                    report.setObject(1, reportId);
+                    try (var row = report.executeQuery()) {
+                        if (!row.next() || !actor.id().equals(row.getObject("assignee_id", UUID.class))) {
+                            connection.commit();
+                            return null;
+                        }
+                    }
+                }
+
+                DraftReadResult result = new DraftReadResult(List.of(), 0);
+                try (var checklist = connection.prepareStatement(
+                        "SELECT draft_steps, draft_revision FROM investigation_checklists WHERE report_id = ?")) {
+                    checklist.setObject(1, reportId);
+                    try (var row = checklist.executeQuery()) {
+                        if (row.next()) {
+                            var steps = row.getArray("draft_steps");
+                            try {
+                                result = new DraftReadResult(List.of((String[]) steps.getArray()),
+                                        row.getLong("draft_revision"));
+                            } finally {
+                                steps.free();
+                            }
+                        }
+                    }
+                }
+                connection.commit();
+                return result;
+            } catch (SQLException | RuntimeException failure) {
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackFailure) {
+                    failure.addSuppressed(rollbackFailure);
+                }
+                throw failure;
+            }
+        }
     }
 
     public SaveResult save(Actor actor, UUID reportId, long expectedDraftRevision, List<String> steps)

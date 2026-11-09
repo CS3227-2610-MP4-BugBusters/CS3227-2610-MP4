@@ -26,6 +26,14 @@ Save and Share require Assigned, In progress, or Resolution proposed. Compare th
 
 ## Private Save HTTP contract
 
+For local application integration, `GET /api/reports/{reportId}/checklist/draft`
+returns `{ "steps": ["..."], "draftRevision": 2 }` only to the active,
+currently assigned Developer. A report without a checklist returns empty
+steps and revision zero. The response excludes shared steps and uses
+`Cache-Control: no-store`. Inaccessible or missing reports return generic
+403 without revealing draft contents or report existence. Real session and
+account eligibility locking remain integration dependencies.
+
 Use `PUT /api/reports/{reportId}/checklist/draft` with a JSON body
 `{ "steps": ["Reproduce the bug"], "expectedDraftRevision": 2 }`.
 On success, respond with HTTP 200 and `{ "draftRevision": 3 }`.

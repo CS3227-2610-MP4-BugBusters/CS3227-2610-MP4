@@ -85,6 +85,10 @@ public class AuthConfiguration {
             AuthSessionFreshnessFilter freshness) throws Exception {
         return http.csrf(c -> c.csrfTokenRepository(csrf))
             .authorizeHttpRequests(r -> r.requestMatchers("/api/health", "/api/auth/**", "/", "/index.html", "/assets/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reports/*/checklist/draft").hasRole("DEVELOPER")
+                .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/reports/*/checklist/draft").hasRole("DEVELOPER")
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/reports/*/checklist/share").hasRole("DEVELOPER")
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reports/*/checklist/shared").hasAnyRole("REPORTER", "DEVELOPER", "MAINTAINER")
                 .requestMatchers("/api/developer/**").hasRole("DEVELOPER")
                 .requestMatchers("/api/maintainer/**").hasRole("MAINTAINER").anyRequest().denyAll())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
