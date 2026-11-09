@@ -44,8 +44,10 @@ some destructive actions; it is not an approval gate.
 Automatic deploys are disabled. To request a development deploy, manually dispatch
 the `Deploy application` workflow from `main`. It checks the latest `CI` workflow
 run for the exact `main` push SHA before reading the environment secret
-`RENDER_DEV_DEPLOY_HOOK`. Configure that secret as the Render deploy hook URL in the
-GitHub `development` environment. The workflow requests that exact SHA and reports
+`RENDER_DEPLOY_HOOK`. Configure that secret as the Render deploy hook URL in the
+GitHub `development` environment. Configure the same secret name independently
+in the GitHub `production` environment; the selected job environment supplies
+only its own value. The workflow requests that exact SHA and reports
 only the returned deploy ID (when Render returns one). Configure GitHub environment
 protection rules separately if human approval is required; naming an environment
 does not enable approval protection.
@@ -71,9 +73,14 @@ and its own environment-scoped deploy hook after provisioning.
 Configured the GitHub `development` and `production` environments to allow only
 `main`. Production requires Developer-owner review (`XuHh03`) and prevents
 self-review. The `Deploy production` wrapper reuses the same exact-revision CI
-gate and checks actual production reviewer metadata before using
-`RENDER_PROD_DEPLOY_HOOK`; development uses `RENDER_DEV_DEPLOY_HOOK`. No hook is
-configured yet and no deployment was requested. A production environment name
+gate and checks actual production reviewer metadata before using the
+`RENDER_DEPLOY_HOOK` secret scoped to the selected job environment. No hook is
+configured yet and no deployment was requested. Keep this name exclusively in the
+selected GitHub environment; do not create repository/organization copies. GitHub
+can otherwise fall back to a same-name broader secret, so review secret-scope metadata
+before enabling hooks. Verified empty repository, development and production secret
+inventories locally; organization secret scope remains a release configuration check.
+A production environment name
 alone does not satisfy the protection check.
 
 For rollback, select a previously verified deployment in the correct Render

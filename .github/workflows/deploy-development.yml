@@ -75,9 +75,7 @@ jobs:
 
       - name: Request Render deployment for this revision
         env:
-          RENDER_DEV_DEPLOY_HOOK: ${{ secrets.RENDER_DEV_DEPLOY_HOOK }}
-          RENDER_PROD_DEPLOY_HOOK: ${{ secrets.RENDER_PROD_DEPLOY_HOOK }}
-          TARGET_ENVIRONMENT: ${{ inputs.target_environment || 'development' }}
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
@@ -89,9 +87,7 @@ jobs:
           import urllib.parse
           import urllib.request
 
-          target_environment = os.environ["TARGET_ENVIRONMENT"]
-          hook_name = "RENDER_PROD_DEPLOY_HOOK" if target_environment == "production" else "RENDER_DEV_DEPLOY_HOOK"
-          hook = os.environ.get(hook_name, "")
+          hook = os.environ.get("RENDER_DEPLOY_HOOK", "")
           sha = os.environ["EXPECTED_SHA"]
           if not hook or not sha:
               print("The selected environment deploy hook is not configured.", file=sys.stderr)

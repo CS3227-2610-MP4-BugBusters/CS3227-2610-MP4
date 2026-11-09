@@ -165,7 +165,8 @@ budget. Report unavailable cache/reasoning-token measurements rather than guessi
 
 ## Migration Plan
 
-This PR moves documentation only. Retain historical commits and logs; remove the
+The original migration moved documentation only. Subsequent implementation is
+tracked in PR #10. Retain historical commits and logs; remove the
 five superseded Maintainer workflow documents after independent coverage review.
 Use [verification.md](verification.md) and the new delta scenarios as test oracles.
 Future implementation follows tasks.md and the approved Red baseline, never this

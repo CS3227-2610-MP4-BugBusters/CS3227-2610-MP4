@@ -27,8 +27,10 @@ maintaining duplicate migration files.
 
 ## Verification and delivery
 
-Run `python src/backend/auth/test/run_setup.py` for the disposable PostgreSQL backend
-checks. Select a class with `--tests` for focused development. Run `npm run verify`
+Use `python workflow/verify.py` for the repository frontend/backend/security/tooling
+checks. CI uses the same entry point with focused groups; see workflow/README.md.
+Run `python src/backend/auth/test/run_setup.py` for only the disposable PostgreSQL
+backend checks. Select a class with `--tests` for focused development. Run `npm run verify`
 inside each changed frontend. CI retains complete checks and builds the packaged
 application. Follow the repository TDD workflow and preserve independently verified
 baseline tests. Record unavailable independent reviews as pending.
@@ -40,3 +42,24 @@ prevents self-review. Neither Render provisioning nor live deployment has been
 performed here; deploy hooks and host connectivity remain unverified. The Pages
 site is a separate team deliverable, not the application host. The repository uses
 `main`; reconcile any assignment reference to `master` with the final submission.
+
+## Acknowledgements
+
+Used Spring Security/Spring Session, Gradle, PostgreSQL JDBC/Flyway, React and Vite
+through the dependencies recorded in the repository. Consulted MP2/MP3 documentation
+for framework/server reference; did not carry over their application implementation.
+Used the official Render and GitHub Actions references linked in the deployment
+README, and Gitleaks, OSV-Scanner and actionlint documentation linked in
+workflow/security/README.md. Used OpenSpec for specifications and Codex/specialist
+agents for development and review. The team's final acknowledgement section should
+retain these references alongside the other owners' contributions.
+
+## Workflow files contributed
+
+| Path | Purpose |
+| --- | --- |
+| workflow/verify.py and workflow/test/ | Shared verification command and focused runner/security/auditor checks. |
+| workflow/security/ | Pinned scanner downloads, wrapper verification, resolved dependency inventory and release scans. |
+| workflow/evaluation/agents/ | Synthetic security/scope/failure fixtures and coordinator audit command. |
+| workflow/evaluation/reflections/ | Frozen protocol, isolated comparison generator, Maintainer examples and controlled Java reuse harness. |
+| .github/workflows/ci.yml and deploy-*.yml | Verification matrices/image check and protected environment deployment automation. |

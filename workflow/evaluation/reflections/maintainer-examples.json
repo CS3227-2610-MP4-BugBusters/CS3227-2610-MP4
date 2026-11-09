@@ -1,0 +1,75 @@
+[
+  {
+    "id": "MNT-EX01",
+    "queue": "high-priority unresolved browser failures",
+    "reports": [
+      {
+        "id": "00000000-0000-0000-0000-000000000101",
+        "priority": "HIGH",
+        "status": "IN_PROGRESS",
+        "title": "Save fails after session expiry",
+        "description": "Saving a draft after 30 minutes returns an error. Refreshing and signing in allows save.",
+        "recentUpdates": [
+          "Reproduced in Chrome with an expired session.",
+          "Expected behavior after expiry has not been confirmed."
+        ]
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000102",
+        "priority": "CRITICAL",
+        "status": "ASSIGNED",
+        "title": "Report list becomes empty after filter change",
+        "description": "Changing status filter while a request is pending sometimes shows an empty list. No stored reports were deleted.",
+        "recentUpdates": [
+          "Latency-dependent reproduction reported.",
+          "Investigation has not confirmed the cause."
+        ]
+      }
+    ],
+    "expected_facts": [
+      "session-expiry-dependent save error",
+      "possible late filter response, cause uncertain",
+      "no evidence of deletion"
+    ],
+    "unsupported_claims": [
+      "fix implemented",
+      "tests passed",
+      "confirmed shared root cause"
+    ]
+  },
+  {
+    "id": "MNT-EX02",
+    "queue": "unresolved incomplete reproduction reports",
+    "reports": [
+      {
+        "id": "00000000-0000-0000-0000-000000000201",
+        "priority": "MEDIUM",
+        "status": "SUBMITTED",
+        "title": "Occasional duplicate comment",
+        "description": "A comment appeared twice after repeated clicks. Browser version and network conditions are missing.",
+        "recentUpdates": [
+          "Reporter has not supplied a reproducible sequence."
+        ]
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000202",
+        "priority": "LOW",
+        "status": "IN_PROGRESS",
+        "title": "Priority label wraps on narrow screen",
+        "description": "Priority label wraps at 320px width. No screenshot or browser details supplied.",
+        "recentUpdates": [
+          "Need browser/device details and expected layout."
+        ]
+      }
+    ],
+    "expected_facts": [
+      "missing browser/network/reproduction details",
+      "reported narrow-screen wrapping, impact uncertain"
+    ],
+    "unsupported_claims": [
+      "all users affected",
+      "duplicate database rows confirmed",
+      "investigation completed"
+    ]
+  }
+]
