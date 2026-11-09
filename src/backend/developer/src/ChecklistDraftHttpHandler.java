@@ -68,8 +68,8 @@ public final class ChecklistDraftHttpHandler {
                 var result = store.read(actor, reportId);
                 if (result == null) {
                     sendError(exchange, 403, "FORBIDDEN", "Access denied");
-                } else if (result.draftRevision() > ChecklistShareService.MAX_SAFE_VERSION
-                        || result.reportVersion() > ChecklistShareService.MAX_SAFE_VERSION) {
+                } else if (result.draftRevision() > ChecklistDraftStore.MAX_SAFE_VERSION
+                        || result.reportVersion() > ChecklistDraftStore.MAX_SAFE_VERSION) {
                     sendError(exchange, 409, "VERSION_LIMIT", "Checklist version cannot be safely represented");
                 } else {
                     var body = JSON.createObjectNode();
@@ -135,7 +135,7 @@ public final class ChecklistDraftHttpHandler {
         if (stepsNode == null || !stepsNode.isArray() || revisionNode == null
                 || !revisionNode.isIntegralNumber() || !revisionNode.canConvertToLong()
                 || revisionNode.longValue() < 0
-                || revisionNode.longValue() > ChecklistShareService.MAX_SAFE_VERSION) {
+                || revisionNode.longValue() > ChecklistDraftStore.MAX_SAFE_VERSION) {
             throw new IllegalArgumentException("Invalid request body");
         }
         var steps = new ArrayList<String>();

@@ -8,6 +8,8 @@ import javax.sql.DataSource;
 
 /** Saves private drafts for actors resolved by the application's authentication layer. */
 public final class ChecklistDraftStore {
+    public static final long MAX_SAFE_VERSION = 9_007_199_254_740_991L;
+
     public enum Role { REPORTER, DEVELOPER, MAINTAINER }
     public enum Outcome { SAVED, FORBIDDEN, INVALID_STATE, STALE_VERSION, VERSION_LIMIT }
 
@@ -114,7 +116,7 @@ public final class ChecklistDraftStore {
                 }
             }
         }
-        if (expectedDraftRevision > ChecklistShareService.MAX_SAFE_VERSION) {
+        if (expectedDraftRevision > MAX_SAFE_VERSION) {
             return new SaveResult(Outcome.VERSION_LIMIT, null);
         }
 
@@ -132,7 +134,7 @@ public final class ChecklistDraftStore {
         if (revision != expectedDraftRevision) {
             return new SaveResult(Outcome.STALE_VERSION, null);
         }
-        if (revision >= ChecklistShareService.MAX_SAFE_VERSION) {
+        if (revision >= MAX_SAFE_VERSION) {
             return new SaveResult(Outcome.VERSION_LIMIT, null);
         }
 

@@ -15,7 +15,7 @@ public interface ChecklistShareService {
         VERSION_LIMIT
     }
 
-    long MAX_SAFE_VERSION = 9_007_199_254_740_991L;
+    long MAX_SAFE_VERSION = ChecklistDraftStore.MAX_SAFE_VERSION;
 
     record ShareRequest(
             ChecklistDraftStore.Actor actor,
