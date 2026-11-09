@@ -15,6 +15,11 @@ export const MAX_NESTING_DEPTH = 32;
  * at roughly 0.3-0.7 s in jsdom, while the 2,500-column attack exhausts memory.
  */
 export const MAX_TABLE_CELLS = 10_000;
+/**
+ * Estimated table cells summed over every table in the source (design D13).
+ * Many tables just under the per-table cap still build a huge output tree.
+ */
+export const MAX_TOTAL_TABLE_CELLS = 10_000;
 /** Longest run of one emphasis delimiter character (`*`, `_` or `~`). */
 export const MAX_DELIMITER_RUN = 63;
 /** Total `*`, `_` and `~` characters in the source (10% of the length cap). */
@@ -222,6 +227,8 @@ export function exceedsRenderLimits(source: string): boolean {
   // Table estimate: columns of the latest delimiter row and lines since it.
   let tableColumns = 0;
   let tableRows = 0;
+  // Estimated cells of the tables already closed by a blank line.
+  let closedTableCells = 0;
   // Set by a line containing a container `>`; cleared by a blank line.
   let inQuote = false;
   let lazyLines = 0;
@@ -241,6 +248,7 @@ export function exceedsRenderLimits(source: string): boolean {
 
     if (isBlankLine(source, start, end)) {
       previousBlank = true;
+      closedTableCells += tableColumns * tableRows;
       tableColumns = 0;
       tableRows = 0;
       inQuote = false;
@@ -259,7 +267,9 @@ export function exceedsRenderLimits(source: string): boolean {
     }
     if (tableColumns > 0) {
       tableRows++;
-      if (tableColumns * tableRows > MAX_TABLE_CELLS) return true;
+      const cells = tableColumns * tableRows;
+      if (cells > MAX_TABLE_CELLS) return true;
+      if (closedTableCells + cells > MAX_TOTAL_TABLE_CELLS) return true;
     }
 
     if (!previousBlank && isSetextUnderline(source, start, end)) {

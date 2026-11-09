@@ -88,26 +88,21 @@ describe("MDR-03 Images are never loaded", () => {
   });
 });
 
-describe("MDR-04 Restricted links", () => {
-  it("Allowed link: https link with required rel", () => {
+describe("MDR-04 No links", () => {
+  it("Link syntax is shown as text: docs (https://example.com/a)", () => {
     const { container } = render(<MarkdownView source="[docs](https://example.com/a)" />);
-    const a = container.querySelector("a");
-    expect(a).not.toBeNull();
-    expect(a!.getAttribute("href")).toBe("https://example.com/a");
-    expect(a!.getAttribute("rel")).toBe("noopener noreferrer nofollow");
-    expect(a!.textContent).toBe("docs");
+    expect(container.querySelectorAll("a")).toHaveLength(0);
+    expect(container.querySelector("[href]")).toBeNull();
+    expect(container.textContent).toBe("docs (https://example.com/a)");
   });
 
-  it("Allowed link: http and mailto render as links with required rel", () => {
+  it("Link syntax is shown as text: http and mailto", () => {
     const { container } = render(
       <MarkdownView source="[a](http://example.com/x) and [m](mailto:me@example.com)" />,
     );
-    const anchors = Array.from(container.querySelectorAll("a"));
-    expect(anchors.map((a) => a.getAttribute("href"))).toEqual([
-      "http://example.com/x",
-      "mailto:me@example.com",
-    ]);
-    for (const a of anchors) expect(a.getAttribute("rel")).toBe("noopener noreferrer nofollow");
+    expect(container.querySelectorAll("a")).toHaveLength(0);
+    expect(container.querySelector("[href]")).toBeNull();
+    expect(container.textContent).toBe("a (http://example.com/x) and m (mailto:me@example.com)");
   });
 
   it.each([
@@ -124,12 +119,12 @@ describe("MDR-04 Restricted links", () => {
     ["relative path", "/relative/path"],
     ["relative path without slash", "relative/page.html"],
     ["protocol-relative", "//example.com/x"],
-  ])("Dangerous or relative link: %s renders text only", (_label, dest) => {
+    ["fragment", "#top"],
+  ])("Dangerous or relative destination: %s is inert text, destination shown", (_label, dest) => {
     const { container } = render(<MarkdownView source={`[linktext](${dest})`} />);
     expect(container.querySelectorAll("a")).toHaveLength(0);
     expect(container.querySelector("[href]")).toBeNull();
-    const text = container.textContent ?? "";
-    expect(text).toContain("linktext");
-    expect(text).not.toContain(dest.replace(/^<|>$/g, "").trim());
+    const shown = dest.replace(/^<|>$/g, "").trim();
+    expect(container.textContent).toContain(`linktext (${shown})`);
   });
 });

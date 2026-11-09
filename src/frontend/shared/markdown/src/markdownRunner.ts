@@ -1,13 +1,17 @@
 import type { Root } from "hast";
 import { exceedsRenderLimits } from "./MarkdownView.limits";
-import { toHast } from "./MarkdownView.pipeline";
+import { isHastRoot, toHast } from "./MarkdownView.pipeline";
 
 // Off-main-thread parsing with a per-request time limit (MDR-10, design D11).
 
 export type ParseOutcome = { kind: "ok"; hast: Root } | { kind: "fallback" };
 
 export interface MarkdownRunner {
-  parse(source: string, prefix: string): Promise<ParseOutcome>;
+  /**
+   * Parse `source`. Aborting `signal` before the request is sent drops it and
+   * resolves "fallback" (design D13); a request already sent runs to the end.
+   */
+  parse(source: string, prefix: string, signal?: AbortSignal): Promise<ParseOutcome>;
 }
 
 /** The part of `Worker` the runner uses, so tests can inject a fake. */
@@ -31,8 +35,8 @@ export interface WorkerRunnerOptions {
 
 type Pending = ParseRequest & {
   resolve: (outcome: ParseOutcome) => void;
-  /** Set once the request has been moved to a fresh worker. */
-  retried: boolean;
+  /** Stops listening for the caller's abort signal. */
+  release: () => void;
 };
 
 const FALLBACK: ParseOutcome = { kind: "fallback" };
@@ -40,7 +44,9 @@ const FALLBACK: ParseOutcome = { kind: "fallback" };
 /**
  * One worker, one request in flight, each request timed from when it is sent.
  * A timeout or worker error terminates the worker and falls back for that
- * request; requests still waiting are retried once on a fresh worker.
+ * request only; requests still waiting were never sent, so they stay queued
+ * and go to a fresh worker (design D13). An aborted request that has not been
+ * sent is removed from the queue and never posted.
  */
 export function createWorkerRunner({
   createWorker,
@@ -60,7 +66,10 @@ export function createWorkerRunner({
     current?.resolve(outcome);
   }
 
-  /** Drop the current worker; waiting requests get one retry on a fresh one. */
+  /**
+   * Drop the current worker. Only the request in flight used up its attempt
+   * and falls back; waiting requests are sent to a fresh worker by `pump`.
+   */
   function abandonWorker() {
     const dead = worker;
     worker = null;
@@ -70,10 +79,6 @@ export function createWorkerRunner({
       dead.terminate();
     }
     settle(FALLBACK);
-    for (let i = queue.length - 1; i >= 0; i--) {
-      if (queue[i].retried) queue.splice(i, 1)[0].resolve(FALLBACK);
-      else queue[i].retried = true;
-    }
   }
 
   function onReply(from: WorkerLike, data: unknown) {
@@ -83,8 +88,8 @@ export function createWorkerRunner({
     const reply = data as Partial<{ id: unknown; ok: unknown; hast: unknown }>;
     if (reply.id !== inFlight.id) return;
     const hast = reply.hast;
-    if (reply.ok === true && typeof hast === "object" && hast !== null) {
-      settle({ kind: "ok", hast: hast as Root });
+    if (reply.ok === true && isHastRoot(hast)) {
+      settle({ kind: "ok", hast });
     } else {
       settle(FALLBACK);
     }
@@ -106,6 +111,7 @@ export function createWorkerRunner({
     if (inFlight !== null) return;
     const next = queue.shift();
     if (next === undefined) return;
+    next.release();
     inFlight = next;
     try {
       worker ??= startWorker();
@@ -123,9 +129,29 @@ export function createWorkerRunner({
   }
 
   return {
-    parse(source, prefix) {
+    parse(source, prefix, signal) {
       return new Promise<ParseOutcome>((resolve) => {
-        queue.push({ id: nextId++, source, prefix, resolve, retried: false });
+        if (signal?.aborted) {
+          resolve(FALLBACK);
+          return;
+        }
+        const pending: Pending = {
+          id: nextId++,
+          source,
+          prefix,
+          resolve,
+          release: () => signal?.removeEventListener("abort", onAbort),
+        };
+        function onAbort() {
+          // Only a request still waiting is dropped; one in flight runs to the end.
+          const index = queue.indexOf(pending);
+          if (index === -1) return;
+          queue.splice(index, 1);
+          pending.release();
+          resolve(FALLBACK);
+        }
+        signal?.addEventListener("abort", onAbort);
+        queue.push(pending);
         pump();
       });
     },

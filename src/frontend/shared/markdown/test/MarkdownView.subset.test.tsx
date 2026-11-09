@@ -52,13 +52,15 @@ describe("MDR-01 Supported Markdown subset", () => {
     expect(tds).toEqual(["1", "2"]);
   });
 
-  it("Common report formatting: links and autolinks", () => {
+  it("Common report formatting: links and autolinks are recognised, then shown as text", () => {
     const { container } = renderMd(
       "[docs](https://example.com/docs) and https://example.com/auto\n",
     );
-    const hrefs = [...container.querySelectorAll("a")].map((a) => a.getAttribute("href"));
-    expect(hrefs).toContain("https://example.com/docs");
-    expect(hrefs).toContain("https://example.com/auto");
+    expect(container.querySelector("a")).toBeNull();
+    expect(container.querySelector("[href]")).toBeNull();
+    expect(container.querySelector("p")?.textContent).toBe(
+      "docs (https://example.com/docs) and https://example.com/auto",
+    );
   });
 
   it("Common report formatting: headings receive no generated id", () => {
