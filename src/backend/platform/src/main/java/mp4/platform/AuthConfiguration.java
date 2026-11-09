@@ -26,11 +26,21 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration(proxyBeanMethods = false)
 @EnableJdbcHttpSession(tableName = "mp4_auth_session", maxInactiveIntervalInSeconds = 1800)
 @EnableScheduling
 public class AuthConfiguration {
+    @Bean WebMvcConfigurer developerFrontendRoute() {
+        return new WebMvcConfigurer() {
+            @Override public void addViewControllers(ViewControllerRegistry registry) {
+                registry.addViewController("/developer/").setViewName("forward:/developer/index.html");
+            }
+        };
+    }
+
     @Bean DataSource authDataSource(@Value("${mp4.auth.jdbc-url}") String url,
             @Value("${mp4.auth.db-user}") String user, @Value("${mp4.auth.db-password}") String password) {
         DriverManagerDataSource ds = new DriverManagerDataSource();
@@ -85,6 +95,11 @@ public class AuthConfiguration {
             AuthSessionFreshnessFilter freshness) throws Exception {
         return http.csrf(c -> c.csrfTokenRepository(csrf))
             .authorizeHttpRequests(r -> r.requestMatchers("/api/health", "/api/auth/**", "/", "/index.html", "/assets/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/developer", "/developer/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reports/*/checklist/draft").hasRole("DEVELOPER")
+                .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/reports/*/checklist/draft").hasRole("DEVELOPER")
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/reports/*/checklist/share").hasRole("DEVELOPER")
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reports/*/checklist/shared").hasAnyRole("REPORTER", "DEVELOPER", "MAINTAINER")
                 .requestMatchers("/api/developer/**").hasRole("DEVELOPER")
                 .requestMatchers("/api/maintainer/**").hasRole("MAINTAINER").anyRequest().denyAll())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))

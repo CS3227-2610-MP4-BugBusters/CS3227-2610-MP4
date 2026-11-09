@@ -54,7 +54,7 @@ jobs:
       - name: Install PostgreSQL tools and JDBC driver
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql postgresql-client libpostgresql-jdbc-java
+          sudo apt-get install -y postgresql postgresql-client libpostgresql-jdbc-java libjackson2-databind-java
           echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
       - name: Verify shared report migration
         if: matrix.java == '17'
@@ -63,6 +63,19 @@ jobs:
         env:
           POSTGRES_JDBC_JAR: /usr/share/java/postgresql.jar
         run: src/backend/developer/test/run-assigned-reports.sh
+      - name: Verify checklist Share and shared reads
+        env:
+          POSTGRES_JDBC_JAR: /usr/share/java/postgresql.jar
+          JACKSON_CORE_JAR: /usr/share/java/jackson-core.jar
+          JACKSON_DATABIND_JAR: /usr/share/java/jackson-databind.jar
+          JACKSON_ANNOTATIONS_JAR: /usr/share/java/jackson-annotations.jar
+        run: |
+          bash src/backend/developer/test/run-checklist-share-service.sh mp4.developer.JdbcChecklistShareService src/backend/developer/src/JdbcChecklistShareService.java
+          bash src/backend/developer/test/run-checklist-share-proposal-guard-regression.sh
+          bash src/backend/developer/test/run-checklist-share-closure-race-regression.sh
+          bash src/backend/developer/test/run-checklist-share-safe-version-regression.sh
+          bash src/backend/developer/test/run-checklist-share-http.sh
+          bash src/backend/developer/test/run-checklist-shared-read-http.sh
 
   auth-setup:
     name: Auth setup / Java ${{ matrix.java }}
@@ -139,6 +152,7 @@ jobs:
           done
           "$ready" || { echo 'Packaged application did not become healthy.' >&2; exit 1; }
           curl --silent --show-error --fail http://127.0.0.1:18080/ | grep -q '<div id="root">'
+          curl --silent --show-error --fail http://127.0.0.1:18080/developer/ | grep -q '/developer/assets/'
           actual="$(curl --silent --show-error --fail http://127.0.0.1:18080/assets/revision.txt)"
           test "$actual" = "$GITHUB_SHA"
           echo 'Packaged health, frontend and exact build revision passed.'
