@@ -17,3 +17,6 @@ subsequent handoffs around concrete fixtures, executable API boundaries, typed
 errors and one owner of the Gradle build directory. The summary designer's first
 plan-only handoff and malformed temporary Java were not copied into the repository
 or counted as executable test evidence. Existing approved tests remain unchanged.
+
+Raised future baseline_verifier reasoning from low to high after two fixture contradictions escaped earlier reviews. Retained the same model and low-effort candidate execution role. Checking the state-reference correction against the original pre-implementation service in an isolated worktree before re-approving the tests; no production change is justified solely by an inconsistent fixture.
+

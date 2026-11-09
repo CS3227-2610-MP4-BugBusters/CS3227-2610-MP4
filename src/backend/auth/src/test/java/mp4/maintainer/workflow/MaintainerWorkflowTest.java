@@ -117,8 +117,9 @@ class MaintainerWorkflowTest {
         var f = new WorkflowFixture(); error(() -> f.service.updatePriority(f.actor, WorkflowFixture.REPORT, new PriorityChange(7, Priority.HIGH)), "STALE_VERSION", 409);
         assertSame(f.initial, f.report); assertEquals(List.of(f.retained, f.pending), f.proposals); assertEquals(List.of(f.priorEvent), f.history);
         var target = new WorkflowFixture(); target.report = withStatus(target.report, Status.SUBMITTED, null);
+        var reportBeforeRejectedAssignment = target.report;
         error(() -> target.service.assign(target.actor, WorkflowFixture.REPORT, new AssignmentChange(8, WorkflowFixture.INACTIVE, null)), "VALIDATION_FAILED", 400);
-        assertEquals(List.of(target.priorEvent), target.history); assertSame(target.initial, target.report);
+        assertEquals(List.of(target.priorEvent), target.history); assertSame(reportBeforeRejectedAssignment, target.report);
     }
     @Test void failureAppendingHistoryRollsBackReportProposalAndComment() {
         var close = new WorkflowFixture(); close.failAppendHistory = true;

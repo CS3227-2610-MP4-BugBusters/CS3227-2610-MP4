@@ -79,3 +79,24 @@ strengthens the contract, verified all 24 input hashes and reran the pure-fake
 workflow class on `1b18791`: compile passed, 14 tests failed at NOT_IMPLEMENTED,
 exit 1. Existing 40-control proof remains the separately recorded valid fixture run.
 The updated baseline is the approved starting point for workflow implementation.
+
+## Fixture correction before implementation
+
+The rejected-assignment rollback assertion now captures the submitted report object after fixture setup and verifies that the rejected call preserves that exact object. The prior assertion compared against the original fixture report even though setup intentionally replaced it with a submitted-state report. This corrects the test oracle only; the no-mutation contract is unchanged. The corrected test was run in isolated stub worktree `C:\Users\ngkok\.codex\worktrees\mp4-workflow-red-state-check` at source commit `c459d775dc5ef2ca0a4d530f1bfd7b9703f379c1`, with the unchanged service stub. The combined focused command completed compilation and reported 35 tests completed, 35 failed, including all 14 workflow cases; failures are expected because the service boundary remains unimplemented. The run did not execute the pre-existing 40 setup/auth controls. Their earlier passing Python fixture-runner result remains separate evidence above, not a result of this focused check.
+
+LF-normalized test hash after correction: `MaintainerWorkflowTest.java` `7efb17584169d3717271028e7a9a7714701c67daf6f07df8e458b667db8a3bce`. The corrected input manifest hash is recorded in `2026-11-09-workflow-red-inputs.sha256`. No feature contract, fixture, implementation, or other test was changed.
+
+## Final corrected-oracle approval before Green
+
+Rechecked the corrected workflow state-reference and summary field-cap assertions
+with a fresh baseline_verifier (gpt-6-luna/high) against the original application
+stubs in an isolated worktree at `c459d77`. Only the two corrected test files were
+copied there; production implementation files were not changed. Primary and
+isolated LF-normalized test hashes matched. The focused command selected both
+pure-fake classes, compiled and produced 35 expected Red failures: 14 workflow and
+21 summary, with no compiler or fixture failure and no database used. The reviewer
+checked the broader assertions against the contracts and found no remaining
+contradictory oracle. The separate 40-control fixture proof was not repeated.
+This corrected baseline supersedes the mistaken assertion expectations above;
+no product rule was relaxed to fit an implementation. Proceeding under the feature
+owner's standing authorization.

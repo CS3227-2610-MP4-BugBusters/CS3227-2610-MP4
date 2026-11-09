@@ -1,6 +1,8 @@
 package mp4.maintainer.summary;
 
 import org.junit.jupiter.api.Test;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -158,14 +160,27 @@ class QueueSummaryTest {
         SummaryResult result = f.service().generate(f.actor, ANY, false);
         String payload = f.requests.get(0).reports().value();
         IncludedReport included = result.included().get(0);
+        JsonNode context = assertDoesNotThrow(() -> new ObjectMapper().readTree(payload));
+        List<String> textNodes = new ArrayList<>();
+        collectTextNodes(context, textNodes);
 
-        assertTrue(included.truncatedFields().containsAll(List.of("title", "description", "reproductionSteps",
-            "expectedBehavior", "actualBehavior", "environment")));
-        assertTrue(payload.contains("latest <unsafe> \\\"quoted\\\""));
+        List<String> expectedTruncatedFields = List.of("title", "description", "reproductionSteps",
+            "expectedBehavior", "actualBehavior", "environment");
+        assertTrue(included.truncatedFields().containsAll(expectedTruncatedFields));
+        assertTrue(textNodes.contains("é".repeat(200)), "title is capped at 200 Unicode code points");
+        assertTrue(textNodes.contains("d".repeat(1000)), "description is capped at 1,000 Unicode code points");
+        assertTrue(textNodes.contains("r".repeat(1000)), "reproduction steps are capped at 1,000 code points");
+        assertTrue(textNodes.contains("e".repeat(500)), "expected behavior is capped at 500 code points");
+        assertTrue(textNodes.contains("a".repeat(500)), "actual behavior is capped at 500 code points");
+        assertTrue(textNodes.contains("v".repeat(300)), "environment is capped at 300 code points");
+        String latestPrefix = "latest <unsafe> \"quoted\" ";
+        assertTrue(textNodes.stream().anyMatch(text -> text.startsWith(latestPrefix)
+            && text.codePointCount(0, text.length()) == 300),
+            "latest update is semantically unescaped and capped at 300 Unicode code points");
         assertFalse(payload.contains("oldest must drop"));
-        assertTrue(payload.contains("three") && payload.contains("two") && payload.contains("one"));
-        assertTrue(payload.contains("L".repeat(300)));
-        assertFalse(payload.contains("L".repeat(301)), "each latest update is capped to 300 code points");
+        assertFalse(payload.contains("three"), "the fourth-newest update is excluded");
+        assertTrue(textNodes.contains("two") && textNodes.contains("one"));
+        assertEquals(expectedTruncatedFields.size(), included.truncatedFields().size());
         assertTrue(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= 24 * 1024);
         assertTrue(payload.contains("é"));
     }
@@ -546,6 +561,14 @@ class QueueSummaryTest {
             (who, filters, max) -> snapshot(List.of(report(1))), f.gateway,
             (who, model, duration) -> noOpLease(), f.cache, Limits.proposedDefaults(),
             java.time.Clock.fixed(NOW, java.time.ZoneOffset.UTC), true);
+    }
+
+    private static void collectTextNodes(JsonNode node, List<String> values) {
+        if (node.isTextual()) {
+            values.add(node.textValue());
+        } else if (node.isContainerNode()) {
+            node.elements().forEachRemaining(child -> collectTextNodes(child, values));
+        }
     }
 
     private static Limits limits(Duration deadline) {
