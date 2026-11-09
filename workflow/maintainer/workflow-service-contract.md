@@ -110,3 +110,8 @@ contract to `Actor`, and use the shared account lifecycle source for fresh
 eligibility. The current Maintainer package has no JDBC adapter, controller,
 account adapter or schema integration. Those are not supplied by these setup
 files.
+
+## Maintainer discussion decision
+
+Allow Maintainer plain-text discussion on Closed reports, following the plan's all-report discussion permission. Comments increment the aggregate version and append history without changing status or superseding the current proposal. Keep Reporter source edits and Developer publication subject to their unresolved-only rules. Selected this policy for the Maintainer-owned implementation; have not claimed separate teammate acceptance.
+

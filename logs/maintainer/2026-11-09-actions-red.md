@@ -17,4 +17,3 @@ The goal is to add explicit priority, assignment, resolution review and plain-te
 ## Independent baseline verification
 
 Confirmed Red with a fresh baseline_verifier (gpt-6-luna/low) on setup checkpoint 8645dc1, with frontend source unchanged from e63dc47. Targeted action tests failed 14/14 for missing behavior; existing 40 controls and typecheck passed. All 13 LF-normalized input hashes matched. Corrected the earlier one-report race fixture, raw-CRLF hash mismatch, ambiguous priority selector and conflict-feedback assertion before freezing this baseline. This is UI-only evidence; have not verified backend permissions or transactions. Proceeded under the feature owner's standing instruction to implement verified, unblocked work.
-

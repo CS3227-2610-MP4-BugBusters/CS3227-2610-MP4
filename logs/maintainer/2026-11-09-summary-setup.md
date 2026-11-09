@@ -14,3 +14,15 @@ The setup runner completed successfully on the shared-enum source revision befor
 - Last-run JUnit XML totals: 40 tests, 0 failures, 0 errors, 0 skipped. Per-class counts: AccountLifecycle 3, ProvisioningAcceptance 5, ProvisioningValidation 4, RunnerSetup 1, SessionAuthentication 11, SessionGuardRegression 8, summary setup 1, workflow setup 2, AuthParsingAndRaceRegression 5.
 - Final corrected `SummarySetupTest` has not yet been rerun in the isolated disposable PostgreSQL setup; no verification claim is made for that exact source tree.
 - No AI integration, auth session-identity adapter, full-queue SQL reader, source-field migration, production gateway, shared quota implementation or cross-replica cache was attempted or verified.
+
+## Independent combined setup verification
+
+Confirmed setup readiness with a fresh candidate_verifier, gpt-6-luna/low, on
+`8645dc1`. The disposable runner exited 0, with 40 tests passed and no failures,
+errors or skips: 37 existing tests and three new constructor/API setup controls.
+Captured tool session 19733 through completion; no duplicate run. The temporary
+PostgreSQL fixture was stopped and removed. Workflow proposal statuses match the
+Developer PENDING/SUPERSEDED/CLOSED contract; public versions stay JavaScript-safe.
+Changed the initial setup assertions before the behavior baseline so they check
+construction/API availability rather than permanently requiring NOT_IMPLEMENTED.
+No Maintainer behavior or provider call is claimed by this setup.
