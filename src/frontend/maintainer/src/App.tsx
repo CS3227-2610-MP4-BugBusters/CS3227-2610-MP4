@@ -263,10 +263,8 @@ export function App({
       return true;
     } catch (e) {
       const error = failure(e);
-      if (current()) {
-        if (error.code === "session" || error.code === "denied") deny(error, expectedEpoch);
-        else if (error.code !== "cancelled") setActionError(error);
-      }
+      if (expectedEpoch === epoch.current && (error.code === "session" || error.code === "denied")) deny(error, expectedEpoch);
+      else if (current() && error.code !== "cancelled") setActionError(error);
       return false;
     } finally {
       controllers.current.delete(c);
