@@ -36,6 +36,17 @@ allprojects {
                     into new File(classesDirectory, 'static')
                 }
 
+                def developerFrontend = project.providers.gradleProperty('developerFrontendDist').orNull
+                if (developerFrontend != null) {
+                    if (!new File(developerFrontend).isDirectory()) {
+                        throw new GradleException('Developer frontend distribution is unavailable.')
+                    }
+                    project.copy {
+                        from developerFrontend
+                        into new File(classesDirectory, 'static/developer')
+                    }
+                }
+
                 def revision = project.providers.gradleProperty('buildRevision').orElse('unknown').get()
                 if (!(revision ==~ /[A-Za-z0-9._-]{1,128}/)) {
                     throw new GradleException('Build revision is invalid.')

@@ -5,6 +5,13 @@ RUN npm ci
 COPY src/frontend/maintainer/ ./
 RUN npm run build
 
+FROM node:22-bookworm-slim AS developer-frontend
+WORKDIR /workspace/src/frontend/developer
+COPY src/frontend/developer/package.json src/frontend/developer/package-lock.json ./
+RUN npm ci
+COPY src/frontend/developer/ ./
+RUN npm run build
+
 FROM eclipse-temurin:17-jdk-jammy AS package
 WORKDIR /workspace/src/backend/auth
 COPY src/backend/auth/ ./
@@ -12,12 +19,14 @@ COPY src/backend/platform/ ../platform/
 COPY src/backend/developer/src/ ../developer/src/
 COPY src/backend/platform/deployment/package.gradle ../platform/deployment/package.gradle
 COPY --from=frontend /workspace/src/frontend/maintainer/dist /workspace/frontend-dist
+COPY --from=developer-frontend /workspace/src/frontend/developer/dist /workspace/developer-frontend-dist
 ARG RENDER_GIT_COMMIT
 ARG GITHUB_SHA
 RUN chmod +x ./gradlew \
     && ./gradlew --no-daemon -I ../platform/deployment/package.gradle authDistribution \
     -PbuildRevision="${RENDER_GIT_COMMIT:-${GITHUB_SHA:-unknown}}" \
-    -PfrontendDist=/workspace/frontend-dist
+    -PfrontendDist=/workspace/frontend-dist \
+    -PdeveloperFrontendDist=/workspace/developer-frontend-dist
 
 FROM eclipse-temurin:17-jre-jammy AS runtime
 WORKDIR /app
