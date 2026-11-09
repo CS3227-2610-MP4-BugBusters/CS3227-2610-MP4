@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDemoQueries, reports } from "./demo";
+import { createDemoQueries, developers, reports } from "./demo";
 import type { Detail } from "./domain";
 
 describe("preview mutation invariants", () => {
@@ -31,6 +31,17 @@ describe("preview mutation invariants", () => {
     expect(source[0].currentProposal).toBeNull();
     const retained = source[0].history.filter((event) => event.type === "Proposal retained").at(-1);
     expect(retained).toBeDefined();
-    expect(JSON.parse(retained!.text)).toEqual({ id: before.id, version: before.version, text: before.text, author: before.author, createdAt: before.createdAt });
+    expect(retained!.text).toContain(`Proposal ${before.id} (version ${before.version})`);
+    expect(retained!.text).toContain(`by ${before.author.displayName} [${before.author.id}] at ${before.createdAt}`);
+    expect(retained!.text).toContain(before.text);
+  });
+
+  it.each(["\u0085", "\u009b"])("rejects C1 controls before preview writes", async (control) => {
+    const source = [structuredClone(reports[1])];
+    const queries = createDemoQueries(source, true);
+    const version = source[0].version;
+    await expect(queries.assignReport!({ reportId: source[0].id, expectedVersion: version, developerId: developers[0].id, reason: `Change${control}reason` })).rejects.toMatchObject({ code: "validation" });
+    expect(source[0].version).toBe(version);
+    expect(source[0].history).toHaveLength(reports[1].history.length);
   });
 });

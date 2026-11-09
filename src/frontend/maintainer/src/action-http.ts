@@ -98,7 +98,7 @@ export function withHttpActions<T extends Queries>(queries: T, fetcher: typeof f
   };
   const text = (value: string, max: number) => {
     const clean = value.trim();
-    if ([...clean].length < 1 || [...clean].length > max || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f]/.test(clean)) throw new QueryError("validation");
+    if ([...clean].length < 1 || [...clean].length > max || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f-\u009f]/.test(clean)) throw new QueryError("validation");
     return clean;
   };
   return Object.assign(queries, {
@@ -151,7 +151,7 @@ function validateCommentResult(value: unknown, expectedVersion?: number): void {
   const result = value as Record<string, unknown>, comment = result.comment;
   if (!Number.isSafeInteger(result.reportVersion) || (result.reportVersion as number) < 0 || (expectedVersion !== undefined && result.reportVersion !== expectedVersion + 1) || !comment || typeof comment !== "object" || Array.isArray(comment)) throw new QueryError("contract");
   const item = comment as Record<string, unknown>, author = item.author;
-  if (typeof item.id !== "string" || !uuid.test(item.id) || typeof item.text !== "string" || !item.text.trim() || [...item.text].length > 4000 || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f]/.test(item.text) || typeof item.createdAt !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(item.createdAt) || !Number.isFinite(Date.parse(item.createdAt)) || new Date(item.createdAt).toISOString().slice(0, 19) !== item.createdAt.slice(0, 19) || !author || typeof author !== "object" || Array.isArray(author)) throw new QueryError("contract");
+  if (typeof item.id !== "string" || !uuid.test(item.id) || typeof item.text !== "string" || !item.text.trim() || [...item.text].length > 4000 || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f-\u009f]/.test(item.text) || typeof item.createdAt !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(item.createdAt) || !Number.isFinite(Date.parse(item.createdAt)) || new Date(item.createdAt).toISOString().slice(0, 19) !== item.createdAt.slice(0, 19) || !author || typeof author !== "object" || Array.isArray(author)) throw new QueryError("contract");
   const person = author as Record<string, unknown>;
   if (typeof person.id !== "string" || !uuid.test(person.id) || typeof person.displayName !== "string" || person.displayName.length > 200) throw new QueryError("contract");
 }

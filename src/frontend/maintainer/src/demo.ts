@@ -93,7 +93,7 @@ export function createDemoQueries(
   });
   const retainProposal = (r: Detail) => {
     const proposal = r.currentProposal;
-    if (proposal) history(r, "Proposal retained", JSON.stringify({ id: proposal.id, version: proposal.version, text: proposal.text, author: proposal.author, createdAt: proposal.createdAt }));
+    if (proposal) history(r, "Proposal retained", `Proposal ${proposal.id} (version ${proposal.version}) by ${proposal.author.displayName} [${proposal.author.id}] at ${proposal.createdAt}\n\n${proposal.text}`);
   };
   return {
     async getCurrentUser(s) {
@@ -144,14 +144,14 @@ export function createDemoQueries(
       const reassignment = before.status !== "Submitted";
       if (reassignment && before.assignee?.id === developerId) throw new QueryError("validation");
       const text = reason?.trim() ?? "";
-      if (reassignment && (!text || [...text].length > 1000 || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f]/.test(text))) throw new QueryError("validation");
+      if (reassignment && (!text || [...text].length > 1000 || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f-\u009f]/.test(text))) throw new QueryError("validation");
       const r = write(reportId, expectedVersion);
       r.assignee = target; r.status = "Assigned"; history(r, reassignment ? "Reassigned" : "Assigned", reassignment ? text : target.displayName);
     },
     async returnResolution({ reportId, expectedVersion, proposalId, proposalVersion, reason }: { reportId: string; expectedVersion: number; proposalId: string; proposalVersion: number; reason: string }) {
       const before = find(reportId);
       if (before.status !== "Resolution proposed" || before.currentProposal?.id !== proposalId || before.currentProposal.version !== proposalVersion) throw new QueryError("invalidState");
-      if (!reason.trim() || [...reason.trim()].length > 1000 || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f]/.test(reason.trim())) throw new QueryError("validation");
+      if (!reason.trim() || [...reason.trim()].length > 1000 || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f-\u009f]/.test(reason.trim())) throw new QueryError("validation");
       const r = write(reportId, expectedVersion); retainProposal(r); r.status = "In progress"; r.currentProposal = null; history(r, "Resolution returned", reason.trim());
     },
     async closeReport({ reportId, expectedVersion, proposalId, proposalVersion, reviewed }: { reportId: string; expectedVersion: number; proposalId: string; proposalVersion: number; reviewed: true }) {
@@ -161,12 +161,12 @@ export function createDemoQueries(
     },
     async reopenReport({ reportId, expectedVersion, reason }: { reportId: string; expectedVersion: number; reason: string }) {
       if (find(reportId).status !== "Closed") throw new QueryError("invalidState");
-      if (!reason.trim() || [...reason.trim()].length > 1000 || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f]/.test(reason.trim())) throw new QueryError("validation");
+      if (!reason.trim() || [...reason.trim()].length > 1000 || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f-\u009f]/.test(reason.trim())) throw new QueryError("validation");
       const r = write(reportId, expectedVersion); retainProposal(r); r.status = "Submitted"; r.assignee = null; r.currentProposal = null; history(r, "Reopened", reason.trim());
     },
     async addComment({ reportId, expectedVersion, text }: { reportId: string; expectedVersion: number; text: string }) {
       const clean = text.trim();
-      if (!clean || [...clean].length > 4000 || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f]/.test(clean)) throw new QueryError("validation");
+      if (!clean || [...clean].length > 4000 || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f-\u009f]/.test(clean)) throw new QueryError("validation");
       const r = write(reportId, expectedVersion); r.comments.push({ id: fixtureId(20000 + r.comments.length + r.version), author, text: clean, createdAt: r.updatedAt }); history(r, "Comment added", clean);
     } } : {}),
   };

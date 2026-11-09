@@ -80,4 +80,17 @@ describe("Maintainer mutation HTTP boundary", () => {
       await rejection;
     } finally { vi.useRealTimers(); }
   });
+
+  it("rejects C1 input before fetching and C1 text in a comment response", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const queries = withHttpActions(createHttpQueries(fetcher), fetcher);
+    await expect(queries.assignReport({ reportId: reports[1].id, expectedVersion: 1, developerId: reports[0].id, reason: "Bad\u0085reason" })).rejects.toMatchObject({ code: "validation" });
+    expect(fetcher).not.toHaveBeenCalled();
+
+    fetcher.mockResolvedValueOnce(csrf()).mockResolvedValueOnce(new Response(JSON.stringify({
+      reportVersion: 5,
+      comment: { id: reports[0].id, author: reports[0].reporter, text: "Bad\u009bcomment", createdAt: "2026-11-09T00:00:00Z" },
+    }), { status: 201 }));
+    await expect(queries.addComment({ reportId: reports[0].id, expectedVersion: 4, text: "valid comment" })).rejects.toMatchObject({ code: "contract" });
+  });
 });
