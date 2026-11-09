@@ -6,3 +6,9 @@
 - `search_candidate_verify` (GPT-6 Luna low) independently ran `/private/tmp/run-assigned-search-red.sh`, `/private/tmp/run-assigned-search-security.sh`, and `/private/tmp/run-assigned-reports-al.sh` on the final candidate: search and security suites passed, as did all eight prior assigned-list cases. These temporary scripts provisioned disposable PostgreSQL with synthetic sessions; escalation was needed for loopback. The script paths are temporary, not portable checked-in runners. `git diff --check` passed.
 - Final hashes: handler `f6f5385703081b86e169a2748efa743f0b7da8d32681931ff5eafd3089d555b3`; store `5d2db8a5be6b325bcc75b2b58ac4d0e2513d11bdb79b8955bce0a77b74e0bf59`; security test `ce3a75897c032be340cf53e9ff48bd63a52ce0cca8fd6dba9c04d1e21e8bf2df`.
 - Limits: synthetic authentication and disposable database only; real shared authentication, routing, schema and deployment remain unverified. Status filtering, pagination controls and dashboard UI are separate. Filtered search streams all currently assigned titles to compute exact totals; cursor batches are bounded but latency and worst-case matching cost at production scale are unmeasured. Real usage/token counts and costs unavailable.
+
+## Context and interpretation for reflection
+
+The search handoff supplied the assignment-scoped contract, existing handler and fixture. The security reviewer investigated malformed text and Unicode behavior beyond the initial title-search path; the implementer repaired those cases.
+
+The initial test helper typo was corrected and the Red was rerun; the corrected evidence should not be confused with the earlier execution. The 300-row probe bounds one observation, not production-scale performance.

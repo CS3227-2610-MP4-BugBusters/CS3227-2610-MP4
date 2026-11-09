@@ -40,7 +40,10 @@
   `src/backend/developer/README.md` when the backend is present.
 - Start evidence logs with a plain-language summary of the goal, changes,
   checks and results, review findings and fixes, and remaining limitations.
-  Put commands, revisions, hashes, and agent details afterward for reviewers.
+  Follow it with the detailed reflection format in the TDD workflow, including
+  agent coordination, context supplied, review findings and fixes, test scope,
+  resource measurements and limitations. Put commands, revisions and hashes
+  after the summary. Do not invent missing details or measurements.
 - Record the checks run, the revision tested, and any blocked checks using
   the evidence format in the TDD workflow. Mark an OpenSpec task complete
   only when its stated checks have passed.

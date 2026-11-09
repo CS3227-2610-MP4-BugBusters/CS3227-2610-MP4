@@ -35,3 +35,27 @@ For authorization or AI security changes, spawn `security_reviewer` on the same 
 ## Evidence
 
 Start each evidence record with a short, plain-language summary that a teammate can understand without reading hashes: the goal, what changed, checks and outcomes, review findings and fixes, and what remains open. Below it, retain a technical evidence section with the sanitized run ID, agent role, actual model and reasoning effort, task and revision, context supplied and retrieved, exact checks and outcomes, file hashes where needed, and any fix and recheck. Record token usage when the trace exposes it. Record missing measurements as unavailable.
+
+For subsequent logs, use the detailed structure demonstrated by
+`logs/developer/2026-11-09-resolution-submission.md`, scaled to the work:
+
+1. **Summary and scope:** Explain the goal, resulting behavior, outcome and
+   remaining limitations in plain language.
+2. **Implementation and coordination:** Record the starting revision and
+   uncommitted state, the relevant requirements and paths, who did each task,
+   what context was supplied or retrieved, and any handoffs or interruptions.
+3. **Findings and fixes:** Describe each material test or review finding, what
+   changed in response, and who or what rechecked it. Distinguish test or setup
+   errors from application failures and identify changed test baselines.
+4. **Verification:** Record commands, evidence locations and outcomes, and
+   distinguish mocked UI, synthetic sessions, real authenticated API,
+   database, browser, hosted and deployment checks. Include blocked checks and
+   the actual revision or worktree state tested.
+5. **Reflection and resources:** Record actual model/effort and token, cache,
+   reasoning, time or cost measurements only when available. Explain observed
+   coordination and context choices, their benefits and overhead, and the limits
+   of any comparison. Mark missing measurements unavailable; never infer savings.
+
+Keep a short historical checkpoint short when no further evidence was captured;
+link related follow-up evidence and explicitly identify missing details rather
+than inventing agent actions, results or measurements.
