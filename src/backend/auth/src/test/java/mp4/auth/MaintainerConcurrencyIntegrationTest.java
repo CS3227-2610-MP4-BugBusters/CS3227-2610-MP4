@@ -148,6 +148,54 @@ class MaintainerConcurrencyIntegrationTest {
         shareCloseOrder(false);
     }
 
+    @Test void targetDeactivationAndAssignmentSerializeInBothOrders() throws Exception {
+        for (boolean deactivateFirst : List.of(true, false)) {
+            var maintainer = SessionAuthenticationTest.account("MAINTAINER");
+            var developer = SessionAuthenticationTest.account("DEVELOPER");
+            var reporter = SessionAuthenticationTest.account("REPORTER");
+            UUID report = report(reporter.id(), null, "SUBMITTED", 0, "MEDIUM");
+            var browser = SessionAuthenticationTest.authenticated(maintainer);
+            String token = browser.csrf();
+            String path = "/api/maintainer/reports/" + report + "/assignment";
+            String body = "{\"expectedVersion\":0,\"developerId\":\"" + developer.id() + "\"}";
+            ExecutorService workers = Executors.newFixedThreadPool(2);
+            try {
+                if (deactivateFirst) {
+                    try (Connection blocker = lockAccount(developer.id())) {
+                        var pending = workers.submit(() -> post(browser, path, body, token));
+                        awaitBlockedCount(blockerPid(blocker), 1);
+                        deactivateAndCommit(blocker, developer.id());
+                        SessionAuthenticationTest.error(pending.get(WAIT_SECONDS, TimeUnit.SECONDS), 400, "VALIDATION_FAILED");
+                        assertEquals(0, reportVersion(report));
+                        assertEquals(0, historyCount(report));
+                    }
+                } else {
+                    try (Connection blocker = lockReport(report)) {
+                        var pending = workers.submit(() -> post(browser, path, body, token));
+                        long mutation = awaitBlockedPid(blockerPid(blocker));
+                        AtomicLong disabling = new AtomicLong();
+                        var deactivation = workers.submit(() -> {
+                            try (var connection = SessionAuthenticationTest.connection()) {
+                                disabling.set(blockerPid(connection));
+                                try (var update = connection.prepareStatement("UPDATE app_accounts SET active=false WHERE id=?")) {
+                                    update.setObject(1, developer.id()); assertEquals(1, update.executeUpdate());
+                                }
+                            }
+                            return null;
+                        });
+                        awaitBlockedBy(disabling, mutation);
+                        blocker.commit();
+                        SessionAuthenticationTest.status(200, pending.get(WAIT_SECONDS, TimeUnit.SECONDS), "assignment wins eligibility race");
+                        deactivation.get(WAIT_SECONDS, TimeUnit.SECONDS);
+                        assertFalse(accountActive(developer.id()));
+                        assertEquals(1, reportVersion(report));
+                        assertEquals(1, historyCount(report));
+                    }
+                }
+            } finally { stopWorkers(workers); }
+        }
+    }
+
     private static void shareCloseOrder(boolean shareFirst) throws Exception {
         var maintainer = SessionAuthenticationTest.account("MAINTAINER");
         var developer = SessionAuthenticationTest.account("DEVELOPER");

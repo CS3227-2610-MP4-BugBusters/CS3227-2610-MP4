@@ -3,10 +3,11 @@
 ## Context
 
 Migrated the technical decisions from MNT-SPEC-1 into the planning change described
-in [proposal.md](proposal.md). Only the isolated read-only frontend is implemented.
+in [proposal.md](proposal.md). Implementation now includes authenticated Maintainer workflows, shared PostgreSQL
+adapters and the queue-summary endpoint; see PR #10 for checks and pending reviews.
 The current query DTOs are recorded in the [implemented baseline](../../specs/maintainer-report-browser/spec.md).
-All future endpoints and numeric application policies below remain proposed until
-reviewed with their shared-service owners; they are not verified SoC limits.
+Numeric application policies below are application bounds, not verified SoC limits.
+Shared-owner review and live provider/deployment checks remain pending.
 
 ## Goals / Non-Goals
 
@@ -14,7 +15,8 @@ Preserve role requirements, proposed service seams, security controls and origin
 verification IDs without duplicating shared stores or lifecycle logic. Keep role
 prompts/context separate from shared provider mechanics. Permit isolated fixtures
 while real adapters are incomplete; require real service checks before integration.
-No application changes are authorized by this migration.
+The migration originally authorized no application edits; subsequent implementation
+was authorized separately and is tracked in PR #10.
 
 Use the active ownership table in section 2 (page 2) of the original plan, not the
 crossed-out workload split on pages 17-19. Own authentication/provisioning and

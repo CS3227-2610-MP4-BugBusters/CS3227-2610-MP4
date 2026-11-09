@@ -15,6 +15,8 @@ import mp4.maintainer.storage.JdbcMaintainerRepository;
 import mp4.maintainer.workflow.MaintainerContracts.*;
 import mp4.maintainer.workflow.MaintainerService;
 import mp4.maintainer.workflow.MaintainerService.ServiceException;
+import mp4.maintainer.summary.QueueSummaryService;
+import mp4.maintainer.summary.SummaryContracts;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,9 +37,11 @@ final class MaintainerController {
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build())
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
     private final MaintainerService service;
+    private final QueueSummaryService summary;
 
-    MaintainerController(DataSource database) {
+    MaintainerController(DataSource database, QueueSummaryService summary) {
         service = new MaintainerService(new JdbcMaintainerRepository(database));
+        this.summary = summary;
     }
 
     @GetMapping("/api/maintainer/reports")
@@ -138,9 +142,34 @@ final class MaintainerController {
         });
     }
 
+    @PostMapping("/api/maintainer/queue-summary")
+    Object queueSummary(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        return read(request, response, () -> {
+            JsonNode body = body(request, Set.of("filters", "regenerate"));
+            JsonNode filters = body.get("filters"), regenerate = body.get("regenerate");
+            if (filters == null || !filters.isObject() || regenerate == null || !regenerate.isBoolean()) throw invalid();
+            var fields = filters.fieldNames();
+            while (fields.hasNext()) if (!Set.of("status", "priority", "assigneeId").contains(fields.next())) throw invalid();
+            Status status = filters.has("status") ? status(text(filters, "status")) : null;
+            Priority priority = filters.has("priority") ? Priority.valueOf(text(filters, "priority")) : null;
+            UUID assignee = filters.has("assigneeId") ? uuid(text(filters, "assigneeId")) : null;
+            var trusted = actor();
+            var session = request.getSession(false);
+            if (session == null) throw new SummaryContracts.SummaryFailure(SummaryContracts.FailureCode.UNAUTHENTICATED);
+            var caller = new SummaryContracts.Actor(trusted.accountId(), trusted.role(), trusted.active(),
+                    trusted.generation(), session.getId());
+            return MaintainerHttpDtos.summaryResult(summary.generate(caller,
+                    new SummaryContracts.Filters(status, priority, assignee), regenerate.booleanValue()));
+        });
+    }
+
     private Object read(HttpServletRequest request, HttpServletResponse response, Query query) throws IOException {
         AuthHttp.noStore(response);
         try { return query.get(); }
+        catch (SummaryContracts.SummaryFailure failure) {
+            if (failure.retryAfterSeconds() != null) response.setHeader("Retry-After", failure.retryAfterSeconds().toString());
+            AuthHttp.error(response, failure.statusCode(), failure.code(), failure.getMessage());
+        }
         catch (ServiceException failure) {
             AuthHttp.error(response, failure.statusCode(), failure.code(), failure.getMessage());
         } catch (IllegalArgumentException failure) {

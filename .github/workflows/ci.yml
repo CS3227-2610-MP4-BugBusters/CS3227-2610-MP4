@@ -59,6 +59,9 @@ jobs:
       - name: Verify shared report migration
         if: matrix.java == '17'
         run: src/backend/shared/test/run-shared-report-storage.sh
+      - name: Verify deployment check gating
+        if: matrix.java == '17'
+        run: python3 -m unittest discover -s src/backend/platform/deployment/test -p 'test_*.py'
       - name: Verify assigned reports with disposable PostgreSQL
         env:
           POSTGRES_JDBC_JAR: /usr/share/java/postgresql.jar

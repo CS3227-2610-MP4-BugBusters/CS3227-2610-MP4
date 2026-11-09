@@ -1,0 +1,56 @@
+# Separate production Blueprint. Applying it provisions paid resources; not applied by CI.
+projects:
+  - name: mp4-production
+    environments:
+      - name: production
+        permissions:
+          protection: enabled
+        services:
+          - type: web
+            name: mp4-production
+            runtime: docker
+            region: singapore
+            plan: 0.5c-512mb
+            branch: main
+            dockerfilePath: src/backend/platform/deployment/Dockerfile
+            dockerContext: .
+            autoDeployTrigger: 'off'
+            healthCheckPath: /api/health
+            envVars:
+              - key: SERVER_ADDRESS
+                value: 0.0.0.0
+              - key: MP4_AUTH_LOCAL
+                value: 'false'
+              - key: MP4_AUTH_DB_HOST
+                fromDatabase:
+                  name: mp4-production-db
+                  property: host
+              - key: MP4_AUTH_DB_PORT
+                fromDatabase:
+                  name: mp4-production-db
+                  property: port
+              - key: MP4_AUTH_DB_NAME
+                fromDatabase:
+                  name: mp4-production-db
+                  property: database
+              - key: MP4_AUTH_DB_USER
+                fromDatabase:
+                  name: mp4-production-db
+                  property: user
+              - key: MP4_AUTH_DB_PASSWORD
+                fromDatabase:
+                  name: mp4-production-db
+                  property: password
+              - key: MP4_AUTH_RATE_LIMIT_SECRET
+                generateValue: true
+              - key: MP4_AUTH_PUBLIC_ORIGIN
+                sync: false
+        databases:
+          - name: mp4-production-db
+            region: singapore
+            plan: 0.1c-256mb
+            diskSizeGB: 1
+            postgresMajorVersion: '17'
+            databaseName: mp4_production
+            user: mp4_production_app
+            ipAllowList: []

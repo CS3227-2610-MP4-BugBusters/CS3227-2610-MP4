@@ -59,14 +59,15 @@ final class AuthController {
         this.sessionStrategy = sessionStrategy;
         this.clock = clock;
         this.attempts = attempts;
-        this.assignedReports = new AssignedReportListHttpHandler(new AssignedReportStore(dataSource));
-        this.checklistDraft = new ChecklistDraftHttpHandler(new ChecklistDraftStore(dataSource));
-        this.checklistShare = new ChecklistShareHttpHandler(new JdbcChecklistShareService(dataSource,
+        var actorDataSource = new ActorTransactionDataSource(dataSource);
+        this.assignedReports = new AssignedReportListHttpHandler(new AssignedReportStore(actorDataSource));
+        this.checklistDraft = new ChecklistDraftHttpHandler(new ChecklistDraftStore(actorDataSource));
+        this.checklistShare = new ChecklistShareHttpHandler(new JdbcChecklistShareService(actorDataSource,
                 (connection, request, version, invalidated) ->
                         mp4.maintainer.storage.SharedReportHistory.checklistPublished(connection, request.reportId(),
                                 request.actor().id(), version, invalidated)));
         var maintainerReports = new mp4.maintainer.storage.JdbcMaintainerRepository(dataSource);
-        this.sharedChecklist = new ChecklistSharedHttpHandler(dataSource, (actor, reportId) -> {
+        this.sharedChecklist = new ChecklistSharedHttpHandler(actorDataSource, (actor, reportId) -> {
             try { return maintainerReports.canViewSharedChecklist(MaintainerController.actor(), reportId); }
             catch (mp4.maintainer.workflow.MaintainerService.ServiceException denied) {
                 if (denied.statusCode() == 401 || denied.statusCode() == 403) return false;
@@ -170,23 +171,40 @@ final class AuthController {
         AuthProvider.CurrentUser user = (AuthProvider.CurrentUser)
                 SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         var actor = new ChecklistDraftStore.Actor(user.id(), ChecklistDraftStore.Role.DEVELOPER, true);
-        assignedReports.handle(new ServletHttpExchange(request, response), actor);
+        roleRequest(request, response, output -> assignedReports.handle(new ServletHttpExchange(request, output), actor));
     }
 
     @RequestMapping("/api/reports/{reportId}/checklist/share")
     void shareChecklist(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        checklistShare.handle(new ServletHttpExchange(request, response), checklistActor());
+        roleRequest(request, response, output -> checklistShare.handle(new ServletHttpExchange(request, output), checklistActor()));
     }
 
     @RequestMapping("/api/reports/{reportId}/checklist/draft")
     void saveChecklistDraft(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        checklistDraft.handle(new ServletHttpExchange(request, response), checklistActor());
+        roleRequest(request, response, output -> checklistDraft.handle(new ServletHttpExchange(request, output), checklistActor()));
     }
 
     @RequestMapping("/api/reports/{reportId}/checklist/shared")
     void readSharedChecklist(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        sharedChecklist.handle(new ServletHttpExchange(request, response), checklistActor());
+        roleRequest(request, response, output -> sharedChecklist.handle(new ServletHttpExchange(request, output), checklistActor()));
     }
+
+    private static void roleRequest(HttpServletRequest request, HttpServletResponse response, RoleRequest action) throws IOException {
+        var buffered = new org.springframework.web.util.ContentCachingResponseWrapper(response);
+        ActorTransactionDataSource.clearRevocation();
+        try {
+            try { action.run(buffered); }
+            catch (ActorTransactionDataSource.Revoked revoked) { /* Map below, including failures consumed by handlers. */ }
+            if (ActorTransactionDataSource.wasRevoked()) {
+                var session = request.getSession(false);
+                if (session != null) session.invalidate();
+                SecurityContextHolder.clearContext();
+                response.resetBuffer();
+                AuthHttp.error(response, 401, "UNAUTHENTICATED", "Authentication required");
+            } else buffered.copyBodyToResponse();
+        } finally { ActorTransactionDataSource.clearRevocation(); }
+    }
+    @FunctionalInterface private interface RoleRequest { void run(HttpServletResponse response) throws IOException; }
 
     private static ChecklistDraftStore.Actor checklistActor() {
         AuthProvider.CurrentUser user = (AuthProvider.CurrentUser)

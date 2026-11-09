@@ -42,7 +42,7 @@ contains no production service or database. Its project protection setting preve
 some destructive actions; it is not an approval gate.
 
 Automatic deploys are disabled. To request a development deploy, manually dispatch
-the `Deploy development` workflow from `main`. It checks the successful `CI` workflow
+the `Deploy application` workflow from `main`. It checks the latest `CI` workflow
 run for the exact `main` push SHA before reading the environment secret
 `RENDER_DEV_DEPLOY_HOOK`. Configure that secret as the Render deploy hook URL in the
 GitHub `development` environment. The workflow requests that exact SHA and reports
@@ -59,3 +59,26 @@ Render deploy hook or GitHub environment secrets available to this work, and Doc
 is unavailable in the current machine. A live deployed revision, host-to-database
 connectivity, login/read/wrong-role smoke checks, production setup and rollback have
 not been verified. The configuration does not complete OpenSpec tasks 0.3 or 6.2.
+
+## Production preparation
+
+Prepared [a separate production Blueprint](render-production.yaml) using a distinct
+project, service, database, user and generated rate-limit secret. Applying that
+file provisions paid resources; have not applied it or created Render resources.
+Kept the root Blueprint development-only. Set each service's public HTTPS origin
+and its own environment-scoped deploy hook after provisioning.
+
+Configured the GitHub `development` and `production` environments to allow only
+`main`. Production requires Developer-owner review (`XuHh03`) and prevents
+self-review. The `Deploy production` wrapper reuses the same exact-revision CI
+gate and checks actual production reviewer metadata before using
+`RENDER_PROD_DEPLOY_HOOK`; development uses `RENDER_DEV_DEPLOY_HOOK`. No hook is
+configured yet and no deployment was requested. A production environment name
+alone does not satisfy the protection check.
+
+For rollback, select a previously verified deployment in the correct Render
+service after reviewing migration compatibility. Keep database history and data;
+do not run destructive reverse migrations. Have not performed a live rollback.
+
+Checked configuration against the [Render Blueprint reference](https://render.com/docs/blueprint-spec)
+and [GitHub environment API](https://docs.github.com/en/rest/deployments/environments).

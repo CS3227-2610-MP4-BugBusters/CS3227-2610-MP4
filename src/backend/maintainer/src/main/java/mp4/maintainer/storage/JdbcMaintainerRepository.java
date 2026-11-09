@@ -258,9 +258,12 @@ public final class JdbcMaintainerRepository implements Repository {
         // readable history list, without synthesizing an author for legacy rows that have none recorded.
         for (Proposal proposal : retained) {
             Person author = proposal.author();
+            String created = proposal.createdAt().equals(Instant.EPOCH) ? "time not recorded" : proposal.createdAt().toString();
+            String retainedText = "Proposal " + proposal.id() + " (version " + proposal.version() + ", "
+                    + proposal.status().name() + ") by " + author.displayName() + " [" + author.id()
+                    + "] at " + created + "\n\n" + proposal.text();
             history.add(new HistoryEvent(UUID.nameUUIDFromBytes(("proposal-history:" + proposal.id()).getBytes(StandardCharsets.UTF_8)),
-                    "proposal_" + proposal.status().name().toLowerCase(),
-                    proposal.text(), author, proposal.createdAt()));
+                    "Proposal retained", retainedText, author, proposal.createdAt()));
         }
         history.sort(Comparator.comparing(HistoryEvent::createdAt).thenComparing(event -> event.id().toString()));
         return new ReportDetail(summary, row.description, row.reproductionSteps, row.expectedBehavior,

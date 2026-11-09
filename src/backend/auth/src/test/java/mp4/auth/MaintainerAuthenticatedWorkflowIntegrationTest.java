@@ -21,6 +21,45 @@ class MaintainerAuthenticatedWorkflowIntegrationTest {
         SessionAuthenticationTest.shutdown();
     }
 
+    @Test void retainedProposalHistoryIncludesItsIdentityAndVersion() throws Exception {
+        var maintainer = SessionAuthenticationTest.account("MAINTAINER");
+        var reporter = SessionAuthenticationTest.account("REPORTER");
+        var developer = SessionAuthenticationTest.account("DEVELOPER");
+        var report = report(reporter.id(), developer.id(), "CLOSED", 4);
+        var retained = proposal(report, "CLOSED", 2, "Retained resolution evidence");
+        setCurrentProposal(report, retained);
+        var browser = SessionAuthenticationTest.authenticated(maintainer);
+        var response = browser.get("/api/maintainer/reports/" + report);
+        SessionAuthenticationTest.status(200, response, "retained proposal detail");
+        var body = SessionAuthenticationTest.json(response);
+        var history = (List<?>) body.get("history");
+        assertTrue(history.stream().map(event -> (Map<?, ?>) event).anyMatch(event ->
+                ((String) event.get("text")).contains(retained.toString())
+                && ((String) event.get("text")).contains("version 2")
+                && ((String) event.get("text")).contains("Retained resolution evidence")));
+    }
+
+    @Test void reassignmentRevokesFormerDeveloperReadsAndWrites() throws Exception {
+        var maintainer = SessionAuthenticationTest.account("MAINTAINER");
+        var reporter = SessionAuthenticationTest.account("REPORTER");
+        var former = SessionAuthenticationTest.account("DEVELOPER");
+        var replacement = SessionAuthenticationTest.account("DEVELOPER");
+        var report = report(reporter.id(), former.id(), "IN_PROGRESS", 3);
+        checklist(report, new String[]{"Private draft"}, 1, new String[]{"Published evidence"});
+        var browser = SessionAuthenticationTest.authenticated(maintainer);
+        SessionAuthenticationTest.status(200, post(browser, "/api/maintainer/reports/" + report + "/assignment",
+                "{\"expectedVersion\":3,\"developerId\":\"" + replacement.id() + "\",\"reason\":\"Rebalance work\"}"), "reassignment");
+        var oldSession = SessionAuthenticationTest.authenticated(former);
+        String draftPath = "/api/reports/" + report + "/checklist/draft";
+        SessionAuthenticationTest.error(oldSession.get(draftPath), 403, "FORBIDDEN");
+        SessionAuthenticationTest.error(put(oldSession, draftPath, "{\"expectedDraftRevision\":1,\"steps\":[\"Overwrite\"]}"), 403, "FORBIDDEN");
+        var currentSession = SessionAuthenticationTest.authenticated(replacement);
+        SessionAuthenticationTest.status(200, currentSession.get(draftPath), "new assignee reads preserved draft");
+        var detail = browser.get("/api/maintainer/reports/" + report);
+        assertTrue(detail.body().contains("Published evidence"));
+        assertFalse(detail.body().contains("Private draft"));
+    }
+
     @Test void activeMaintainerReadsReportsDevelopersAndOnlySharedChecklistProjection() throws Exception {
         var maintainer = SessionAuthenticationTest.account("MAINTAINER");
         var reporter = SessionAuthenticationTest.account("REPORTER");

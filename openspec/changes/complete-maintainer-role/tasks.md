@@ -1,9 +1,10 @@
 # Tasks
 
-Status: migrated future work, not implementation results. All tasks below remain
-unchecked. The existing fake-backed read-only frontend is recorded in the main
-`maintainer-report-browser` spec and its historical logs; do not recreate its
-completion as a newly approved Red baseline.
+Status: implementation in progress in PR #10. Local authentication, Maintainer
+workflow, database and controlled summary checks are implemented. Keep the broad
+tasks unchecked where independent review, owner review or live deployment/provider
+checks remain pending. See the PR and Maintainer backend README for current status;
+historical baseline logs retain their original results.
 
 For each behavior task, follow `workflow/tdd.md`: test_designer, fresh
 baseline_verifier, feature-owner approval of the verified Red, implementer,

@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import mp4.maintainer.workflow.MaintainerContracts.*;
+import mp4.maintainer.summary.SummaryContracts.SummaryResult;
 
 /** Explicit browser wire mappings; internal aggregate wrappers never cross HTTP. */
 public final class MaintainerHttpDtos {
@@ -48,6 +49,17 @@ public final class MaintainerHttpDtos {
 
     public static Map<String, Object> commentResult(CommentResult value) {
         return Map.of("comment", entry(value.comment()), "reportVersion", value.reportVersion());
+    }
+
+    public static Map<String, Object> summaryResult(SummaryResult value) {
+        Map<String, Object> filters = new LinkedHashMap<>();
+        if (value.filters().status() != null) filters.put("status", value.filters().status().wireLabel());
+        if (value.filters().priority() != null) filters.put("priority", value.filters().priority().name());
+        if (value.filters().assigneeId() != null) filters.put("assigneeId", value.filters().assigneeId());
+        String mode = switch (value.providerMode()) { case NONE -> "none"; case DETERMINISTIC -> "deterministic"; case LIVE -> "soc"; };
+        return Map.of("capturedAt", value.capturedAt(), "filters", filters, "included", value.included(),
+                "excluded", value.excluded(), "findings", value.findings(), "requiresReview", value.requiresReview(),
+                "providerMode", mode, "promptVersion", value.promptVersion());
     }
 
     private static Map<String, Object> entry(Evidence value) {
