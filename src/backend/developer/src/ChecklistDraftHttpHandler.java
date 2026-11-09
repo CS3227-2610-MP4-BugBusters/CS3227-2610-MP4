@@ -38,8 +38,9 @@ public final class ChecklistDraftHttpHandler {
             sendError(exchange, 404, "NOT_FOUND", "Resource not found");
             return;
         }
-        if (!exchange.getRequestMethod().equals("PUT")) {
-            exchange.getResponseHeaders().set("Allow", "PUT");
+        String method = exchange.getRequestMethod();
+        if (!method.equals("GET") && !method.equals("PUT")) {
+            exchange.getResponseHeaders().set("Allow", "GET, PUT");
             sendError(exchange, 405, "METHOD_NOT_ALLOWED", "Method not allowed");
             return;
         }
@@ -58,6 +59,28 @@ public final class ChecklistDraftHttpHandler {
             reportId = UUID.fromString(id);
         } catch (IllegalArgumentException invalidId) {
             sendError(exchange, 400, "INVALID_REQUEST", "Invalid report ID");
+            return;
+        }
+
+        if (method.equals("GET")) {
+            exchange.getResponseHeaders().set("Cache-Control", "no-store");
+            try {
+                var result = store.read(actor, reportId);
+                if (result == null) {
+                    sendError(exchange, 403, "FORBIDDEN", "Access denied");
+                } else if (result.draftRevision() > ChecklistDraftStore.MAX_SAFE_VERSION
+                        || result.reportVersion() > ChecklistDraftStore.MAX_SAFE_VERSION) {
+                    sendError(exchange, 409, "VERSION_LIMIT", "Checklist version cannot be safely represented");
+                } else {
+                    var body = JSON.createObjectNode();
+                    body.set("steps", JSON.valueToTree(result.steps()));
+                    body.put("draftRevision", result.draftRevision());
+                    body.put("reportVersion", result.reportVersion());
+                    sendJson(exchange, 200, body);
+                }
+            } catch (SQLException | RuntimeException failure) {
+                sendError(exchange, 500, "INTERNAL_ERROR", "Request could not be completed");
+            }
             return;
         }
 
@@ -83,6 +106,8 @@ public final class ChecklistDraftHttpHandler {
                 sendJson(exchange, 200, JSON.createObjectNode().put("draftRevision", result.draftRevision()));
             } else if (result.outcome() == Outcome.STALE_VERSION) {
                 sendError(exchange, 409, "STALE_VERSION", "Draft revision is out of date");
+            } else if (result.outcome() == Outcome.VERSION_LIMIT) {
+                sendError(exchange, 409, "VERSION_LIMIT", "Draft revision cannot be safely incremented");
             } else if (result.outcome() == Outcome.FORBIDDEN) {
                 sendError(exchange, 403, "FORBIDDEN", "Access denied");
             } else {
@@ -109,7 +134,8 @@ public final class ChecklistDraftHttpHandler {
         JsonNode revisionNode = object.get("expectedDraftRevision");
         if (stepsNode == null || !stepsNode.isArray() || revisionNode == null
                 || !revisionNode.isIntegralNumber() || !revisionNode.canConvertToLong()
-                || revisionNode.longValue() < 0) {
+                || revisionNode.longValue() < 0
+                || revisionNode.longValue() > ChecklistDraftStore.MAX_SAFE_VERSION) {
             throw new IllegalArgumentException("Invalid request body");
         }
         var steps = new ArrayList<String>();

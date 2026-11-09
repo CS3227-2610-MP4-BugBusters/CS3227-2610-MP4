@@ -56,6 +56,28 @@ synthetic-session HTTP server on loopback, then stops them and removes the
 cluster. It does not connect to the shared database. Tests use a synthetic
 schema and sessions; real application integration requires separate checks.
 
+## Local checklist Share and shared read
+
+From the repository root, set `POSTGRES_JDBC_JAR`, `JACKSON_CORE_JAR`,
+`JACKSON_DATABIND_JAR`, and `JACKSON_ANNOTATIONS_JAR` to their JAR paths.
+With JDK 17+, Python 3, OpenSSL, and PostgreSQL server/client tools on PATH,
+run the disposable PostgreSQL and synthetic-session checks:
+
+```sh
+bash src/backend/developer/test/run-checklist-share-service.sh mp4.developer.JdbcChecklistShareService src/backend/developer/src/JdbcChecklistShareService.java
+bash src/backend/developer/test/run-checklist-share-proposal-guard-regression.sh
+bash src/backend/developer/test/run-checklist-share-closure-race-regression.sh
+bash src/backend/developer/test/run-checklist-share-safe-version-regression.sh
+bash src/backend/developer/test/run-checklist-share-http.sh
+bash src/backend/developer/test/run-checklist-shared-read-http.sh
+```
+
+These tests use isolated fixtures. The shared-read adapter requires the host
+to supply a Maintainer report-view permission callback. The test callback is
+synthetic and is not the production authorization policy. Real sessions,
+CSRF, shared routing, database integration, report-detail projections and
+the Maintainer's actual closure service still require integration checks.
+
 ## Pull request checks
 
 The repository CI runs this synthetic-session test runner on Java 17 and 21,

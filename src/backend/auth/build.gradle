@@ -33,7 +33,10 @@ sourceSets.main.java {
     srcDir '../platform/src/main/java'
     srcDir '../developer/src'
     srcDir '../maintainer/src/main/java'
-    include 'mp4/**', 'AssignedReportStore.java', 'AssignedReportListHttpHandler.java', 'ChecklistDraftStore.java'
+    include 'mp4/**', 'AssignedReportStore.java', 'AssignedReportListHttpHandler.java', 'ChecklistDraftStore.java',
+            'ChecklistShareService.java', 'JdbcChecklistShareService.java',
+            'ChecklistShareHttpHandler.java', 'ChecklistSharedHttpHandler.java',
+            'ChecklistDraftHttpHandler.java'
 }
 
 tasks.withType(JavaCompile).configureEach {

@@ -1,5 +1,5 @@
 import { createRoot } from "react-dom/client";
-import { ChecklistDemo } from "./ChecklistDemo";
+import { DeveloperApp } from "./DeveloperApp";
 import "./style.css";
 
-createRoot(document.getElementById("root")!).render(<ChecklistDemo />);
+createRoot(document.getElementById("root")!).render(<DeveloperApp />);

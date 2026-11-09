@@ -12,7 +12,11 @@ import java.util.Map;
 import java.util.Objects;
 import mp4.developer.AssignedReportListHttpHandler;
 import mp4.developer.AssignedReportStore;
+import mp4.developer.ChecklistDraftHttpHandler;
 import mp4.developer.ChecklistDraftStore;
+import mp4.developer.ChecklistShareHttpHandler;
+import mp4.developer.ChecklistSharedHttpHandler;
+import mp4.developer.JdbcChecklistShareService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -43,6 +47,9 @@ final class AuthController {
     private final Clock clock;
     private final LoginAttemptStore attempts;
     private final AssignedReportListHttpHandler assignedReports;
+    private final ChecklistDraftHttpHandler checklistDraft;
+    private final ChecklistShareHttpHandler checklistShare;
+    private final ChecklistSharedHttpHandler sharedChecklist;
     private final String publicOrigin;
 
     AuthController(AuthenticationManager authenticationManager, SessionAuthenticationStrategy sessionStrategy,
@@ -53,6 +60,9 @@ final class AuthController {
         this.clock = clock;
         this.attempts = attempts;
         this.assignedReports = new AssignedReportListHttpHandler(new AssignedReportStore(dataSource));
+        this.checklistDraft = new ChecklistDraftHttpHandler(new ChecklistDraftStore(dataSource));
+        this.checklistShare = new ChecklistShareHttpHandler(new JdbcChecklistShareService(dataSource));
+        this.sharedChecklist = new ChecklistSharedHttpHandler(dataSource, null);
         this.publicOrigin = publicOrigin;
     }
 
@@ -151,6 +161,33 @@ final class AuthController {
                 SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         var actor = new ChecklistDraftStore.Actor(user.id(), ChecklistDraftStore.Role.DEVELOPER, true);
         assignedReports.handle(new ServletHttpExchange(request, response), actor);
+    }
+
+    @RequestMapping("/api/reports/{reportId}/checklist/share")
+    void shareChecklist(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        checklistShare.handle(new ServletHttpExchange(request, response), checklistActor());
+    }
+
+    @RequestMapping("/api/reports/{reportId}/checklist/draft")
+    void saveChecklistDraft(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        checklistDraft.handle(new ServletHttpExchange(request, response), checklistActor());
+    }
+
+    @RequestMapping("/api/reports/{reportId}/checklist/shared")
+    void readSharedChecklist(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        sharedChecklist.handle(new ServletHttpExchange(request, response), checklistActor());
+    }
+
+    private static ChecklistDraftStore.Actor checklistActor() {
+        AuthProvider.CurrentUser user = (AuthProvider.CurrentUser)
+                SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        ChecklistDraftStore.Role role = switch (user.role()) {
+            case "REPORTER" -> ChecklistDraftStore.Role.REPORTER;
+            case "DEVELOPER" -> ChecklistDraftStore.Role.DEVELOPER;
+            case "MAINTAINER" -> ChecklistDraftStore.Role.MAINTAINER;
+            default -> throw new IllegalStateException("Authenticated account has an unsupported role");
+        };
+        return new ChecklistDraftStore.Actor(user.id(), role, true);
     }
 
     private boolean originAllowed(HttpServletRequest request) {

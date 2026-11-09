@@ -26,6 +26,15 @@ Save and Share require Assigned, In progress, or Resolution proposed. Compare th
 
 ## Private Save HTTP contract
 
+For local application integration, `GET /api/reports/{reportId}/checklist/draft`
+returns `{ "steps": ["..."], "draftRevision": 2, "reportVersion": 7 }`
+only to the active, currently assigned Developer. `reportVersion` is read
+under the same report lock and is the version needed to Share. A report
+without a checklist returns empty steps and draft revision zero. The response excludes shared steps and uses
+`Cache-Control: no-store`. Inaccessible or missing reports return generic
+403 without revealing draft contents or report existence. Real session and
+account eligibility locking remain integration dependencies.
+
 Use `PUT /api/reports/{reportId}/checklist/draft` with a JSON body
 `{ "steps": ["Reproduce the bug"], "expectedDraftRevision": 2 }`.
 On success, respond with HTTP 200 and `{ "draftRevision": 3 }`.
@@ -33,6 +42,39 @@ Resolve the actor from the authenticated session and verify the current
 assignment on the server. On a stale draft revision, return HTTP 409
 with `code: "STALE_VERSION"` in the shared
 `{ code, message, requestId }` error response. Leave stored state intact.
+The wire revision is limited to JavaScript's maximum safe integer
+(`9007199254740991`). A Save that cannot increment within that range returns
+409 `VERSION_LIMIT` without changing the draft, shared copy or report.
+
+## Local Share HTTP contract
+
+The local test adapter uses `POST /api/reports/{reportId}/checklist/share`
+with `{ "expectedDraftRevision": 2, "expectedReportVersion": 7 }`.
+On success it returns HTTP 200 with `{ "reportVersion": 8, "changed": true }`;
+an unchanged Share returns the current version and `changed: false`. The
+request publishes the server-saved draft, not steps supplied by the client.
+Both revisions use nonnegative integers no larger than JavaScript's maximum
+safe integer (`9007199254740991`). A changed Share that cannot increment the
+report version within that range must fail without changing stored data.
+Responses use `Cache-Control: no-store`. Invalid requests return 400,
+unauthorized actors 403, and stale versions, ineligible states and empty
+drafts return 409 with `STALE_VERSION`, `INVALID_STATE` or `EMPTY_DRAFT` in
+the shared `{ code, message, requestId }` shape. A changed Share that reaches
+the maximum safe report version returns 409 `VERSION_LIMIT` without mutation.
+A retry with an old report version can be stale; clients should refresh after
+uncertain outcomes. Real session, CSRF and shared-route integration remain
+separate dependencies.
+
+## Local shared checklist read contract
+
+The local test adapter uses `GET /api/reports/{reportId}/checklist/shared`
+and returns `{ "steps": ["..."] }` with `Cache-Control: no-store`.
+It returns only the persisted shared copy, never draft steps or draft
+revision. An active Reporter may read their own report; an active assigned
+Developer may read the shared copy; an active Maintainer requires an
+explicit trusted report-view permission check. A synthetic permission used
+in local tests is not the production authorization policy. Missing or
+inaccessible reports return 403 without exposing their existence.
 
 ## Transaction boundary
 

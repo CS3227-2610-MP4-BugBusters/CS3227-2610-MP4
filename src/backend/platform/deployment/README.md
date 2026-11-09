@@ -1,10 +1,11 @@
 # Development deployment
 
 Prepared the development packaging and deployment files for the Maintainer-owned
-Render environment. The container builds the Maintainer React assets with Node 22,
-packages the Java 17 application and runtime libraries with the repository Gradle
-wrapper, and starts the application directly on Render's `PORT`. The public
-`/assets/revision.txt` asset identifies the source revision passed to the image build.
+Render environment. The container builds the Maintainer and Developer React assets
+with Node 22, packages the Java 17 application and runtime libraries with the
+repository Gradle wrapper, and starts the application directly on Render's `PORT`.
+The Maintainer app is served at `/`; the Developer app is served at `/developer/`.
+The public `/assets/revision.txt` asset identifies the source revision passed to the image build.
 
 ## Local container build
 
