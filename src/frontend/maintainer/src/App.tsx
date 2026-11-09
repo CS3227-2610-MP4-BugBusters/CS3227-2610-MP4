@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { createElement, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   messages,
   priorities,
@@ -11,6 +11,7 @@ import {
   type Queries,
 } from "./domain";
 import type { AuthActions } from "./auth-client";
+import { createRoleWorkspace } from "../../shared/RoleWorkspace";
 type Load<T> = {
   state: "loading" | "ready" | "error";
   data?: T;
@@ -275,7 +276,7 @@ export function App({
       }
     }
   };
-  return (
+  const appContent = (
     <main>
       <header>
         <div>
@@ -511,6 +512,18 @@ export function App({
         </>
       )}
     </main>
+  );
+
+  return createRoleWorkspace(
+    (type, props, ...children) =>
+      createElement(type, props as never, ...(children as ReactNode[])),
+    {
+      role: "Maintainer",
+      identity: identity?.displayName,
+      authenticated: auth === "ready" && identity?.role === "MAINTAINER",
+      navigation: [{ label: "Dashboard", href: "#workspace-content", current: true }],
+      children: appContent,
+    },
   );
 }
 function ErrorView({ error, retry }: { error: QueryError; retry: () => void }) {
