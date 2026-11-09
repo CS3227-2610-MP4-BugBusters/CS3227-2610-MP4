@@ -6,15 +6,39 @@ type DraftResponse = {
   reportVersion: number;
 };
 
+type Suggestions = { steps: string[]; sourceVersion: number };
 type CsrfResponse = { token: string; headerName: "X-CSRF-TOKEN" };
 
 const jsonHeaders = { Accept: "application/json" };
 
-export function DeveloperChecklist({ reportId }: { reportId: string }) {
-  return <ChecklistForReport key={reportId} reportId={reportId} />;
+type AccessLoss = "session" | "report";
+type AccessLossHandler = (reason: AccessLoss, reportId: string) => void;
+
+export function DeveloperChecklist({
+  reportId,
+  onAccessLost,
+  startedVersion,
+  onReportVersionChange,
+}: {
+  reportId: string;
+  onAccessLost?: AccessLossHandler;
+  startedVersion?: { previous: number; current: number };
+  onReportVersionChange?: (previous: number, current: number) => void;
+}) {
+  return <ChecklistForReport key={reportId} reportId={reportId} onAccessLost={onAccessLost} startedVersion={startedVersion} onReportVersionChange={onReportVersionChange} />;
 }
 
-function ChecklistForReport({ reportId }: { reportId: string }) {
+function ChecklistForReport({
+  reportId,
+  onAccessLost,
+  startedVersion,
+  onReportVersionChange,
+}: {
+  reportId: string;
+  onAccessLost?: AccessLossHandler;
+  startedVersion?: { previous: number; current: number };
+  onReportVersionChange?: (previous: number, current: number) => void;
+}) {
   const [editor, setEditor] = useState("");
   const [savedSteps, setSavedSteps] = useState<string[]>([]);
   const [draftRevision, setDraftRevision] = useState(0);
@@ -22,11 +46,25 @@ function ChecklistForReport({ reportId }: { reportId: string }) {
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [pending, setPending] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [suggestions, setSuggestions] = useState<Suggestions | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const startedVersionRef = useRef(startedVersion);
+  startedVersionRef.current = startedVersion;
+  useEffect(() => {
+    if (startedVersion) setReportVersion((version) => version === startedVersion.previous ? startedVersion.current : version);
+  }, [startedVersion]);
   const actionController = useRef<AbortController | null>(null);
+  const suggestionController = useRef<AbortController | null>(null);
+  const applyController = useRef<AbortController | null>(null);
 
-  useEffect(() => () => actionController.current?.abort(), []);
+  useEffect(() => () => {
+    actionController.current?.abort();
+    suggestionController.current?.abort();
+    applyController.current?.abort();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -41,6 +79,7 @@ function ChecklistForReport({ reportId }: { reportId: string }) {
     })
       .then(async (response) => {
         if (controller.signal.aborted) return;
+        if (await handleAccessLoss(response, controller.signal)) return;
         if (!response.ok) throw new Error("Unable to load the checklist.");
         const value: unknown = await response.json();
         if (controller.signal.aborted) return;
@@ -48,7 +87,8 @@ function ChecklistForReport({ reportId }: { reportId: string }) {
         setEditor(value.steps.join("\n"));
         setSavedSteps(value.steps);
         setDraftRevision(value.draftRevision);
-        setReportVersion(value.reportVersion);
+        const transition = startedVersionRef.current;
+        setReportVersion(transition && value.reportVersion === transition.previous ? transition.current : value.reportVersion);
         setLoaded(true);
       })
       .catch((cause: unknown) => {
@@ -62,7 +102,29 @@ function ChecklistForReport({ reportId }: { reportId: string }) {
     return () => controller.abort();
   }, [reportId]);
 
-  async function csrf(signal: AbortSignal): Promise<CsrfResponse> {
+  async function handleAccessLoss(response: Response, signal: AbortSignal): Promise<boolean> {
+    if (signal.aborted) return true;
+    if (response.status === 401) {
+      onAccessLost?.("session", reportId);
+      return true;
+    }
+    if (response.status !== 403) return false;
+
+    let value: unknown;
+    try {
+      value = await response.clone().json();
+    } catch {
+      return false;
+    }
+    if (signal.aborted) return true;
+    if (isRecord(value) && value.code === "FORBIDDEN") {
+      onAccessLost?.("report", reportId);
+      return true;
+    }
+    return false;
+  }
+
+  async function csrf(signal: AbortSignal): Promise<CsrfResponse | null> {
     const response = await fetch("/api/auth/csrf", {
       method: "GET",
       credentials: "same-origin",
@@ -70,6 +132,7 @@ function ChecklistForReport({ reportId }: { reportId: string }) {
       headers: jsonHeaders,
       signal,
     });
+    if (await handleAccessLoss(response, signal)) return null;
     if (!response.ok) throw new Error("Unable to verify this request.");
     const value: unknown = await response.json();
     if (
@@ -92,7 +155,7 @@ function ChecklistForReport({ reportId }: { reportId: string }) {
     try {
       const steps = editor.split("\n").map((step) => step.trim()).filter(Boolean);
       const token = await csrf(controller.signal);
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || !token) return;
       const response = await fetch(
         `/api/reports/${encodeURIComponent(reportId)}/checklist/draft`,
         {
@@ -109,6 +172,7 @@ function ChecklistForReport({ reportId }: { reportId: string }) {
         },
       );
       if (controller.signal.aborted) return;
+      if (await handleAccessLoss(response, controller.signal)) return;
       if (!response.ok) throw new Error("Unable to save. Your text is still here; reload the checklist and try again.");
       const value: unknown = await response.json();
       if (controller.signal.aborted) return;
@@ -139,7 +203,7 @@ function ChecklistForReport({ reportId }: { reportId: string }) {
     setPending(true);
     try {
       const token = await csrf(controller.signal);
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || !token) return;
       const response = await fetch(
         `/api/reports/${encodeURIComponent(reportId)}/checklist/share`,
         {
@@ -159,6 +223,7 @@ function ChecklistForReport({ reportId }: { reportId: string }) {
         },
       );
       if (controller.signal.aborted) return;
+      if (await handleAccessLoss(response, controller.signal)) return;
       if (!response.ok) throw new Error("Unable to share. Refresh the checklist and try again.");
       const value: unknown = await response.json();
       if (controller.signal.aborted) return;
@@ -166,6 +231,8 @@ function ChecklistForReport({ reportId }: { reportId: string }) {
         throw new Error("Unable to share. Refresh the checklist and try again.");
       }
       setReportVersion(value.reportVersion);
+      onReportVersionChange?.(reportVersion, value.reportVersion);
+      setSuggestions(null);
       setMessage(value.changed ? "Saved steps shared." : "The saved steps are already shared.");
     } catch (cause) {
       if (!controller.signal.aborted) {
@@ -173,6 +240,97 @@ function ChecklistForReport({ reportId }: { reportId: string }) {
       }
     } finally {
       if (!controller.signal.aborted) setPending(false);
+    }
+  }
+
+  async function generateSuggestions() {
+    suggestionController.current?.abort();
+    const controller = new AbortController();
+    suggestionController.current = controller;
+    setSuggestions(null);
+    setError("");
+    setMessage("");
+    setGenerating(true);
+    try {
+      const token = await csrf(controller.signal);
+      if (controller.signal.aborted || !token) return;
+      const response = await fetch(
+        `/api/reports/${encodeURIComponent(reportId)}/checklist/suggestions`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: {
+            ...jsonHeaders,
+            "Content-Type": "application/json",
+            [token.headerName]: token.token,
+          },
+          body: "{}",
+          signal: controller.signal,
+        },
+      );
+      if (controller.signal.aborted) return;
+      if (await handleAccessLoss(response, controller.signal)) return;
+      if (!response.ok) throw new Error("Unable to generate suggestions. Please try again.");
+      const value: unknown = await response.json();
+      if (controller.signal.aborted) return;
+      if (!isSuggestions(value)) {
+        throw new Error("Unable to generate suggestions. Please try again.");
+      }
+      setSuggestions(value);
+    } catch {
+      if (!controller.signal.aborted) {
+        setSuggestions(null);
+        setError("Unable to generate suggestions. Please try again.");
+      }
+    } finally {
+      if (!controller.signal.aborted) setGenerating(false);
+    }
+  }
+
+  async function applySuggestions() {
+    if (!suggestions) return;
+    const candidate = suggestions;
+    const controller = new AbortController();
+    applyController.current = controller;
+    setApplying(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch(
+        `/api/reports/${encodeURIComponent(reportId)}/checklist/draft`,
+        {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: jsonHeaders,
+          signal: controller.signal,
+        },
+      );
+      if (controller.signal.aborted) return;
+      if (await handleAccessLoss(response, controller.signal)) return;
+      if (!response.ok) throw new Error("Unable to verify these suggestions. Generate them again.");
+      const value: unknown = await response.json();
+      if (controller.signal.aborted) return;
+      if (!isDraftResponse(value)) {
+        throw new Error("Unable to verify these suggestions. Generate them again.");
+      }
+      if (value.reportVersion !== candidate.sourceVersion) {
+        setSuggestions(null);
+        setError("These suggestions are out of date. Generate them again before applying.");
+        return;
+      }
+      const existingText = editor.trim();
+      setEditor(`${editor}${existingText ? "\n" : ""}${candidate.steps.join("\n")}`);
+      setSuggestions(null);
+      setMessage("Suggestions added to the draft. Save to keep them.");
+    } catch {
+      if (!controller.signal.aborted) {
+        setSuggestions(null);
+        setError("Unable to verify these suggestions. Generate them again.");
+      }
+    } finally {
+      if (!controller.signal.aborted) setApplying(false);
     }
   }
 
@@ -188,12 +346,35 @@ function ChecklistForReport({ reportId }: { reportId: string }) {
             id="investigation-steps"
             rows={6}
             value={editor}
-            disabled={pending}
+            disabled={pending || applying}
             onChange={(event) => setEditor(event.target.value)}
           />
           <p>Save stores the private draft. Share publishes the last saved steps.</p>
-          <button type="button" onClick={() => void save()} disabled={pending}>Save</button>
-          <button type="button" onClick={() => void share()} disabled={pending}>Share</button>
+          <button type="button" onClick={() => void save()} disabled={pending || applying || generating}>Save</button>
+          <button type="button" onClick={() => void share()} disabled={pending || applying || generating}>Share</button>
+          <button
+            type="button"
+            onClick={() => void generateSuggestions()}
+            disabled={pending || applying || generating}
+          >
+            {generating ? "Generating suggestions…" : "Generate suggestions"}
+          </button>
+          {suggestions && (
+            <section aria-label="AI suggestions">
+              <h3>AI-generated suggestions</h3>
+              <p>Review these suggestions before applying them to your draft.</p>
+              <ol>
+                {suggestions.steps.map((step, index) => <li key={index}>{step}</li>)}
+              </ol>
+              <button
+                type="button"
+                onClick={() => void applySuggestions()}
+                disabled={pending || applying || generating}
+              >
+                {applying ? "Checking report version…" : "Apply suggestions"}
+              </button>
+            </section>
+          )}
           {message && <p role="status">{message}</p>}
           {error && <p role="alert">{error}</p>}
         </>
@@ -219,4 +400,39 @@ function isDraftResponse(value: unknown): value is DraftResponse {
     isRevision(value.draftRevision) &&
     isRevision(value.reportVersion)
   );
+}
+
+function isSuggestions(value: unknown): value is Suggestions {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.steps) &&
+    value.steps.length >= 1 &&
+    value.steps.length <= 8 &&
+    value.steps.every(isSuggestionStep) &&
+    isRevision(value.sourceVersion)
+  );
+}
+
+function isSuggestionStep(value: unknown): value is string {
+  if (
+    typeof value !== "string" ||
+    value.trim().length === 0 ||
+    value.includes("\0") ||
+    value.includes("\r") ||
+    value.includes("\n")
+  ) {
+    return false;
+  }
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      if (i + 1 >= value.length) return false;
+      const next = value.charCodeAt(i + 1);
+      if (next < 0xdc00 || next > 0xdfff) return false;
+      i++;
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      return false;
+    }
+  }
+  return new TextEncoder().encode(value).length <= 300;
 }

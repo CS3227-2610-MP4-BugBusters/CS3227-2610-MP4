@@ -14,6 +14,8 @@ identity is rejected. An authorized successful response is
 Steps are advisory plain text: 1–8 nonblank strings, each at most 300 UTF-8
 bytes, no NUL, valid Unicode. Invalid provider output is rejected, not
 partially applied or returned raw.
+Each suggestion is one line: reject CR and LF so the reviewed list cannot
+silently turn one suggested step into multiple saved checklist steps.
 
 Only the selected report's title and description, each limited to 512 and
 8192 UTF-8 bytes respectively, are sent as untrusted data. If either exceeds
@@ -53,8 +55,26 @@ cannot be forwarded to another origin. The deadline
 covers connection, headers and response streaming. Enforce a per-instance
 in-flight limit of one request and retain the permit until the underlying
 provider operation actually stops, including after timeout/cancellation.
+On deadline or interruption the adapter requests cancellation of the HTTP
+exchange and response-body subscription; capacity is not made available to
+a replacement operation until the owned transport has reached its terminal
+cleanup boundary.
 Do not claim it enforces a cross-instance quota. The shared gateway owner must
 confirm model, quota, shared limits and production integration.
+
+For this local adapter, send one OpenAI-compatible `POST` to the configured
+base URL plus `/chat/completions`, with a bearer token and JSON containing
+`model`, fixed system and user `messages`, `temperature: 0`,
+`max_tokens: 384`, and `reasoning_effort: "none"`. The provisional default
+model is `qwen3.5:9b`, selected from a bounded synthetic comparison; allow
+server-side `SOCLAAS_MODEL` to select
+another team-approved model. Parse only `choices[0].message.content` and
+optional integer `usage.prompt_tokens` / `usage.completion_tokens`. A local
+test seam may inject the client, base URI, key, model and deadline. A working
+probe is not evidence of provider quotas or production availability.
+The fixed system instruction is the reviewed candidate in
+`workflow/evaluation/developer/ai-prompt-candidate-v2.txt`; the application
+must use the same content as that recorded experiment.
 
 Use safe structured errors `{code,message,requestId}` and no-store. Denied
 access returns 403 for an authenticated but unauthorized actor; missing or

@@ -44,6 +44,21 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+tasks.named('processResources') {
+    from('../shared/migrations/001_create_reports.sql') {
+        into 'db/shared'
+        rename { 'V1__create_reports.sql' }
+    }
+    from('../shared/migrations/002_create_resolution_proposals.sql') {
+        into 'db/shared'
+        rename { 'V3__create_resolution_proposals.sql' }
+    }
+    from('../developer/migrations/create_investigation_checklists.sql') {
+        into 'db/shared'
+        rename { 'V2__create_investigation_checklists.sql' }
+    }
+}
+
 tasks.named('test') {
     useJUnitPlatform()
     jvmArgs '--add-modules=jdk.httpserver'

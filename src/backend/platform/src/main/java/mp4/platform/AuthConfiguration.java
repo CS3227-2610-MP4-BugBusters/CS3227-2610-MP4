@@ -48,6 +48,20 @@ public class AuthConfiguration {
         return ds;
     }
     @Bean Clock authClock() { return Clock.systemUTC(); }
+    @Bean InitializingBean sharedMigrations(DataSource ds) {
+        return () -> {
+            try (var connection = ds.getConnection(); var statement = connection.createStatement();
+                    var result = statement.executeQuery("SELECT (to_regclass('public.reports') IS NOT NULL OR to_regclass('public.investigation_checklists') IS NOT NULL) AND to_regclass('public.mp4_shared_schema_history') IS NULL")) {
+                result.next();
+                if (result.getBoolean(1)) {
+                    throw new IllegalStateException("Untracked shared reports or checklist table exists; explicit reconciliation is required before migration");
+                }
+            }
+            Flyway.configure().dataSource(ds).defaultSchema("public").locations("classpath:db/shared")
+                    .table("mp4_shared_schema_history").baselineOnMigrate(true).baselineVersion("0")
+                    .failOnMissingLocations(true).load().migrate();
+        };
+    }
     @Bean InitializingBean authMigrations(DataSource ds) { return () -> Flyway.configure().dataSource(ds).defaultSchema("public").locations("classpath:db/auth").table("mp4_auth_schema_history").baselineOnMigrate(true).baselineVersion("99").load().migrate(); }
     @Bean CookieSerializer sessionCookieSerializer(@Value("${mp4.auth.local:false}") boolean local,
             @Value("${server.address:127.0.0.1}") String bind) {
@@ -99,6 +113,7 @@ public class AuthConfiguration {
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reports/*/checklist/draft").hasRole("DEVELOPER")
                 .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/reports/*/checklist/draft").hasRole("DEVELOPER")
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/reports/*/checklist/share").hasRole("DEVELOPER")
+                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/reports/*/checklist/suggestions").hasRole("DEVELOPER")
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reports/*/checklist/shared").hasAnyRole("REPORTER", "DEVELOPER", "MAINTAINER")
                 .requestMatchers("/api/developer/**").hasRole("DEVELOPER")
                 .requestMatchers("/api/maintainer/**").hasRole("MAINTAINER").anyRequest().denyAll())

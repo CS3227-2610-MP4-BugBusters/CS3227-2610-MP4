@@ -234,8 +234,6 @@ def main():
         CLASSES / "mp4/platform/AuthApplication.class",
         CLASSES / "mp4/auth/AccountProvisioningCommand.class",
         LIB,
-        ROOT / "src/backend/shared/migrations/001_create_reports.sql",
-        ROOT / "src/backend/developer/migrations/create_investigation_checklists.sql",
     )
     for path in required:
         if not path.exists():
@@ -276,11 +274,6 @@ def main():
         subprocess.run([createdb, "-h", "127.0.0.1", "-p", str(db_port), "-U", "postgres",
                         "mp4_developer_journey"], env=db_env,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-        psql(psql_bin, db_env, "mp4_developer_journey", None,
-             ROOT / "src/backend/shared/migrations/001_create_reports.sql")
-        psql(psql_bin, db_env, "mp4_developer_journey", None,
-             ROOT / "src/backend/developer/migrations/create_investigation_checklists.sql")
-
         db_user_env = clean_environment()
         jdbc_url = f"jdbc:postgresql://127.0.0.1:{db_port}/mp4_developer_journey"
         db_user_env.update({"MP4_AUTH_JDBC_URL": jdbc_url,
@@ -290,16 +283,6 @@ def main():
         developer = provision_account(classpath, db_user_env, "DEVELOPER", "Journey Developer")
         other_developer = provision_account(classpath, db_user_env, "DEVELOPER", "Other Developer")
         reporter = provision_account(classpath, db_user_env, "REPORTER", "Journey Reporter")
-
-        report_id = str(uuid.uuid4())
-        fixture = (
-            "INSERT INTO reports(id,title,description,reporter_id,assignee_id,status,version) VALUES "
-            f"('{report_id}','Packaged journey report','Disposable HTTP journey fixture',"
-            f"'{reporter['id']}','{developer['id']}','ASSIGNED',0); "
-            "INSERT INTO investigation_checklists(report_id,draft_steps,draft_revision,shared_steps) VALUES "
-            f"('{report_id}',ARRAY[]::text[],0,ARRAY[]::text[]);"
-        )
-        psql(psql_bin, db_env, "mp4_developer_journey", fixture)
 
         app_env = clean_environment()
         app_env.update({"MP4_AUTH_JDBC_URL": jdbc_url,
@@ -320,6 +303,15 @@ def main():
             )
         origin = f"http://127.0.0.1:{app_port}"
         wait_ready(app, origin)
+        report_id = str(uuid.uuid4())
+        fixture = (
+            "INSERT INTO reports(id,title,description,reporter_id,assignee_id,status,version) VALUES "
+            f"('{report_id}','Packaged journey report','Disposable HTTP journey fixture',"
+            f"'{reporter['id']}','{developer['id']}','ASSIGNED',0); "
+            "INSERT INTO investigation_checklists(report_id,draft_steps,draft_revision,shared_steps) VALUES "
+            f"('{report_id}',ARRAY[]::text[],0,ARRAY[]::text[]);"
+        )
+        psql(psql_bin, db_env, "mp4_developer_journey", fixture)
         exercise_journey(origin, developer, other_developer, reporter, report_id,
                          psql_bin, db_env)
         print("Packaged Developer real-session HTTP journey passed (not a browser check).")

@@ -56,6 +56,22 @@ afterEach(() => {
 });
 
 describe("DeveloperChecklist HTTP workflow", () => {
+  it("preserves edits and shares with the new report version after starting", async () => {
+    fetchMock.mockImplementation(async (input, init) => {
+      if (String(input) === draftPath && (!init?.method || init.method === "GET")) return draft(["Saved step"], 3, 7);
+      return responseFor(String(input), init);
+    });
+    const view = render(<DeveloperChecklist reportId={reportId} />);
+    const editor = await screen.findByLabelText(/investigation steps/i) as HTMLTextAreaElement;
+    await waitFor(() => expect(editor.value).toBe("Saved step"));
+    fireEvent.change(editor, { target: { value: "Unsaved edit" } });
+    view.rerender(<DeveloperChecklist reportId={reportId} startedVersion={{ previous: 7, current: 8 }} />);
+    expect(editor.value).toBe("Unsaved edit");
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([path]) => path === sharePath)).toBe(true));
+    const call = fetchMock.mock.calls.findIndex(([path]) => path === sharePath);
+    expect(requestBody(call)).toEqual({ expectedDraftRevision: 3, expectedReportVersion: 8 });
+  });
   it("loads the saved draft and reloads it when the report is reopened", async () => {
     fetchMock.mockImplementation(async (input, init) => {
       if (String(input) === draftPath) {

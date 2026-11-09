@@ -28,3 +28,4 @@ export MP4_TEST_DATABASE_NAME=mp4_shared_reports_test
 export MP4_TEST_DATABASE_URI="postgresql://mp4_fixture:$password@127.0.0.1:$port/mp4_shared_reports_test"
 
 python3 -B "$base/src/backend/shared/test/shared_report_storage_migration_test.py"
+python3 -B "$base/src/backend/shared/test/shared_report_storage_startup_migration_test.py"

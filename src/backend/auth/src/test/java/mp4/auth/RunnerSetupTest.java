@@ -21,6 +21,9 @@ class RunnerSetupTest {
         assertNotNull(JdbcIndexedSessionRepository.class);
         assertNotNull(org.flywaydb.core.Flyway.class);
         assertNotNull(org.apache.catalina.startup.Tomcat.class);
+        org.flywaydb.core.Flyway.configure().dataSource(url, user, password)
+                .defaultSchema("public").locations("classpath:db/shared")
+                .table("mp4_shared_schema_history").load().migrate();
         try (var connection = DriverManager.getConnection(url, user, password);
              Statement statement = connection.createStatement();
              ResultSet result = statement.executeQuery("SELECT 1")) {

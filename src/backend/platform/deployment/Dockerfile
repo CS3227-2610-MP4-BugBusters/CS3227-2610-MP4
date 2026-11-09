@@ -19,6 +19,8 @@ WORKDIR /workspace/src/backend/auth
 COPY src/backend/auth/ ./
 COPY src/backend/platform/ ../platform/
 COPY src/backend/developer/src/ ../developer/src/
+COPY src/backend/developer/migrations/ ../developer/migrations/
+COPY src/backend/shared/migrations/ ../shared/migrations/
 COPY src/backend/platform/deployment/package.gradle ../platform/deployment/package.gradle
 COPY --from=frontend /workspace/src/frontend/maintainer/dist /workspace/frontend-dist
 COPY --from=developer-frontend /workspace/src/frontend/developer/dist /workspace/developer-frontend-dist
