@@ -55,6 +55,22 @@ export type Filters = {
   limit?: number;
 };
 export type Page = { items: Summary[]; total: number };
+export type SummaryFilters = Pick<Filters, "status" | "priority" | "assigneeId">;
+export type SummaryFinding = { text: string; reportIds: string[] };
+export type SummaryResult = {
+  capturedAt: string;
+  filters: SummaryFilters;
+  included: { id: string; version: number; truncatedFields: string[] }[];
+  excluded: { id: string; reason: string }[];
+  findings: {
+    overview: SummaryFinding[];
+    blockers: SummaryFinding[];
+    missingInformation: SummaryFinding[];
+  };
+  requiresReview: true;
+  providerMode: "none" | "deterministic" | "soc";
+  promptVersion: "MNT-SUMMARY-1";
+};
 export type FailureCode =
   | "session"
   | "denied"
@@ -86,6 +102,7 @@ export interface Queries {
   listReports(filters: Filters, signal: AbortSignal): Promise<Page>;
   listDevelopers(signal: AbortSignal): Promise<Person[]>;
   getReport(id: string, signal: AbortSignal): Promise<Detail>;
+  summarizeQueue?(request: { filters: SummaryFilters; regenerate: boolean }, signal?: AbortSignal): Promise<SummaryResult>;
   updatePriority?(input: { reportId: string; expectedVersion: number; priority: (typeof priorities)[number] }, signal?: AbortSignal): Promise<void>;
   assignReport?(input: { reportId: string; expectedVersion: number; developerId: string; reason?: string }, signal?: AbortSignal): Promise<void>;
   returnResolution?(input: { reportId: string; expectedVersion: number; proposalId: string; proposalVersion: number; reason: string }, signal?: AbortSignal): Promise<void>;

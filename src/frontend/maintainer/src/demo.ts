@@ -4,6 +4,7 @@ import {
   type Queries,
   type Detail,
   type Person,
+  type SummaryFilters,
 } from "./domain";
 export const fixtureId = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -71,6 +72,7 @@ export const reports: Detail[] = Array.from({ length: 63 }, (_, i) => {
 export function createDemoQueries(
   input?: Detail[],
   includeActions = input !== undefined,
+  includeSummary = false,
 ): Queries {
   const source = input ?? reports.map((report) => structuredClone(report));
   const check = (s: AbortSignal) => {
@@ -130,6 +132,28 @@ export function createDemoQueries(
       if (!r) throw new QueryError("missing");
       return r;
     },
+    ...(includeSummary ? { async summarizeQueue({ filters }: { filters: SummaryFilters; regenerate: boolean }, s?: AbortSignal) {
+      if (s?.aborted) throw new QueryError("cancelled");
+      const queue = source.filter((r) => r.status !== "Closed" &&
+        (!filters.status || r.status === filters.status) &&
+        (!filters.priority || r.priority === filters.priority) &&
+        (!filters.assigneeId || r.assignee?.id === filters.assigneeId));
+      const rank = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+      queue.sort((a, b) => rank[a.priority] - rank[b.priority] || Date.parse(a.updatedAt) - Date.parse(b.updatedAt) || a.id.localeCompare(b.id));
+      const included = queue.slice(0, 20).map((r) => ({ id: r.id, version: r.version, truncatedFields: [] as string[] }));
+      const includedSet = new Set(included.map((r) => r.id));
+      const excluded = queue.filter((r) => !includedSet.has(r.id)).map((r) => ({ id: r.id, reason: "Context limit" }));
+      const evidence = included[0];
+      return {
+        capturedAt: new Date().toISOString(), filters: { ...filters }, included, excluded,
+        findings: {
+          overview: evidence ? [{ text: "Review the reports in this queue snapshot.", reportIds: [evidence.id] }] : [],
+          blockers: [], missingInformation: [],
+        },
+        requiresReview: true as const, providerMode: "deterministic" as const,
+        promptVersion: "MNT-SUMMARY-1" as const,
+      };
+    } } : {}),
     ...(includeActions ? {
     async updatePriority({ reportId, expectedVersion, priority }: { reportId: string; expectedVersion: number; priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" }) {
       if (!( ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as string[]).includes(priority)) throw new QueryError("validation");

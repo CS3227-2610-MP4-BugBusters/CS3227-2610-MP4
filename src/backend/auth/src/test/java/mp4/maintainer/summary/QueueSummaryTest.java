@@ -116,8 +116,12 @@ class QueueSummaryTest {
         SummaryResult result = f.service().generate(f.actor, ANY, false);
 
         assertEquals(20, result.included().size());
+        assertEquals(java.util.stream.IntStream.iterate(22, i -> i >= 3, i -> i - 1)
+                .mapToObj(SummaryFixture::id).toList(),
+            result.included().stream().map(IncludedReport::id).toList(),
+            "oldest reports are selected first and the report cap preserves that order");
         assertEquals(2, result.excluded().size());
-        assertEquals(List.of(id(21), id(22)), result.excluded().stream().map(ExcludedReport::id).toList());
+        assertEquals(List.of(id(2), id(1)), result.excluded().stream().map(ExcludedReport::id).toList());
         assertTrue(result.excluded().stream().allMatch(e -> !e.reason().isBlank()));
         assertTrue(f.requests.get(0).reports().value().getBytes(java.nio.charset.StandardCharsets.UTF_8).length <= 24 * 1024);
     }
@@ -165,7 +169,7 @@ class QueueSummaryTest {
         collectTextNodes(context, textNodes);
 
         List<String> expectedTruncatedFields = List.of("title", "description", "reproductionSteps",
-            "expectedBehavior", "actualBehavior", "environment");
+            "expectedBehavior", "actualBehavior", "environment", "latestUpdates");
         assertTrue(included.truncatedFields().containsAll(expectedTruncatedFields));
         assertTrue(textNodes.contains("é".repeat(200)), "title is capped at 200 Unicode code points");
         assertTrue(textNodes.contains("d".repeat(1000)), "description is capped at 1,000 Unicode code points");
@@ -367,6 +371,7 @@ class QueueSummaryTest {
         service.generate(otherSession, ANY, true);
         Actor newGeneration = new Actor(f.actor.accountId(), Role.MAINTAINER, true, 5, "session-A");
         service.generate(newGeneration, ANY, true);
+        f.snapshot.set(snapshot(List.of(report(1, Priority.HIGH, NOW.minusSeconds(1), "Report 1"))));
         service.generate(f.actor, new Filters(null, Priority.HIGH, null), true);
         f.snapshot.set(new Snapshot(NOW, 8, List.of(report(1), report(2))));
         service.generate(f.actor, ANY, true);
@@ -504,6 +509,7 @@ class QueueSummaryTest {
         var f = new SummaryFixture();
         f.snapshot.set(snapshot(List.of(report(1))));
         CountDownLatch workerStarted = new CountDownLatch(1);
+        CountDownLatch interruptObserved = new CountDownLatch(1);
         CountDownLatch allowWorkerToFinish = new CountDownLatch(1);
         CountDownLatch workerFinished = new CountDownLatch(1);
         CountDownLatch leaseReleased = new CountDownLatch(1);
@@ -518,7 +524,10 @@ class QueueSummaryTest {
                 try {
                     while (allowWorkerToFinish.getCount() > 0) {
                         try { allowWorkerToFinish.await(); }
-                        catch (InterruptedException e) { interrupted.set(true); }
+                        catch (InterruptedException e) {
+                            interrupted.set(true);
+                            interruptObserved.countDown();
+                        }
                     }
                     return new GatewayResponse(jsonFor(id(1)), MODEL, ProviderMode.LIVE);
                 } finally {
@@ -542,9 +551,13 @@ class QueueSummaryTest {
             assertTrue(workerStarted.await(1, TimeUnit.SECONDS));
             timeout = call.get(2, TimeUnit.SECONDS);
             assertEquals(FailureCode.AI_TIMEOUT, timeout.failureCode());
+            assertTrue(interruptObserved.await(1, TimeUnit.SECONDS),
+                "provider worker should observe cancellation before its lease can be released");
             assertTrue(interrupted.get(), "timeout should cancel/interupt provider work");
             assertFalse(f.leaseClosed, "lease must remain held while provider worker is still alive");
             assertTrue(f.leaseRenewed, "long-lived worker lease is retained/renewed");
+            assertTrue(allowWorkerToFinish.getCount() > 0,
+                "the worker remains blocked until the test releases it after checking the held lease");
         } finally {
             allowWorkerToFinish.countDown();
             workerFinished.await(1, TimeUnit.SECONDS);

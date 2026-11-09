@@ -9,8 +9,11 @@ import {
   type Page,
   type Person,
   type Queries,
+  type SummaryFilters,
+  type SummaryResult,
 } from "./domain";
 import type { AuthActions } from "./auth-client";
+import { parseSummaryResult } from "./summary";
 type Load<T> = {
   state: "loading" | "ready" | "error";
   data?: T;
@@ -53,6 +56,8 @@ export function App({
     [devs, setDevs] = useState<Load<Person[]>>(loading),
     [selected, setSelected] = useState<string>(),
     [detail, setDetail] = useState<Load<Detail>>(loading),
+    [queueSummary, setQueueSummary] = useState<Load<SummaryResult>>({ state: "loading" }),
+    [summaryPending, setSummaryPending] = useState(false),
     [listRetry, setListRetry] = useState(0),
     [devRetry, setDevRetry] = useState(0),
     [detailRetry, setDetailRetry] = useState(0),
@@ -67,6 +72,8 @@ export function App({
     devEpoch = useRef(0),
     actionController = useRef<AbortController | undefined>(undefined),
     actionLock = useRef(false),
+    summaryEpoch = useRef(0),
+    summaryController = useRef<AbortController | undefined>(undefined),
     controllers = useRef(new Set<AbortController>());
   selectedRef.current = selected;
   const control = () => {
@@ -74,7 +81,15 @@ export function App({
     controllers.current.add(c);
     return c;
   };
+  const invalidateSummary = () => {
+    summaryEpoch.current++;
+    summaryController.current?.abort();
+    summaryController.current = undefined;
+    setSummaryPending(false);
+    setQueueSummary({ state: "loading" });
+  };
   const clear = () => {
+    invalidateSummary();
     authActionGeneration.current++;
     activeAuthController.current?.abort();
     activeAuthController.current = undefined;
@@ -228,6 +243,12 @@ export function App({
     };
   }, [queries, auth, session, selected, detailRetry]);
   const change = (next: Filters) => {
+    const canonical = (value: Filters) => JSON.stringify({
+      ...(value.status ? { status: value.status } : {}),
+      ...(value.priority ? { priority: value.priority } : {}),
+      ...(value.assigneeId ? { assigneeId: value.assigneeId } : {}),
+    });
+    if (canonical(next) !== canonical(filters)) invalidateSummary();
     cancelSelectedAction();
     listEpoch.current++;
     detailEpoch.current++;
@@ -235,6 +256,38 @@ export function App({
     setSelected(undefined);
     setDetail(loading());
     setFilters(next);
+  };
+  const runSummary = async (regenerate = false) => {
+    if (!queries.summarizeQueue || summaryPending || actionPending || actionLock.current || auth !== "ready" || session !== epoch.current || filters.status === "Closed") return;
+    const requestFilters: SummaryFilters = {
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.priority ? { priority: filters.priority } : {}),
+      ...(filters.assigneeId ? { assigneeId: filters.assigneeId } : {}),
+    };
+    const request = { filters: requestFilters, regenerate };
+    const requestEpoch = epoch.current, requestSummaryEpoch = ++summaryEpoch.current;
+    const controller = control();
+    summaryController.current = controller;
+    setSummaryPending(true);
+    setQueueSummary({ state: "loading" });
+    const current = () => requestEpoch === epoch.current && requestSummaryEpoch === summaryEpoch.current && !controller.signal.aborted;
+    try {
+      const raw = await queries.summarizeQueue(request, controller.signal);
+      const parsed = parseSummaryResult(raw);
+      if (JSON.stringify(parsed.filters) !== JSON.stringify(requestFilters)) throw new QueryError("contract");
+      if (current()) setQueueSummary({ state: "ready", data: parsed });
+    } catch (cause) {
+      const error = failure(cause);
+      // A denial applies to the current session even if the user changed filters while it was pending.
+      if (requestEpoch === epoch.current && (error.code === "session" || error.code === "denied")) deny(error, requestEpoch);
+      else if (current() && error.code !== "cancelled") setQueueSummary({ state: "error", error });
+    } finally {
+      controllers.current.delete(controller);
+      if (summaryController.current === controller) {
+        summaryController.current = undefined;
+        setSummaryPending(false);
+      }
+    }
   };
   const select = (id: string) => {
     if (selected === id) return;
@@ -252,6 +305,7 @@ export function App({
     const c = control();
     actionController.current = c;
     actionLock.current = true;
+    invalidateSummary();
     setActionPending(true);
     setActionError(undefined);
     const current = () => expectedEpoch === epoch.current && expectedSelection === selectedRef.current && !c.signal.aborted;
@@ -268,6 +322,9 @@ export function App({
       return false;
     } finally {
       controllers.current.delete(c);
+      // An aborted action can still commit server-side. Clear summaries created after its start
+      // when its response arrives, provided the same authorized session is still active.
+      if (expectedEpoch === epoch.current) invalidateSummary();
       if (actionController.current === c) {
         actionController.current = undefined;
         actionLock.current = false;
@@ -489,6 +546,32 @@ export function App({
               />
             )}
           </section>
+          {queries.summarizeQueue && <section className="summary-panel" aria-label="Queue summary">
+            <h2>Queue summary</h2>
+            <p>Advisory summary of the full matching open queue. Review the source reports before acting.</p>
+            <button type="button" disabled={summaryPending || actionPending || filters.status === "Closed"} onClick={() => void runSummary(false)}>Generate summary</button>
+            {summaryPending && <p role="status">Generating a reviewable summary…</p>}
+            {queueSummary.state === "error" && <div role="alert"><p>{messages[queueSummary.error!.code]}</p><button type="button" disabled={filters.status === "Closed"} onClick={() => void runSummary(false)}>Retry summary</button></div>}
+            {queueSummary.state === "ready" && <>
+              <p><strong>Review required.</strong> Captured {queueSummary.data!.capturedAt}. Provider mode: {queueSummary.data!.providerMode}.</p>
+              <button type="button" disabled={summaryPending || actionPending || filters.status === "Closed"} onClick={() => void runSummary(true)}>Regenerate summary</button>
+              {(["overview", "blockers", "missingInformation"] as const).map((group) => <section key={group}>
+                <h3>{group === "missingInformation" ? "Missing information" : group[0].toUpperCase() + group.slice(1)}</h3>
+                {queueSummary.data!.findings[group].length ? <ul>{queueSummary.data!.findings[group].map((finding, index) => <li key={`${group}-${index}`}><p className="text">{finding.text}</p><small>Sources: {finding.reportIds.map((id, i) => <span key={id}>{i > 0 ? ", " : ""}<a href={`#report-${id}`} onClick={() => select(id)}>{id}</a></span>)}</small></li>)}</ul> : <p>None reported.</p>}
+              </section>)}
+              <details>
+                <summary>Included reports ({queueSummary.data!.included.length})</summary>
+                {queueSummary.data!.included.length ? <ul>{queueSummary.data!.included.map((item) => <li key={item.id}>
+                  <a href={`#report-${item.id}`} onClick={() => select(item.id)}>{item.id}</a>
+                  {item.truncatedFields.length > 0 && <span> · {item.truncatedFields.join(", ")} truncated</span>}
+                </li>)}</ul> : <p>No reports were included.</p>}
+              </details>
+              <details>
+                <summary>Excluded reports ({queueSummary.data!.excluded.length})</summary>
+                {queueSummary.data!.excluded.length ? <ul>{queueSummary.data!.excluded.map((item) => <li key={item.id}><a href={`#report-${item.id}`} onClick={() => select(item.id)}>{item.id}</a> · {item.reason}</li>)}</ul> : <p>No reports were excluded.</p>}
+              </details>
+            </>}
+          </section>}
           <div className="workspace">
             <section aria-label="Reports" className="queue">
               {list.state === "loading" ? (

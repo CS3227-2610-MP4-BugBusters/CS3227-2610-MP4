@@ -7,7 +7,7 @@ import "./style.css";
 async function start() {
   const synthetic = import.meta.env.DEV && import.meta.env.MODE === "demo";
   const queries = synthetic
-    ? (await import("./demo")).createDemoQueries(undefined, true)
+    ? (await import("./demo")).createDemoQueries(undefined, true, true)
     : withHttpActions(createHttpQueries());
   createRoot(document.getElementById("root")!).render(
     <App

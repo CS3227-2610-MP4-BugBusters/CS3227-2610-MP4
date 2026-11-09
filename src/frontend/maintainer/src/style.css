@@ -160,6 +160,16 @@ dd {
   border-radius: 8px;
   background: #fff;
 }
+.summary-panel {
+  margin: 0 0 20px;
+  padding: 20px;
+  border: 1px solid #b7d7d7;
+  border-radius: 10px;
+  background: #f8fdfd;
+  overflow-wrap: anywhere;
+}
+.summary-panel a { color: #075f68; }
+.summary-panel section { border-top: 1px solid #dce9e9; }
 .action-panel label { display: grid; gap: 5px; }
 .action-panel input:not([type="checkbox"]),
 .action-panel textarea,
