@@ -57,6 +57,10 @@ tasks.named('processResources') {
         into 'db/shared'
         rename { 'V2__create_investigation_checklists.sql' }
     }
+    from('../developer/migrations/create_developer_private_notes.sql') {
+        into 'db/shared'
+        rename { 'V4__create_developer_private_notes.sql' }
+    }
 }
 
 tasks.named('test') {

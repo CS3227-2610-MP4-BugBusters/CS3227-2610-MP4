@@ -1,5 +1,6 @@
 import { createElement, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { DeveloperChecklist } from "./DeveloperChecklist";
+import { DeveloperPrivateNotes } from "./DeveloperPrivateNotes";
 import { createRoleWorkspace } from "../../shared/RoleWorkspace";
 
 type User = {
@@ -549,6 +550,12 @@ export function DeveloperApp() {
                       {starting ? "Starting…" : "Start investigation"}
                     </button>
                   )}
+                  <DeveloperPrivateNotes
+                    key={selectedReportId}
+                    reportId={selectedReportId}
+                    status={detail.status}
+                    onAccessLost={handleChecklistAccessLoss}
+                  />
                 </>
               )}
               <DeveloperChecklist
