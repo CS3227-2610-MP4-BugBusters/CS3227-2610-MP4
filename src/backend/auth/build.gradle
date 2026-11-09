@@ -32,6 +32,7 @@ dependencies {
 sourceSets.main.java {
     srcDir '../platform/src/main/java'
     srcDir '../developer/src'
+    srcDir '../maintainer/src/main/java'
     include 'mp4/**', 'AssignedReportStore.java', 'AssignedReportListHttpHandler.java', 'ChecklistDraftStore.java'
 }
 
