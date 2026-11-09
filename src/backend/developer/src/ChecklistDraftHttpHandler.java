@@ -68,10 +68,14 @@ public final class ChecklistDraftHttpHandler {
                 var result = store.read(actor, reportId);
                 if (result == null) {
                     sendError(exchange, 403, "FORBIDDEN", "Access denied");
+                } else if (result.draftRevision() > ChecklistShareService.MAX_SAFE_VERSION
+                        || result.reportVersion() > ChecklistShareService.MAX_SAFE_VERSION) {
+                    sendError(exchange, 409, "VERSION_LIMIT", "Checklist version cannot be safely represented");
                 } else {
                     var body = JSON.createObjectNode();
                     body.set("steps", JSON.valueToTree(result.steps()));
                     body.put("draftRevision", result.draftRevision());
+                    body.put("reportVersion", result.reportVersion());
                     sendJson(exchange, 200, body);
                 }
             } catch (SQLException | RuntimeException failure) {
@@ -102,6 +106,8 @@ public final class ChecklistDraftHttpHandler {
                 sendJson(exchange, 200, JSON.createObjectNode().put("draftRevision", result.draftRevision()));
             } else if (result.outcome() == Outcome.STALE_VERSION) {
                 sendError(exchange, 409, "STALE_VERSION", "Draft revision is out of date");
+            } else if (result.outcome() == Outcome.VERSION_LIMIT) {
+                sendError(exchange, 409, "VERSION_LIMIT", "Draft revision cannot be safely incremented");
             } else if (result.outcome() == Outcome.FORBIDDEN) {
                 sendError(exchange, 403, "FORBIDDEN", "Access denied");
             } else {
@@ -128,7 +134,8 @@ public final class ChecklistDraftHttpHandler {
         JsonNode revisionNode = object.get("expectedDraftRevision");
         if (stepsNode == null || !stepsNode.isArray() || revisionNode == null
                 || !revisionNode.isIntegralNumber() || !revisionNode.canConvertToLong()
-                || revisionNode.longValue() < 0) {
+                || revisionNode.longValue() < 0
+                || revisionNode.longValue() > ChecklistShareService.MAX_SAFE_VERSION) {
             throw new IllegalArgumentException("Invalid request body");
         }
         var steps = new ArrayList<String>();

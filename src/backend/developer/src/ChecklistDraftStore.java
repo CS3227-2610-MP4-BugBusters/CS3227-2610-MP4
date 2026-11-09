@@ -9,10 +9,10 @@ import javax.sql.DataSource;
 /** Saves private drafts for actors resolved by the application's authentication layer. */
 public final class ChecklistDraftStore {
     public enum Role { REPORTER, DEVELOPER, MAINTAINER }
-    public enum Outcome { SAVED, FORBIDDEN, INVALID_STATE, STALE_VERSION }
+    public enum Outcome { SAVED, FORBIDDEN, INVALID_STATE, STALE_VERSION, VERSION_LIMIT }
 
     public record Actor(UUID id, Role role, boolean active) {}
-    public record DraftReadResult(List<String> steps, long draftRevision) {}
+    public record DraftReadResult(List<String> steps, long draftRevision, long reportVersion) {}
     public record SaveResult(Outcome outcome, Long draftRevision) {}
 
     private final DataSource database;
@@ -30,18 +30,20 @@ public final class ChecklistDraftStore {
             connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
             connection.setAutoCommit(false);
             try {
+                long reportVersion;
                 try (var report = connection.prepareStatement(
-                        "SELECT assignee_id FROM reports WHERE id = ? FOR UPDATE")) {
+                        "SELECT assignee_id, version FROM reports WHERE id = ? FOR UPDATE")) {
                     report.setObject(1, reportId);
                     try (var row = report.executeQuery()) {
                         if (!row.next() || !actor.id().equals(row.getObject("assignee_id", UUID.class))) {
                             connection.commit();
                             return null;
                         }
+                        reportVersion = row.getLong("version");
                     }
                 }
 
-                DraftReadResult result = new DraftReadResult(List.of(), 0);
+                DraftReadResult result = new DraftReadResult(List.of(), 0, reportVersion);
                 try (var checklist = connection.prepareStatement(
                         "SELECT draft_steps, draft_revision FROM investigation_checklists WHERE report_id = ?")) {
                     checklist.setObject(1, reportId);
@@ -50,7 +52,7 @@ public final class ChecklistDraftStore {
                             var steps = row.getArray("draft_steps");
                             try {
                                 result = new DraftReadResult(List.of((String[]) steps.getArray()),
-                                        row.getLong("draft_revision"));
+                                        row.getLong("draft_revision"), reportVersion);
                             } finally {
                                 steps.free();
                             }
@@ -112,6 +114,9 @@ public final class ChecklistDraftStore {
                 }
             }
         }
+        if (expectedDraftRevision > ChecklistShareService.MAX_SAFE_VERSION) {
+            return new SaveResult(Outcome.VERSION_LIMIT, null);
+        }
 
         // Read the draft after acquiring the report lock so a waiting Save sees the last commit.
         long revision = 0;
@@ -126,6 +131,9 @@ public final class ChecklistDraftStore {
         }
         if (revision != expectedDraftRevision) {
             return new SaveResult(Outcome.STALE_VERSION, null);
+        }
+        if (revision >= ChecklistShareService.MAX_SAFE_VERSION) {
+            return new SaveResult(Outcome.VERSION_LIMIT, null);
         }
 
         long nextRevision = Math.addExact(revision, 1);

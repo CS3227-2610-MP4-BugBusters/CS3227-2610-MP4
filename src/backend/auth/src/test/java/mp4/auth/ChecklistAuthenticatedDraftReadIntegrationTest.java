@@ -26,6 +26,7 @@ class ChecklistAuthenticatedDraftReadIntegrationTest {
         var withChecklist = UUID.randomUUID();
         var withoutChecklist = UUID.randomUUID();
         report(withChecklist, reporter.id(), developer.id());
+        reportVersion(withChecklist, 7);
         checklist(withChecklist, new String[] {"Private draft canary"}, 3, new String[] {"Shared canary"});
         report(withoutChecklist, reporter.id(), developer.id());
 
@@ -33,14 +34,21 @@ class ChecklistAuthenticatedDraftReadIntegrationTest {
         var response = browser.get(path(withChecklist));
         SessionAuthenticationTest.status(200, response, "assigned Developer draft read");
         assertTrue(response.headers().firstValue("Cache-Control").orElse("").contains("no-store"));
-        assertEquals(Map.of("steps", List.of("Private draft canary"), "draftRevision", 3),
+        assertEquals(Map.of("steps", List.of("Private draft canary"), "draftRevision", 3, "reportVersion", 7),
                 SessionAuthenticationTest.json(response));
         assertFalse(response.body().contains("Shared canary"));
+
+        reportVersion(withChecklist, 8);
+        var refreshed = browser.get(path(withChecklist));
+        SessionAuthenticationTest.status(200, refreshed, "draft read returns current report version");
+        assertEquals(Map.of("steps", List.of("Private draft canary"), "draftRevision", 3, "reportVersion", 8),
+                SessionAuthenticationTest.json(refreshed));
+        assertFalse(refreshed.body().contains("Shared canary"));
 
         var empty = browser.get(path(withoutChecklist));
         SessionAuthenticationTest.status(200, empty, "assigned Developer missing checklist read");
         assertTrue(empty.headers().firstValue("Cache-Control").orElse("").contains("no-store"));
-        assertEquals(Map.of("steps", List.of(), "draftRevision", 0), SessionAuthenticationTest.json(empty));
+        assertEquals(Map.of("steps", List.of(), "draftRevision", 0, "reportVersion", 0), SessionAuthenticationTest.json(empty));
     }
 
     @Test void reassignmentAndRoleEligibilityPreventDraftDisclosure() throws Exception {
@@ -58,7 +66,7 @@ class ChecklistAuthenticatedDraftReadIntegrationTest {
 
         var initiallyAssigned = firstBrowser.get(path(report));
         SessionAuthenticationTest.status(200, initiallyAssigned, "currently assigned Developer draft read");
-        assertEquals(Map.of("steps", List.of("Do not disclose draft"), "draftRevision", 4),
+        assertEquals(Map.of("steps", List.of("Do not disclose draft"), "draftRevision", 4, "reportVersion", 0),
                 SessionAuthenticationTest.json(initiallyAssigned));
         denyWithoutDraft(secondBrowser.get(path(report)));
         denyWithoutDraft(reporterBrowser.get(path(report)));
@@ -71,7 +79,7 @@ class ChecklistAuthenticatedDraftReadIntegrationTest {
         denyWithoutDraft(firstBrowser.get(path(report)));
         var newlyAssigned = secondBrowser.get(path(report));
         SessionAuthenticationTest.status(200, newlyAssigned, "newly assigned Developer draft read");
-        assertEquals(Map.of("steps", List.of("Do not disclose draft"), "draftRevision", 4),
+        assertEquals(Map.of("steps", List.of("Do not disclose draft"), "draftRevision", 4, "reportVersion", 0),
                 SessionAuthenticationTest.json(newlyAssigned));
     }
 
@@ -115,6 +123,13 @@ class ChecklistAuthenticatedDraftReadIntegrationTest {
              var insert = c.prepareStatement("INSERT INTO investigation_checklists(report_id,draft_steps,draft_revision,shared_steps) VALUES(?,?::text[],?,?::text[])")) {
             insert.setObject(1, report); insert.setString(2, pgArray(draft)); insert.setLong(3, revision);
             insert.setString(4, pgArray(shared)); insert.executeUpdate();
+        }
+    }
+
+    private static void reportVersion(UUID report, long version) throws Exception {
+        try (var c = SessionAuthenticationTest.connection();
+             var update = c.prepareStatement("UPDATE reports SET version=? WHERE id=?")) {
+            update.setLong(1, version); update.setObject(2, report); assertEquals(1, update.executeUpdate());
         }
     }
 
