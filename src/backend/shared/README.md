@@ -20,3 +20,14 @@ must compare the expected version in their update and increment it atomically.
 This migration is for fresh databases only. It does not upgrade an existing
 schema or track applied migration versions; do not rerun it against a database
 that already has `reports`.
+
+## 002 report timestamps
+
+`migrations/002_add_report_timestamps.sql` (Reporter design D7) adds
+`created_at` and `updated_at` (`timestamptz NOT NULL DEFAULT now()`) to
+`reports` and an index on `(reporter_id, created_at DESC, id)`. Apply it after
+`001_create_reports.sql` and before the Developer checklist migration, on fresh
+databases only. Only the Reporter runner
+(`src/backend/reporter/test/run-reporter-db.sh`) applies it; the shared and
+Developer runners apply `001` only, so their schemas do not include these
+columns.

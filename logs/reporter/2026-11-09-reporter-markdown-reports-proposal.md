@@ -83,7 +83,124 @@ Artifacts updated:
 22 tasks, 1 complete. The verified Red baselines for 3.1 and 3.2 are not affected,
 since they test the renderer, not report fields.
 
+## Revision 2: footnotes and timestamps (9 Nov)
+
+Feature-owner decisions:
+1. **Allow footnotes the way GitHub does.**
+   - Added requirement MDR-08: two-way `#user-content-` links, and every generated
+     ID prefixed `user-content-`. Author-written fragment links stay plain text.
+   - Amended the MDR-04 first sentence so footnote links are the only exception to
+     the rule that relative or fragment links render as plain text.
+   - Added a footnotes bullet to design D2, and new task 3.6.
+   - The approved MDR-01..04 tests use no `#` fragments, so their baselines still
+     hold.
+2. **Add the time fields to the database now.** The Reporter owner chose to go
+   ahead with the additive `created_at` / `updated_at` migration (D7, task 2.2)
+   without waiting for the Developer owner's sign-off. Grounds:
+   - A code survey showed no Developer query or test is affected. All inserts
+     name their columns, and the one positional insert uses a separate fixture
+     table.
+   - The Maintainer UI already displays and sorts by `createdAt` / `updatedAt`.
+
+   The Developer owner is to be **informed**. Task 1.1 stays open until their
+   acknowledgement is recorded.
+
+`openspec validate --strict`: valid, 23 tasks.
+
 ## Next action
 
 Feature-owner review of the artifacts, then task 1.1 approvals. Groups 2 and 3
 can then run in parallel worktrees through the TDD agent pipeline.
+
+## Revision 3: owner decisions after the 3.6 security review (9 Nov)
+
+Feature-owner choices:
+1. **Timestamps go in the shared migrations.** D7 moves to
+   `src/backend/shared/migrations/002_add_report_timestamps.sql`. The Reporter
+   runner will apply every shared migration in name order. Task 2.2 was
+   reworded.
+2. **Hand-written footnote links are allowed.** Option 2a, recorded in design D2.
+3. **Per-view footnote ID prefix** (option 1a). MDR-08 was modified: IDs must be
+   unique per view, scenario 1 no longer hard-codes `#user-content-fn-1`, and a
+   new "two views never share IDs" scenario was added. New task 3.7. This
+   changes an approved test, so it needs a new baseline review and approval.
+4. **Link hardening** (option 3a). New requirement MDR-09: links containing
+   credentials render as text, and `mailto:` keeps only the address. New task 3.8.
+5. **The Developer suite is not run** (option 4b). The owner accepted the
+   verifier's finding that the suite doesn't apply this migration. Recorded in
+   task 2.2.
+
+Design D4 also changed: the security review showed the parse itself overflows
+the stack, so the nesting cap must be a pre-parse source check.
+
+`openspec validate --strict`: valid. 25 tasks, 6 complete.
+
+Five `test_designer` agents were dispatched in parallel, each on separate files:
+2.2 runner, 3.3 limits, 3.4 editor, 3.7 footnote IDs, 3.8 link hardening.
+
+## Revision 4: owner decisions after the round-3 security review (9 Nov)
+
+The owner chose **1A, 2a, 3 keep**:
+1. **1A: patch the pre-check.** No lower formatting cap and no Worker.
+   - MDR-05 gains a "Known slow constructs up to 20,000 characters" scenario:
+     footnote-prefixed nesting, wide tables, emphasis runs and density, setext
+     headings, lazy continuation.
+   - The orchestrator added the setext and lazy-continuation cases. The review
+     measured them at 3.25 s and 1.23 s, and they need the same kind of
+     pre-check pattern.
+   - The D4 revision lists each linear check. The blocklist nature is recorded as
+     an accepted residual risk.
+   - Task 3.3 reopened.
+2. **2a: `mailto:` hardening.** Exactly one address. Render as text when the
+   decoded address contains `?`, `#`, `&`, a comma or a control character. New
+   MDR-09 scenario added; task 3.8 extended.
+3. **3 keep.** Whitespace-only source previews as "Nothing to preview".
+
+`openspec validate --strict`: valid. 25 tasks, 9 complete.
+
+Dispatched two `test_designer` agents in parallel:
+- `MarkdownView.dos.test.tsx` (3.3)
+- `MarkdownView.mailto.test.tsx` (3.8)
+
+## Revision 5: owner decision C, Web Worker parsing (9 Nov)
+
+After the round-4 security review found 6 more slow constructs (2–12 s), the
+owner chose **C: parse in a Web Worker with a 1 s time limit**.
+
+Spec changes:
+- New **MDR-10**, with 6 scenarios:
+  - an abandoned slow parse;
+  - no parsing on the main thread;
+  - the formatted result replacing the plain text;
+  - one slow report not breaking the others;
+  - a stale result being ignored;
+  - the in-thread path when no Worker is available.
+- The `mailto:` address rules move into new **MDR-11**, so MDR-09 stays under
+  500 characters. MDR-11 adds `;`, whitespace, `<`, `>`, `"`, `\`, `/` and
+  "exactly one `@`". This is the orchestrator's allowlist to meet the existing
+  "exactly one address" rule. The owner was told and didn't object. The LOW
+  items (`%253F`, zero-width characters) are excluded.
+
+Design: new **D11**.
+- A pure `toHast` pipeline runs in a shared worker. A runner gives each request
+  its own 1 s timer, then terminates the worker and retries the queued requests
+  once.
+- The first paint is plain text. Stale results are dropped.
+- Every safety rule is re-applied on the main thread when the hast is rendered.
+- Where `Worker` doesn't exist, rendering is in-thread, so the existing tests stay
+  valid.
+- A `MarkdownParserProvider` context is the test seam.
+
+Tasks: new 3.9. Task 3.3 closes when 3.9 passes. 3.8 is extended
+(`MarkdownView.mailto2.test.tsx`).
+
+`openspec validate --strict`: valid. 26 tasks, 9 complete.
+
+Dispatched two `test_designer` agents in parallel: `MarkdownView.worker.test.tsx`
+(3.9), against a contract the orchestrator wrote for `toHast` / `markdownRunner`
+/ `MarkdownParserProvider`; and `MarkdownView.mailto2.test.tsx` (3.8).
+
+Note: the implementation will probably need `hast-util-to-jsx-runtime` and
+`unified`/`remark-*` declared in `package.json`. Today they are transitive
+dependencies of react-markdown. Changing `package.json` touches the approved
+runner configuration and will be raised with the owner at the Green gate.

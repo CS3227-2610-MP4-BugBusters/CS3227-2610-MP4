@@ -54,6 +54,21 @@ Store Markdown source exactly as typed (RPT-03) and render only in the browser.
   - `a` renders as a link only when `urlTransform` accepts the scheme (MDR-04).
   - `input` renders as a disabled checkbox.
   - Headings get no generated IDs (avoids DOM clobbering).
+  - Footnotes (MDR-08, feature-owner decisions 9 Nov): keep remark-gfm's footnote
+    output, with every ID prefixed `user-content-` (GitHub's guard against DOM
+    clobbering).
+    - Each `MarkdownView` instance uses its own prefix,
+      `user-content-<instance>-`, taken from React `useId()` with the characters
+      that aren't valid in an ID stripped, and passed as remark-rehype's
+      `clobberPrefix`. Without that, two reports on one page would share IDs, and
+      one report's footnote link could land on another report's footnote text.
+      The security review found this content-spoofing case.
+    - Allow a fragment `href` only when it starts with the case-sensitive
+      `#user-content-` prefix and targets an ID generated in the same view. Every
+      other fragment stays plain text.
+    - Author-written links to a generated footnote ID (for example
+      `[x](#user-content-…fn-1)`) are **allowed**. The owner accepted this,
+      because the only effect is jumping within the same view.
 - Alternative: `marked` + DOMPurify on `dangerouslySetInnerHTML`. Rejected because
   it relies on a sanitiser being configured correctly at every call site, and
   `dangerouslySetInnerHTML` is the exact pattern the Maintainer spec forbids.
@@ -76,9 +91,92 @@ Store Markdown source exactly as typed (RPT-03) and render only in the browser.
 
 ### D4 Failure-safe rendering
 Wrap `MarkdownView` in an error boundary that falls back to
-`<pre className="text">{source}</pre>` (MDR-05). Also apply a nesting cap, either
-a remark plugin that stops past depth 32 or the same pre-check on the source, so
-the browser never runs a pathological render.
+`<pre className="text">{source}</pre>` (MDR-05). Also apply a nesting cap as a
+**pre-check on the source, before parsing**.
+- The security review measured the parse itself overflowing the stack:
+  `"> - ".repeat(1000)` (4 KB) throws RangeError, and 20 KB takes 18 s. So a remark
+  plugin that runs after parsing would be too late.
+- The pre-check estimates the maximum blockquote and list nesting depth from line
+  prefixes. Past depth 32, or past the 20,000-character bound, it renders the
+  escaped plain-text fallback without calling the parser.
+- **Revision (owner decision 1A, 9 Nov).** The second security review bypassed
+  the line-prefix scan with a footnote-definition prefix (18.9 s). It also found
+  that a wide table can exhaust memory, which an error boundary can't catch, and
+  that emphasis, setext and lazy-continuation input can run 1–15 s. The owner
+  chose to patch the pre-check rather than lower the formatting cap or move
+  rendering to a Worker. Every check stays linear and only ever causes a false
+  fallback to plain text, never a failure:
+  - **Container markers.** Treat `[^label]:` as a container like `>` and list
+    markers. Count `>` and list-marker-plus-blank across the whole line, not only
+    a strict prefix.
+  - **Tables.** Estimate the cell count as the delimiter-row column count times
+    the following non-blank lines. Fall back above a cap of about 10k cells.
+  - **Emphasis delimiters.** Fall back on a long run of one delimiter character
+    (about 64 or more) or a high total density of `*`, `_` and `~`.
+  - **Setext headings and lazy continuation lines.** Fall back above a count
+    threshold.
+  - Each threshold is tuned so the MDR-05 "known slow constructs" scenario
+    renders in under 1 s while ordinary reports stay formatted.
+- **Residual risk.** This is a blocklist. A slow construct nobody has found yet
+  would still parse. That is now addressed by D11; the pre-check stays as a fast
+  first filter.
+
+### D11 Parse in a Web Worker with a 1 s budget (owner decision C, 9 Nov)
+The third security review found 6 more constructs under 20,000 characters that
+take 2–12 s on the main thread, after the D4 patch: multi-table totals, nested
+images, `]` runs, unclosed `<!--`, list and footnote lazy lines, and many
+blockquotes. The blocklist doesn't converge, so parsing moves off the main thread.
+
+- **Split the pipeline.**
+  - A pure `toHast(source, prefix)` in `MarkdownView.pipeline.ts` runs
+    remark-parse, remark-gfm, remark-rehype (with
+    `clobberPrefix = user-content-<instance>-`) and the footnote-link trust pass.
+    It returns a serialisable hast tree.
+  - The main thread renders hast to React with `hast-util-to-jsx-runtime`, using
+    the **same** components map and `safeUrl`. Every safety rule (images as alt
+    text, the link allow-list, credentials, `mailto:`, heading IDs, the fragment
+    trust check) is applied on the main thread at render time, so a bug in the
+    worker can't bypass them.
+  - The worker's hast is treated as untrusted structure. The main thread re-checks
+    the `user-content-` prefix and same-tree targets.
+- **Worker.** `markdown.worker.ts`, created with
+  `new Worker(new URL("./markdown.worker.ts", import.meta.url), { type: "module" })`.
+  Vite bundles this pattern for the apps that consume the `file:` package.
+  - It is shared per page through a small runner module: one worker and a request
+    queue keyed by request ID.
+  - Each request has its own 1 s timer, started when the worker begins that
+    request. On timeout the runner terminates the worker and resolves that
+    request as "fallback".
+  - Requests that were waiting behind the timed-out one are retried **once** on a
+    fresh worker. A request that times out again falls back.
+- **View state.**
+  - It first renders `<pre className="text">{source}</pre>` (the complete,
+    escaped source).
+  - It sends `{ id, source, prefix }` to the worker. The pre-check runs first;
+    over the limit, it never sends.
+  - It swaps to the formatted output only if the result's source equals the
+    current source (stale results are dropped).
+  - An error from the worker or from the render keeps the plain text. The error
+    boundary stays.
+- **Environments without `Worker`** (jsdom, SSR): use the in-thread path,
+  pre-check, then `toHast`, then the same renderer, synchronously. Existing
+  approved tests exercise this path and stay valid.
+- **Test seam.** `MarkdownView` reads the runner from a React context,
+  `MarkdownParserProvider`.
+  - The default is the worker runner when `typeof Worker !== "undefined"`, and
+    in-thread otherwise.
+  - Tests inject a fake Worker (or fake runner) with fake timers to prove the
+    timeout, termination, retry, stale-drop and "no main-thread parse" behavior.
+    They also check that a worker result renders the same DOM as the in-thread
+    path, by running `toHast` in the fake worker.
+- **Trade-offs.**
+  - The first paint is plain text, then it swaps to formatted. This is usually
+    within a few milliseconds, but it can flash.
+  - The editor Preview goes through the same path, so in browsers it is async too.
+  - Out-of-memory in the worker kills the worker, not the page.
+- **Alternatives rejected.** Keep patching the blocklist: it doesn't converge.
+  A lower formatting cap: it doesn't bound nested images or `]` runs at 5–6 KB,
+  and it drops formatting for long reports.
 
 ### D5 Reporter backend follows the Developer pattern
 - `src/backend/reporter/`:
@@ -106,14 +204,19 @@ the browser never runs a pathological render.
 - Responses never include `assignee` details. They would need display names from
   the auth accounts table. Deferred.
 
-### D7 Additive Reporter migration
-`src/backend/reporter/migrations/002_add_report_timestamps.sql`:
+### D7 Additive shared timestamp migration
+`src/backend/shared/migrations/002_add_report_timestamps.sql`. It lives with the
+shared reports schema, not in the Reporter folder (feature-owner decision 9 Nov),
+because the timestamps belong to the shared record that every role reads.
 - Adds `created_at` and `updated_at` (timestamptz, NOT NULL, DEFAULT now()).
 - Adds an index on `(reporter_id, created_at DESC, id)`. It serves both the
   newest-first list and the rate-limit window count.
 - Adds no new text columns.
 - Applied after `001` and before the checklist migration, on fresh databases only
-  (the same policy as SR-01).
+  (the same policy as SR-01). The Reporter test runner applies every
+  `src/backend/shared/migrations/*.sql` in name order, then the Reporter
+  migrations, then the checklist migration. The existing shared and Developer
+  runners apply only `001`, so their schemas are unchanged.
 - Length limits are enforced by the service, not by `CHECK` constraints, because
   they're measured in UTF-16 code units.
 - Needs Developer owner sign-off because it alters the shared table.
@@ -181,7 +284,7 @@ clock hook. The concurrency scenario uses real parallel HTTP requests.
 
 ## Migration Plan
 
-Fresh-database only, like SR-01. Apply `001` → `002_add_report_timestamps` →
+Fresh-database only, like SR-01. Apply shared `001` → shared `002_add_report_timestamps` →
 checklist migration. Rollback means rebuilding the disposable database.
 Frontend rollback means reverting the dependency and component swap. No stored
 data changes shape.
