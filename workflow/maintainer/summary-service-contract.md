@@ -25,10 +25,24 @@ fresh access and complete-snapshot checks. Implementations must keep real provid
 calls outside database transactions.
 
 `QueueSummaryService` has constructor-injected auth, full-snapshot, gateway, budget,
-cache, limits and `Clock` ports. Its `generate(actor, filters, regenerate)` method
+cache, limits, `Clock` and an `allowDeterministic` runtime-policy input. The shorter
+constructor defaults `allowDeterministic` to false; deterministic gateways are
+available only when a development/test caller explicitly opts in. Production wiring
+must use the default-deny policy. Its `generate(actor, filters, regenerate)` method
 currently throws deterministic `NOT_IMPLEMENTED` before consulting any port. The
 setup test verifies that boundary and all imports/types compile; no generation
 behavior has passed Red or Green.
+
+`SummaryContracts.SummaryFailure` is the typed service/port failure seam. It maps
+`UNAUTHENTICATED`→401, `FORBIDDEN`→403, `VALIDATION_FAILED`→400,
+`QUEUE_TOO_LARGE`→422, `AI_STALE_SOURCE`/`AI_BUSY`→409,
+`AI_RATE_LIMITED`→429, `AI_INVALID_OUTPUT`→502, `AI_UNAVAILABLE`→503,
+`AI_TIMEOUT`→504 and `NOT_IMPLEMENTED`→503. Its only response messages are fixed
+safe strings; it has no raw-message constructor. Optional Retry-After seconds are
+positive integers capped at 3,600. Snapshot, gateway and budget adapters can throw
+this typed runtime failure for known cases; unknown adapter errors will later map
+to safe `AI_UNAVAILABLE` at the service boundary. The current
+`QueueSummaryService.NotImplementedException` extends this failure type.
 
 ## Proposed application defaults
 

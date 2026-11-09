@@ -15,6 +15,53 @@ public final class SummaryContracts {
 
     public enum ProviderMode { NONE, DETERMINISTIC, LIVE }
 
+    /** Safe service/API failures. Messages and HTTP mappings are fixed here, never provider supplied. */
+    public enum FailureCode {
+        UNAUTHENTICATED(401, "Authentication required"),
+        FORBIDDEN(403, "Maintainer access required"),
+        VALIDATION_FAILED(400, "Summary request is invalid"),
+        QUEUE_TOO_LARGE(422, "Selected queue is too large"),
+        AI_STALE_SOURCE(409, "Queue changed; regenerate the summary"),
+        AI_BUSY(409, "A summary is already running"),
+        AI_RATE_LIMITED(429, "Summary generation is rate limited"),
+        AI_INVALID_OUTPUT(502, "Summary provider returned an invalid result"),
+        AI_UNAVAILABLE(503, "Summary generation is temporarily unavailable"),
+        AI_TIMEOUT(504, "Summary generation timed out"),
+        NOT_IMPLEMENTED(503, "Summary generation is not implemented");
+
+        private final int statusCode;
+        private final String safeMessage;
+        FailureCode(int statusCode, String safeMessage) {
+            this.statusCode = statusCode;
+            this.safeMessage = safeMessage;
+        }
+        public int statusCode() { return statusCode; }
+        public String safeMessage() { return safeMessage; }
+    }
+
+    /** Typed failure seam for ports/service. Retry-After is optional, positive and capped at one hour. */
+    public static class SummaryFailure extends RuntimeException {
+        private static final int MAX_RETRY_AFTER_SECONDS = 3600;
+        private final FailureCode failureCode;
+        private final Integer retryAfterSeconds;
+
+        public SummaryFailure(FailureCode failureCode) { this(failureCode, null); }
+
+        public SummaryFailure(FailureCode failureCode, Integer retryAfterSeconds) {
+            super(Objects.requireNonNull(failureCode, "failureCode").safeMessage());
+            if (retryAfterSeconds != null && (retryAfterSeconds < 1 || retryAfterSeconds > MAX_RETRY_AFTER_SECONDS)) {
+                throw new IllegalArgumentException("retryAfterSeconds must be 1..3600");
+            }
+            this.failureCode = failureCode;
+            this.retryAfterSeconds = retryAfterSeconds;
+        }
+
+        public FailureCode failureCode() { return failureCode; }
+        public String code() { return failureCode.name(); }
+        public int statusCode() { return failureCode.statusCode(); }
+        public Integer retryAfterSeconds() { return retryAfterSeconds; }
+    }
+
     /** Trusted session projection. sessionIdentity is internal and must never enter DTOs or logs. */
     public record Actor(UUID accountId, Role role, boolean active, long generation,
                         String sessionIdentity) {

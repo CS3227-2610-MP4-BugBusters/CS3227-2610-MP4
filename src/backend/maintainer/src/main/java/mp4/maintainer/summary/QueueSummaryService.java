@@ -14,10 +14,20 @@ public final class QueueSummaryService {
     private final SummaryCache cache;
     private final Limits limits;
     private final Clock clock;
+    private final boolean allowDeterministic;
 
     public QueueSummaryService(CurrentAuthorization authorization, SnapshotReader snapshots,
                                SummaryGateway gateway, BudgetAndAdmission admission,
                                SummaryCache cache, Limits limits, Clock clock) {
+        this(authorization, snapshots, gateway, admission, cache, limits, clock, false);
+    }
+
+    /** Deterministic gateways require explicit development/test opt-in; the production-safe
+     * constructor above defaults this policy to false. */
+    public QueueSummaryService(CurrentAuthorization authorization, SnapshotReader snapshots,
+                               SummaryGateway gateway, BudgetAndAdmission admission,
+                               SummaryCache cache, Limits limits, Clock clock,
+                               boolean allowDeterministic) {
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.snapshots = Objects.requireNonNull(snapshots, "snapshots");
         this.gateway = Objects.requireNonNull(gateway, "gateway");
@@ -25,6 +35,7 @@ public final class QueueSummaryService {
         this.cache = Objects.requireNonNull(cache, "cache");
         this.limits = Objects.requireNonNull(limits, "limits");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.allowDeterministic = allowDeterministic;
     }
 
     /** Reserved API for the behavior task. Until that task's approved Red gate, fail closed
@@ -33,9 +44,7 @@ public final class QueueSummaryService {
         throw new NotImplementedException();
     }
 
-    public static final class NotImplementedException extends RuntimeException {
-        private final String code = "NOT_IMPLEMENTED";
-        public NotImplementedException() { super("Queue summary generation is not implemented"); }
-        public String code() { return code; }
+    public static final class NotImplementedException extends SummaryFailure {
+        public NotImplementedException() { super(FailureCode.NOT_IMPLEMENTED); }
     }
 }

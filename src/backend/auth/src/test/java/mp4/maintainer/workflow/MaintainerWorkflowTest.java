@@ -122,10 +122,16 @@ class MaintainerWorkflowTest {
     }
     @Test void failureAppendingHistoryRollsBackReportProposalAndComment() {
         var close = new WorkflowFixture(); close.failAppendHistory = true;
-        assertThrows(IllegalStateException.class, () -> close.service.close(close.actor, WorkflowFixture.REPORT, new CloseReport(8, WorkflowFixture.PROPOSAL, 3, true)));
+        var closeFailure = assertThrows(MaintainerService.ServiceException.class, () -> close.service.close(close.actor, WorkflowFixture.REPORT, new CloseReport(8, WorkflowFixture.PROPOSAL, 3, true)));
+        assertEquals("TEMPORARILY_UNAVAILABLE", closeFailure.code()); assertEquals(503, closeFailure.statusCode());
+        assertEquals("Maintainer workflow is temporarily unavailable", closeFailure.getMessage());
+        assertFalse(closeFailure.getMessage().contains("injected history failure"));
         assertSame(close.initial, close.report); assertEquals(List.of(close.retained, close.pending), close.proposals); assertEquals(List.of(close.priorEvent), close.history);
         var comment = new WorkflowFixture(); comment.failAppendHistory = true;
-        assertThrows(IllegalStateException.class, () -> comment.service.addComment(comment.actor, WorkflowFixture.REPORT, new AddComment(8, "comment")));
+        var commentFailure = assertThrows(MaintainerService.ServiceException.class, () -> comment.service.addComment(comment.actor, WorkflowFixture.REPORT, new AddComment(8, "comment")));
+        assertEquals("TEMPORARILY_UNAVAILABLE", commentFailure.code()); assertEquals(503, commentFailure.statusCode());
+        assertEquals("Maintainer workflow is temporarily unavailable", commentFailure.getMessage());
+        assertFalse(commentFailure.getMessage().contains("injected history failure"));
         assertSame(comment.initial, comment.report); assertTrue(comment.comments.isEmpty()); assertEquals(List.of(comment.priorEvent), comment.history);
     }
     private static ReportCore withStatus(ReportCore r, Status status, UUID assignee) {

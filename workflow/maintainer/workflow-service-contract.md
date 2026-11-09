@@ -114,4 +114,3 @@ files.
 ## Maintainer discussion decision
 
 Allow Maintainer plain-text discussion on Closed reports, following the plan's all-report discussion permission. Comments increment the aggregate version and append history without changing status or superseding the current proposal. Keep Reporter source edits and Developer publication subject to their unresolved-only rules. Selected this policy for the Maintainer-owned implementation; have not claimed separate teammate acceptance.
-
