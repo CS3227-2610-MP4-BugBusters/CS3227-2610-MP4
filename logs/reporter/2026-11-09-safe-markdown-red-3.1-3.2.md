@@ -692,3 +692,554 @@ potentially malicious renders as text"), not against the spec text:
 Tasks 3.8 and 3.10 are marked complete, because their stated checks passed:
 tests, `tsc`, candidate verification and security review. Findings 1–4 go to
 the owner as a possible MDR-12 extension.
+
+## Feature-owner decision 7 (9 Nov)
+
+After the combined 3.8/3.10 security review, the owner said: "ignore all
+potential malicious element parse as plain text". All four LOW findings will be
+fixed. Changes:
+
+- **New requirement MDR-13, with 3 scenarios.** A link renders as text in any
+  of these cases:
+  - Its destination contains a default-ignorable, blank (U+2800, U+3164,
+    U+FFA0, U+115F, U+1160) or slash-look-alike (U+2044, U+2215, U+29F8,
+    U+FF0F) character.
+  - Its http(s) host, after conversion from punycode, contains such a
+    character or an MDR-12 character.
+  - Its `mailto:` domain is not 2 or more valid labels.
+  - Its title contains any of these characters.
+- **Unchanged:** IDN `https` links still work. The owner chose this earlier.
+  It means Cyrillic or Latin look-alike hosts still render as links. This is
+  flagged to the owner.
+- **New task 3.11**, to be tested in `MarkdownView.hidden.test.tsx`.
+
+Existing approved tests checked against the new rule:
+- No approved test uses a link title.
+- No approved test expects a single-label `mailto:` domain to stay a link.
+
+**3.9 security review:** the agent stopped early on an API usage limit (resets
+20:40 SGT) and returned no verdict. It will be resumed, and 3.9 and 3.3 stay
+open until then. No orphan node processes remain.
+
+## 3.11 Red: MDR-13 hidden characters (9 Nov)
+
+`test_designer` wrote `MarkdownView.hidden.test.tsx` (`76a871b0…2581`, 112
+tests) against candidate `2774ec68…3751`. It fails 93 tests and passes 19.
+
+The 19 passes:
+- 18 guards.
+- `U+FF0F in host`, which the URL parser already rejects. This test is a
+  regression guard and does not demonstrate Red.
+
+All 93 failures are "link still rendered". `tsc` is clean.
+
+The worker path is covered with 6 blocked cases and 3 guards.
+
+Fresh `baseline_verifier`: **PASS**.
+- All 13 MDR-13 scenario inputs appear verbatim.
+- The test's punycode encoder was checked against `bcher-kva` and against
+  `domainToASCII`.
+- Partial fixes would fail at least one test: percent-decode only,
+  https-title only, label charset only, named blanks only, and in-thread only.
+- Over-blocking would fail a guard: blocking all IDN, all non-ASCII titles,
+  or every `xn--` host.
+- The control tests pass 172 of 172.
+- Run with `--environment jsdom`.
+
+The 3.11 baseline is **awaiting feature-owner approval**.
+
+### 3.9 security review, resumed after the usage limit (9 Nov)
+
+Result: **FAIL**, with 1 HIGH finding. Reviewed `snap-3.9` (`d998fa33…`); its
+hashes were unchanged before and after the run.
+
+**HIGH: the main thread can freeze while rendering a legitimate source.** The
+pre-check caps cells per table, not in total. A 19,708-character source made
+of 35 tables, each 71 columns × 137 rows, passes the pre-check. The worker
+then parses it in 487 ms and produces a 708k-node hast. On the main thread:
+- structuredClone takes 1,318 ms;
+- `toJsxRuntime` takes 1,326 ms;
+- the full jsdom render takes 6,007 ms.
+
+With 10 tables, the render still takes 2.2 s.
+
+Proposed fix:
+- a node budget in the worker, replying `ok:false`;
+- the same budget enforced on the main thread;
+- a cap on total table cells across the whole source.
+
+**Other findings:**
+- **MEDIUM/LOW:** `className` is not allowlisted, so a page-CSS class from the
+  worker reaches the DOM.
+- **LOW:** a malformed `ok` reply, such as `hast:[]` or `{}`, blanks the view
+  instead of showing the source.
+- **LOW:** two slow reports exhaust the retries of later requests that were
+  never sent.
+- **LOW:** requests aren't cancelled on unmount, so the queue keeps growing.
+- **LOW/info:** a custom runner that throws synchronously unmounts the React
+  root.
+
+**Held up under testing:**
+- The main-thread allowlist rebuild, against every injection probe: schemes,
+  `on*`, `style`, `id`/`name`, tags, node types, `__proto__`, getters, and
+  fragment trust.
+- Deep hast: depths from 3k to 100k fall back in 31 ms or less.
+- Runner id spoofing, terminate races, error storms and never-loading
+  workers.
+- Parity: worker-path DOM is identical to the in-thread path on 15 sources.
+- Supply chain and the worker URL.
+
+**Not verified:** real-browser timings, the Vite worker bundle, and
+`messageerror`.
+
+3.9 and 3.3 stay open. The owner's decision is needed.
+
+## Feature-owner decision 8 (9 Nov): "go"
+
+The owner accepted both proposals.
+
+1. **No links at all.**
+   - **Spec.**
+     - MDR-04 is replaced by "No links". A link shows its text, followed by
+       ` (<destination>)` when the destination is different. Autolinks show
+       the address once. No element has an `href`.
+     - MDR-08 changes to footnotes as superscript numbers plus a footnotes
+       section, with no links or back-references.
+     - MDR-01 is reworded: link syntax is recognised and then displayed as
+       text.
+     - MDR-09, 11, 12 and 13 are removed. They were added by this change
+       only.
+   - **Design.** New D12.
+   - **Tasks.** 3.11 now means "no links" Red/Green, which rewrites the
+     approved link-related tests. 3.8 and 3.10 stay checked as history.
+   - **Files.** The unapproved `MarkdownView.hidden.test.tsx` (`76a871b0…`)
+     is deleted.
+2. **Worker-result bounds.**
+   - **Spec.** MDR-10 gets three new scenarios:
+     - oversized output, meaning more than 25,000 nodes or more than 10,000
+       table cells in total;
+     - malformed or hostile results, and class names;
+     - queue fairness and cancellation.
+   - **Design.** New D13.
+   - **Tasks.** New 3.12. 3.9 and 3.3 close when it passes.
+
+`openspec validate --strict`: valid.
+
+Two `test_designer` agents were dispatched in parallel, writing to separate
+files.
+
+## 3.11 and 3.12 Red (9 Nov)
+
+**Test layout.** The owner moved the package's tests from `src/` to `test/`, as
+recorded in commits `3a7bd9e` and `50b7972` and in
+`2026-11-09-markdown-view-test-folder.md`. As a result:
+- The approved test hashes changed. Only the import paths differ (`./` became
+  `../src/`).
+- Both Red runs were adapted to the new layout.
+
+### 3.11 "no links"
+
+`test_designer` rewrote three test files and added one. The orchestrator moved
+them into `test/` and rewrote their imports.
+
+| File | Change | sha256 |
+|---|---|---|
+| subset | rewritten | `7453f1b1…` |
+| security | rewritten | `1d761ebe…` |
+| footnotes | rewritten | `88804860…` |
+| nolinks | new | `7ba8b2e7…` |
+
+- The urls, mailto, mailto2 and suspicious tests were folded into nolinks and
+  deleted.
+- Result on candidate `2774ec68…`: 53 failed, 65 passed. `tsc` is clean.
+- The 15 payload tests that already pass are regression guards: the old
+  `safeUrl` already rendered text for them.
+
+### 3.12 bounds
+
+`test_designer` wrote `test/MarkdownView.budget.test.tsx` (`189c15bb…`).
+- Result: 24 failed, 6 passed. The 6 passes are guards, including `null` hast,
+  which the runner already rejects.
+- `tsc` is clean.
+
+**Next step:** fresh `baseline_verifier` runs for both are in parallel, on
+`snap-3.11` and `snap-3.12`.
+
+### 3.11 baseline verification
+
+A fresh `baseline_verifier` gave **PASS**, with no blocking findings.
+
+- **Hashes and move:** all hashes match. The dos, limits and worker files
+  differ only in their import and mock paths.
+- **Spec coverage:** the inputs for MDR-04 and MDR-08 are verbatim, and the
+  exact-text assertions match the spec.
+- **Partial-fix resistance:** each of these partial fixes fails at least one
+  test:
+  - dropping `href` but keeping `<a>`;
+  - fixing the in-thread path only;
+  - not showing the destination;
+  - showing an autolink's destination twice;
+  - keeping footnote back-references;
+  - keeping footnote `<a>` wrappers.
+- **Reproduction:** 53 failed and 65 passed. All failures are assertion
+  failures on missing behavior. `tsc` exited 0.
+
+**Non-blocking:**
+- About 60 hostile cases specific to the old validators were dropped: the
+  mailto encoding matrix and the invisible-character matrix. They are moot
+  under "no links", since all of those inputs render as text.
+- The 15 payload guards check that no link renders, but not the destination
+  text.
+
+### 3.12 baseline verification
+
+- **Revision 1 (`189c15bb…`):** `baseline_verifier` gave **FAIL**, with one
+  blocking gap. The tests did not use a hostile class on `code`, so an
+  allowlist that kept every class on `code` would still have passed.
+- **Revision 2 (`6f706f4e…a519`):**
+  - **Changes:**
+    - Hostile classes are now tested on `code` and `li`.
+    - The early-stop test asserts `limit < n <= limit + 1`.
+  - **Results:**
+    - A fresh `baseline_verifier` gave **PASS**.
+    - 24 tests fail and 6 pass, in both plain and shuffled runs.
+    - `tsc` exits 0.
+    - Every partial-fix variant fails at least one test.
+  - **Non-blocking finding:** the exact stop point was stricter than the
+    design wording. The orchestrator added the `limit + 1` sentence to D13.
+    `openspec validate --strict` reports valid.
+
+**Both 3.11 and 3.12 baselines are awaiting feature-owner approval.**
+
+### 3.12 revision 3 (owner decision "add it")
+
+D13 adds a rule: each element keeps at most one class, the first allowed one.
+This came from the 3.9 probe, where jsdom hung on 50 elements with 200,000
+classes each.
+
+The test has two new cases:
+- at most one class per element;
+- a single `code` element with 200,000 classes renders as `language-x0` in
+  under 1 s.
+
+**Baseline** `0cae4f70…dac` (32 tests):
+- 26 failed and 6 passed, in both plain and shuffled runs. `tsc` exits 0.
+- A fresh `baseline_verifier` gave **PASS**.
+- The tests catch the partial fixes "keep all", "keep last" and
+  "dedupe only". An O(n²) filter would exceed the time bound.
+- Real timers are used only inside the test.
+
+**Both 3.11 (`7453f1b1…`, `1d761ebe…`, `88804860…`, `7ba8b2e7…`) and 3.12
+(`0cae4f70…`) baselines are awaiting feature-owner approval.**
+
+## Feature-owner approval 7 (9 Nov)
+
+The owner replied "approve" and approved both baselines:
+
+| Task | Test file | sha256 |
+|---|---|---|
+| 3.11 | subset | `7453f1b1…` |
+| 3.11 | security | `1d761ebe…` |
+| 3.11 | footnotes | `88804860…` |
+| 3.11 | nolinks | `7ba8b2e7…` |
+| 3.12 | budget | `0cae4f70…` |
+
+Both tasks write `MarkdownView.tsx`, so they are implemented one after the
+other: 3.11 first, then 3.12.
+
+The 3.11 `implementer` was dispatched against the repo, where
+`MarkdownView.tsx` is `2774ec68…`.
+
+## 3.11 Green: no links (9 Nov)
+
+**Result.** The `implementer` reported GREEN. 124 of 150 tests pass, and all 26
+failures are in the 3.12 budget file, which is expected. `tsc` is clean, and no
+test file changed.
+
+**Changed files.**
+
+| File | Before | After |
+|---|---|---|
+| `MarkdownView.tsx` | `2774ec68` | `ffc2cbf3` |
+| `MarkdownView.pipeline.ts` | `dfa37b33` | `f90cac0f` |
+
+**What changed.**
+- **Link handlers.** mdast `link` and `linkReference` nodes now render as their
+  children followed by ` (<trimmed url>)`.
+- **`rehypeNoLinks`.** It removes every remaining `a`:
+  - a footnote reference keeps only its number;
+  - a back-reference is removed;
+  - any other `a` becomes text.
+  It runs on both paths, and again in the worker sanitiser.
+- **Dead code removed.** `safeUrl`, the mailto, suspicious-character and
+  fragment-trust logic, and `urlTransform`.
+
+**Implementer choices, for review.**
+- The destination is omitted when it equals the text, or `mailto:`/`http://`
+  plus the text. Under that rule, `[example.com](http://example.com)` shows
+  its text only.
+- `[x]()` shows `x`.
+- The footnote `sup` has no ID.
+
+**Next steps, running in parallel.**
+- The candidate is frozen at `scratchpad/snap-3.11g`.
+- A fresh `candidate_verifier` and a `security_reviewer` are checking 3.11.
+- The 3.12 `implementer` is building on top of 3.11 in the repo.
+
+### 3.11 candidate verification
+
+Agents resumed after the session restart. A fresh `candidate_verifier` gave
+**PASS** on `snap-3.11g`.
+
+- **Hashes:** all match. Only `MarkdownView.tsx` and `pipeline.ts` differ from
+  `snap-3.11`.
+- **Tests:** 124 of 150 pass. The 26 failures are all in the 3.12 budget file.
+  `tsc` exits 0.
+- **No loosening:** images, raw HTML, heading IDs, checkboxes and the ID prefix
+  behave as before. The dead link code is removed.
+- **Throwaway checks, all passing:**
+  - in-thread vs worker DOM parity on 15 sources;
+  - 9 hostile worker trees (`a`/`javascript:`, `svg a`, `area`, `base`, `form`
+    with `action`, `link`, `button` with `formaction`, footnote-style `a`);
+  - no `a` or URL attribute survived.
+- **Non-blocking findings:**
+  - Omitting the destination for an empty destination, or for text plus
+    `http://` or `mailto:`, was narrower than the MDR-04 wording. The
+    orchestrator added a clarifying sentence to MDR-04 that matches the
+    implementation, and `openspec validate --strict` passes. No approved test
+    is affected.
+  - A hostile worker `a` renders as `1 (#…)` text, which is safe.
+
+3.11 closes after the `security_reviewer` passes.
+
+## 3.12 Green: worker-result bounds (9 Nov)
+
+The `implementer` reported GREEN on top of 3.11.
+
+**Results:** 150 of 150 tests pass, including budget 32 of 32. `tsc` is clean
+and no test file changed.
+
+**Candidate files:**
+
+| File | sha256 prefix |
+|---|---|
+| `limits` | `25c229f4` |
+| `pipeline` | `1615675e` |
+| `worker` | `764c6338` |
+| `runner` | `73ce84e2` |
+| `MarkdownView.tsx` | `b5d8fe39` |
+
+**Implementer choices to review:**
+- The `retried` flag is removed. Each worker failure settles only the request
+  that was in flight.
+- Non-string class entries are skipped.
+- `language-*` is matched by prefix only.
+- A new `isHastRoot` helper was exported.
+- The `sanitizeHast` and `toJsxRuntime` passes are still recursive.
+
+**Owner decision needed:** `heading()` now keeps `class="sr-only"` on `h2` on
+both paths. This affects the footnote label, which renders as
+`<h2 class="sr-only">Footnotes</h2>` (GitHub does the same). Before this
+change, every heading attribute was dropped.
+
+**Next:** the candidate is frozen at `scratchpad/snap-3.12g`. A fresh
+`candidate_verifier` and a `security_reviewer` were dispatched in parallel.
+The 3.11 `security_reviewer` is still running on `snap-3.11g`.
+
+### 3.12 candidate verification
+
+Fresh `candidate_verifier` on `snap-3.12g`: **PASS**.
+
+- **Integrity and tests**
+  - Only the 5 src files differ from `snap-3.11g`.
+  - The suite passes 150/150, including a shuffled run.
+  - `tsc` exits 0.
+- **D13 review:** each item was confirmed against the code.
+  - `countHastNodes` is iterative and returns `limit+1`.
+  - Budgets are enforced in the worker and on the main thread, before
+    `toJsxRuntime` runs.
+  - The shape check runs on both paths.
+  - The class allowlist is one pass and keeps the first allowed class.
+  - `safeParse` is in place.
+  - An aborted request is removed and never posted.
+  - Fairness holds.
+- **Choices accepted**
+  - (a) No `retried` flag. 50 queued requests against 4 kinds of always-failing
+    worker all settled, with 0 timers left.
+  - (b) Non-string class entries are skipped.
+  - (c) `language-*` is matched by prefix. Non-blocking.
+- **Throwaway checks**
+  - A 35-table source falls back to `pre` on both paths.
+  - 10-source DOM parity holds.
+  - Unmount leaves no leaked timers or window listeners.
+  - `handleParseRequest` returns `ok:false` for oversized output.
+- **Non-blocking findings**
+  - `pump` recurses once per queued request when `createWorker` or
+    `postMessage` throws synchronously. This is bounded by queue length.
+  - The `h2.sr-only` change still needs an owner decision. A Reporter can't
+    produce the class from Markdown or raw HTML; only a hostile worker could,
+    and the impact would be low.
+
+3.12 closes after the `security_reviewer` passes and the owner decides on
+`h2.sr-only`.
+
+### 3.11 security review
+
+The `security_reviewer` ran on `snap-3.11g` and gave **PASS**: no CRITICAL,
+HIGH or MEDIUM findings.
+
+**What was tested**
+
+- 32 link forms, run in-thread and in the worker, plus a hostile-worker barrage
+  and a DOM audit covering navigating tags, URL attributes, `on*`, ARIA
+  references and ids. No issues were found, and the in-thread and worker HTML
+  were identical.
+- Destinations are never re-parsed.
+- Hostile footnote labels: every `id` is prefixed and unique across views.
+- Regressions: images, raw HTML, headings and checkboxes all behave as before.
+
+**LOW findings**
+
+1. When deciding whether to omit the destination, `textOf` ignores `img` alt
+   text. Example:
+   `[https://evil![.bank.example](i)](https://evil)` shows
+   `https://evil.bank.example` with no suffix.
+2. A hostile worker can build a nested `a` chain that makes `unlink` do
+   O(depth²) work. A depth of 5,000 takes 453 ms on the main thread. Deeper
+   chains overflow the stack and fall back to plain text.
+3. Worker `className` is unrestricted. This is already fixed by 3.12 (D13).
+4. Informational: Cf, bidi and fake-`)` characters appear verbatim in the
+   ` (destination)` suffix. Example: an RLO makes the destination read as
+   `…exe.pdf`.
+
+**Status:** task 3.11 is marked complete, because its stated checks passed.
+Findings 1, 2 and 4 go to the owner as a possible follow-up.
+
+## Feature-owner decision 9 (9 Nov): "keep sr-only fix 1 2 4"
+
+1. **Keep `h2.sr-only`.** The footnote section heading keeps only the
+   `sr-only` class, as GitHub does. MDR-08 now says so. This settles the open
+   item from 3.12.
+2. **Fix 3.11 security findings 1, 2 and 4.** New requirement **MDR-14**
+   ("Shown destinations are unambiguous"), with 3 scenarios:
+   - image alt text counts as link text;
+   - Cf, U+2028/2029 and non-ASCII whitespace in a shown destination appear
+     as `<U+XXXX>`;
+   - `(` and `)` in a shown destination appear as `%28` and `%29`.
+
+   New task **3.13**, which also covers a linear-time `unlink` for nested
+   `a` elements in worker hast.
+
+`openspec validate --strict`: valid.
+
+The 3.13 `test_designer` was dispatched against `snap-3.13`, a copy of the
+repo's 3.12 candidate. The 3.12 `security_reviewer` is still running.
+
+## 3.13 Red: MDR-14 and linear unlink (9 Nov)
+
+**Test file:** `test_designer` wrote `test/MarkdownView.destinations.test.tsx`.
+
+**Revision 1 (`d29d9ecc…`)**
+- Result: 55 failed, 23 passed.
+- `baseline_verifier` gave **FAIL**. The 100 ms bound timed the React render
+  plus `waitFor`, and a flat tree with no unlink work already takes 45–130 ms
+  cold.
+
+**Revision 2 (`b217598c…`)**
+- Changes:
+  - The view test for the depth-5,000 `a` chain no longer measures time.
+  - A new test times only `rehypeNoLinks()(tree)`, after a warm-up.
+  - A guard checks that parentheses in link text are not escaped.
+- Result: 55 failed, 26 passed (81). Three shuffled runs gave the same
+  counts. `tsc` is clean.
+- A fresh `baseline_verifier` gave **PASS**.
+  - A throwaway linear flatten took 0.2–1.7 ms, including cold runs. The
+    current code took 800–845 ms, or overflowed the stack in some runs. The
+    bound therefore separates linear from quadratic code reliably.
+  - The no-`a` and DEEPEST checks are not vacuous.
+
+**Non-blocking findings**
+- The RangeError seen in some shuffled runs comes from the current recursive
+  `unlink`. It reflects the missing behavior: the test is still Red, and the
+  count stays at 55.
+- The measured time is about 800 ms, not the 725 ms first reported.
+
+The 3.13 baseline is **awaiting feature-owner approval**.
+
+### 3.12 security review (9 Nov)
+
+`security_reviewer` on `snap-3.12g` gave **FAIL**, with 1 MEDIUM and 2 LOW
+findings. The worker path holds: every prior 3.9 repro is fixed.
+
+**MEDIUM: the in-thread path has no node budget.** This is the path used when
+no Worker exists (jsdom, SSR). The pre-check misses nested-list constructs.
+These sources all pass `exceedsRenderLimits` and render formatted in-thread:
+
+| Source | Time in-thread |
+|---|---|
+| `"- -\n"`×5000 | 2.6–2.8 s (`toHast` alone takes 2.15 s) |
+| `(">"×32+"a\n\n")`×571 | 1.1–1.3 s |
+| `("- "×16+"a\n")`×588 | 1.2 s |
+
+This breaks MDR-05 "Pathological input" (under 1 s in the test environment).
+The worker path is safe for the same inputs.
+
+**LOW findings:**
+- Property bloat from a hostile worker gets past the node count:
+  - 200k junk props × 20 `p` takes 1.1 s;
+  - a 2M-entry unmatched class list × 50 takes 0.9 s.
+- `pump` recursion overflows the stack after about 10k queued requests with a
+  synchronously throwing `createWorker`, which wedges the runner.
+
+**INFO:**
+- The tree is counted before it is sanitised, which a custom runner with a
+  stateful getter can exploit.
+- A worker that never answers is recreated for every request.
+- The `language-*` suffix is Reporter-controlled.
+
+**No issues found:**
+- the worst legitimate render under all budgets on the worker path is 713 ms;
+- deep, cyclic and Proxy hast fall back;
+- `h2.sr-only` can't be produced by a Reporter;
+- regressions and parity hold;
+- the snapshot suite passes 272 of 272.
+
+3.12, 3.9 and 3.3 stay open. The owner must decide on the fix.
+
+## Feature-owner approval 8 (9 Nov)
+
+The owner replied: "I approve the test move to reporter BE".
+
+Recorded as follows:
+- **Approved:** the 3.13 baseline, `test/MarkdownView.destinations.test.tsx`
+  (`b217598c…`).
+- **Next:** start the Reporter backend (group 2).
+- **Proposed 3.14 fix** (in-thread node budget and related LOW items from the
+  3.12 security review): not yet decided. 3.12, 3.9 and 3.3 stay open.
+- **"Remove the old tests":** waiting for the owner to clarify. Nothing has
+  been deleted.
+
+Dispatched in parallel. They write separate files.
+- **3.13 `implementer`:** works in the repo, on top of the 3.12 candidate.
+- **2.3 `test_designer`:** RPT-01..03 Red. It writes the Reporter harness,
+  runner and tests. Environment:
+  - JDK 25;
+  - JDBC jar `postgresql-42.7.14.jar` from the Gradle cache;
+  - Python 3.14;
+  - Docker with `postgres:17`.
+
+## Feature-owner decision 10 (9 Nov): "fix 3.14 and ignore the remove old tests"
+
+1. **3.14 approved as proposed.** Changes:
+   - **Spec:** new MDR-10 scenario, "The in-thread path has the same output
+     budget".
+   - **Design:** new D14.
+   - **Tasks:** new 3.14. Tasks 3.12, 3.9 and 3.3 close when 3.14 passes.
+   - **Tests:** the approved dos and limits tests have their react-markdown
+     mocks moved to the pipeline. Their assertions stay the same, but the
+     change needs re-approval.
+   - `openspec validate --strict`: valid.
+2. **"Remove old tests" dropped.** Nothing was deleted.
+
+The 3.14 `test_designer` was dispatched against `snap-3.14`, a copy of the
+3.12 candidate `snap-3.12g`.

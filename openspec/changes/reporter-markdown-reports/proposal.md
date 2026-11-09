@@ -27,7 +27,8 @@ triaging and investigating the bug.
   renders, converts or stores HTML.
 - **MDR-01..05** A shared safe Markdown capability: a GitHub-flavoured subset
   renderer and a GitHub-style **Write | Preview** editor. Raw HTML, images and
-  unsafe link schemes never render.
+  links never render. Links show as text with their destination (owner
+  decision 9 Nov: no links at all).
 - **MODIFIED MNT-READ-05**: the Maintainer browser renders the report
   `description` through the shared safe renderer. Title, the other source fields,
   notes, comments, checklist, responses, proposal and history stay escaped plain

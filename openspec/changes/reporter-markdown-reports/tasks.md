@@ -36,6 +36,29 @@ can run in parallel in separate worktrees. Groups 4 and 5 depend on group 3.
 - [x] 3.8 **[sec]** Red/Green MDR-09 link destination hardening: links containing credentials (including `user:pass@`, `good@evil` and `&#64;` forms) render as text, and a `mailto:` `href` is reduced to `mailto:<address>`. Verify with `MarkdownView.urls.test.tsx`, `tsc --noEmit`, and every earlier test still passing. **Extended (owner decisions 2a and C):** also reject `;`, whitespace, `<`, `>`, `"`, `\`, `/` and anything other than exactly one `@` (MDR-11 scenario "Other recipient separators"; verify with `MarkdownView.mailto2.test.tsx`). `mailto:` allows exactly one address and renders as text when the decoded address contains `?`, `#`, `&`, a comma or a control character. Verify with `MarkdownView.mailto.test.tsx`.
 - [ ] 3.9 **[sec]** Red/Green MDR-10 off-main-thread parsing (design D11, owner decision C): pure `toHast` pipeline, a shared worker runner with a 1 s per-request budget, terminate and fall back, retry queued requests once on a fresh worker, plain-text first paint, stale-result drop, the main-thread safety rules re-applied to worker hast, and in-thread behavior where `Worker` doesn't exist. Verify with `MarkdownView.worker.test.tsx` (fake Worker plus fake timers), a test that worker-path and in-thread DOM are equal, `npm run verify` with every earlier test still passing, and `npm run build` succeeding in a consuming app once group 4 or 5 adds the dependency. When 3.9 passes, close 3.3: the D4 pre-check is the first filter and MDR-05 is met through MDR-10.
 - [x] 3.10 **[sec]** Red/Green MDR-12 suspicious link characters (owner decision 9 Nov: anything potentially malicious renders as text): Unicode format characters, U+2028/2029 and non-ASCII whitespace (including NBSP) in any link destination; a `%` left after one decode, or characters outside the strict ASCII allowlist, in a `mailto:` address (so IDN email renders as text, while IDN `https` links still work). Verify with `MarkdownView.suspicious.test.tsx`, `tsc --noEmit`, and every earlier test still passing.
+- [x] 3.11 **[sec]** Red/Green the "no links" rule (MDR-04 and MDR-08 as modified, design D12, owner decision 9 Nov). This supersedes the MDR-09/11/12/13 link rules, so 3.8 and 3.10 remain as history. Every link, autolink and reference shows as text plus ` (<destination>)` when that differs from the text, and no element has an `href`. Footnotes show as superscript numbers and a footnotes section, with no links or back-references. Rewrite the approved subset, security, footnotes, urls, mailto, mailto2 and suspicious tests to the new rules. This needs a new baseline review and approval. Delete the unapproved `MarkdownView.hidden.test.tsx`. Verify with the rewritten tests, `tsc --noEmit`, and every other test still passing.
+- [ ] 3.12 **[sec]** Red/Green the D13 worker-result bounds. These fix the 3.9 security findings:
+  - a 10,000-cell total table cap;
+  - a 25,000-node budget in the worker and again on the main thread;
+  - result shape validation and a `className` allowlist;
+  - fair retries;
+  - cancelling unsent requests on unmount;
+  - a guarded `runner.parse`.
+
+  Verify with `MarkdownView.budget.test.tsx`, the 35-table repro rendering as plain text without building formatted output, and `npm run verify`. 3.9 and 3.3 close when 3.12 passes.
+- [ ] 3.13 **[sec]** Red/Green MDR-14 and the linear `unlink` (owner decision 9 Nov after the 3.11 security review, "fix 1 2 4"). Covers:
+  - image alt text counting as link text;
+  - format, bidi and line-separator characters and non-ASCII whitespace in a shown destination appearing as `<U+XXXX>`, and `(`/`)` as `%28`/`%29`;
+  - nested `a` elements in worker hast being flattened in linear time (a depth-5,000 chain in under 100 ms on the main thread).
+
+  Verify with `test/MarkdownView.destinations.test.tsx`, `tsc --noEmit`, and every other test still passing.
+- [ ] 3.14 **[sec]** Red/Green design D14, the fix for the 3.12 security review (owner decision 9 Nov, "fix 3.14"). Covers:
+  - the in-thread path rendering through `toHast`, the node count and the shared sanitiser;
+  - a pre-check cap on total list and blockquote containers;
+  - a sanitiser that cleans once, then counts, reads only the allowed properties, and scans at most 8 class entries;
+  - a loop-based `pump`.
+
+  The approved dos and limits tests have their react-markdown mocks moved to the pipeline, with their assertions unchanged. This needs re-approval. Verify with `test/MarkdownView.inthread.test.tsx` (the three review repros under 1 s as plain text, plus the property-bloat and 20,000-request queue repros), the updated dos and limits tests, and `npm run verify`. 3.12, 3.9 and 3.3 close when 3.14 passes.
 - [ ] 3.5 Document usage and the safety rules in `src/frontend/shared/markdown/README.md` and verify that `npm run verify` passes in the package.
 
 ## 4. Maintainer adoption (MNT-READ-05 delta)

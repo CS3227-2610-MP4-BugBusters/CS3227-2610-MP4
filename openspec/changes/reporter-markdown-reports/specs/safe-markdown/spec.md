@@ -8,7 +8,7 @@ Defines one safe, GitHub-flavoured Markdown display and Write/Preview editing be
 
 ### Requirement: MDR-01 Supported Markdown subset
 
-The renderer SHALL display headings, paragraphs, emphasis, strikethrough, ordered and unordered lists, blockquotes, inline code, fenced code blocks, tables, thematic breaks, links and autolinks using GitHub-flavoured Markdown semantics. Task-list items SHALL render as disabled checkboxes that cannot be toggled. Headings SHALL NOT receive generated element IDs.
+The renderer SHALL display headings, paragraphs, emphasis, strikethrough, ordered and unordered lists, blockquotes, inline code, fenced code blocks, tables and thematic breaks using GitHub-flavoured Markdown semantics, and SHALL recognise link and autolink syntax so that it can display it as text under MDR-04. Task-list items SHALL render as disabled checkboxes that cannot be toggled. Headings SHALL NOT receive generated element IDs.
 
 #### Scenario: Common report formatting
 - **WHEN** source contains a heading, a numbered list, a fenced code block and a two-column table
@@ -37,80 +37,56 @@ Markdown image syntax SHALL NOT produce an image element or any network request.
 - **THEN** no img element is rendered and no request is made to that URL
 - **AND** the text `logo` is shown
 
-### Requirement: MDR-04 Restricted links
+### Requirement: MDR-04 No links
 
-Only absolute `http:`, `https:` and `mailto:` URLs SHALL render as links, each with `rel="noopener noreferrer nofollow"`. The only exception is a footnote link under MDR-08. Every other scheme, relative URL or fragment SHALL render as its plain link text without a link element.
+The rendered output SHALL contain no link elements. Inline, reference, angle-bracket and GFM bare URL or email links of any scheme SHALL render as their link text. When the parsed destination differs from the link text, the text SHALL be followed by ` (<destination>)` as plain text. An empty destination, or one equal to the text with only `http://` or `mailto:` added, counts as not differing. Footnotes follow MDR-08.
 
-#### Scenario: Allowed link
-- **WHEN** source contains `[docs](https://example.com/a)`
-- **THEN** a link to `https://example.com/a` renders with the required `rel` value
+#### Scenario: Ordinary links become text
+- **WHEN** source contains `[docs](https://example.com/a)`, `[mail](mailto:dev@example.com)` and `[ref][r]` with `[r]: https://example.com/r`
+- **THEN** no link element exists
+- **AND** the text reads `docs (https://example.com/a)`, `mail (mailto:dev@example.com)` and `ref (https://example.com/r)`
 
-#### Scenario: Dangerous or relative link
-- **WHEN** source contains links using `javascript:`, `data:`, `vbscript:`, `file:` or a relative path, in any letter case or with leading whitespace
-- **THEN** no link element is rendered and only the link text is shown
+#### Scenario: Autolinks show the address once
+- **WHEN** source contains `<https://example.com/x>`, `https://example.com/y`, `www.example.com` and `dev@example.com`
+- **THEN** no link element exists, and each address appears exactly once as text
 
-### Requirement: MDR-09 Link destination hardening
+#### Scenario: Dangerous destinations are inert text
+- **WHEN** source contains links using `javascript:`, `data:`, `vbscript:`, `file:`, a relative path or `#top`, in any letter case
+- **THEN** no link element exists and no element has an `href`, and the link text and destination are shown as text
 
-An otherwise allowed link SHALL render as plain link text when its URL contains a username or password. A `mailto:` link's `href` SHALL contain only `mailto:` and exactly one address. Any query (such as `subject`, `body`, `cc` or `bcc`) and any fragment SHALL be removed.
+### Requirement: MDR-14 Shown destinations are unambiguous
 
-#### Scenario: Credentials in a link
-- **WHEN** source contains `[a](https://user:pass@evil.example/)`, `[b](https://good.example@evil.example/)` and `[c](https://good.example&#64;evil.example/)`
-- **THEN** none renders as a link element, and the link text is shown
+The link text compared with the destination under MDR-04 SHALL be the text as displayed, including image alt text. In a shown ` (<destination>)`, each Unicode format character, U+2028, U+2029 and non-ASCII whitespace SHALL appear as the visible code `<U+XXXX>`, and `(` and `)` SHALL appear as `%28` and `%29`.
 
-#### Scenario: Prefilled email
-- **WHEN** source contains `[mail](mailto:dev@example.com?cc=boss@example.com&body=hi#x)`
-- **THEN** the link's `href` is exactly `mailto:dev@example.com`, with the required `rel`
+#### Scenario: Image alt text counts as link text
+- **WHEN** source contains `[https://evil![.bank.example](i)](https://evil)`
+- **THEN** the text reads `https://evil.bank.example (https://evil)`
 
-### Requirement: MDR-11 Mailto address validation
+#### Scenario: Hidden characters and parentheses are visible
+- **WHEN** source contains `[invoice](https://evil.example/%E2%80%AEfdp.exe)`, `[x](https://e.x/%E2%80%8Ba)` and `[a](<b) (https://bank.example>)`
+- **THEN** the text reads `invoice (https://evil.example/<U+202E>fdp.exe)`, `x (https://e.x/<U+200B>a)` and `a (b%29 %28https://bank.example)`
 
-A `mailto:` link SHALL render as plain text when its address, after percent-decoding once, contains `?`, `#`, `&`, a comma, a semicolon, whitespace, `<`, `>`, `"`, `\`, `/`, a control character, or anything other than exactly one `@`.
+#### Scenario: Ordinary destinations are unchanged
+- **WHEN** source contains `[docs](https://example.com/a?q=1)` and `[b](https://bücher.example/)`
+- **THEN** the text reads `docs (https://example.com/a?q=1)` and `b (https://bücher.example/)`
 
-#### Scenario: Encoded header characters or several recipients
-- **WHEN** source contains `[a](mailto:a@b.example%3Fcc=c@d.example)`, `[b](mailto:a@b.example%23x)`, `[c](mailto:a@b%0Abcc:x@y.example)`, `[d](mailto:%3Fbody=hi)` and `[e](mailto:a@b.example,c@d.example)`
-- **THEN** none renders as a link element, and the link text is shown
+### Requirement: MDR-08 GitHub-style footnotes without links
 
-#### Scenario: Other recipient separators and malformed addresses
-- **WHEN** source contains `[a](mailto:a@b.example;c@d.example)`, `[b](mailto:a@b.example%3Bc@d.example)`, `[c](mailto:a@b.example%20c@d.example)`, `[d](mailto:a@b@c.example)`, `[e](mailto:a@b.example%3E%3Cc@d.example)` and `[f](mailto:nobody)`
-- **THEN** none renders as a link element, and the link text is shown
+The renderer SHALL show GFM footnotes as numbered superscript references and a footnotes section listing the definitions in reference order, without link elements or back-references. As on GitHub, the section's heading SHALL carry only the class `sr-only`, so that it is announced by screen readers but visually hidden where the page styles that class. Any element ID the renderer generates SHALL start with `user-content-` and SHALL be unique to its view instance.
 
-### Requirement: MDR-12 Suspicious link characters render as text
-
-An otherwise allowed link SHALL render as plain link text when its destination, after percent-decoding once, contains a Unicode format character (such as U+200B or U+202E), U+2028, U+2029, or any non-ASCII whitespace including U+00A0. A `mailto:` link SHALL also render as plain text when a `%` remains after one decode, or when its address uses any character outside ASCII letters, digits and `.!$'*+-=^_`{|}~` before the `@`, or outside ASCII letters, digits, `.` and `-` after it.
-
-#### Scenario: Invisible or direction-changing characters
-- **WHEN** source contains `[a](https://exa%E2%80%8Bmple.com/)`, `[b](https://example.com/%E2%80%AEfdp.exe)`, `[c](mailto:a%E2%80%8B@b.example)` and `[d](https://example.com/a%E2%80%A8b)`
-- **THEN** none renders as a link element, and the link text is shown
-
-#### Scenario: Suspicious mailto addresses
-- **WHEN** source contains `[a](mailto:a%A0b@c.example)`, `[b](mailto:a@b.example%253Fcc=x)`, `[c](mailto:a@b%C3%BCcher.example)` and `[d](mailto:a(b)@c.example)`
-- **THEN** none renders as a link element, and the link text is shown
-
-#### Scenario: Ordinary links are unaffected
-- **WHEN** source contains `[a](https://example.com/path?q=1#frag)`, `[b](https://bücher.example/)` and `[c](mailto:Dev.Name+tag@Example.com)`
-- **THEN** each renders as one link with the required `rel`
-
-### Requirement: MDR-08 GitHub-style footnotes
-
-The renderer SHALL support GFM footnotes as GitHub does. References and definitions SHALL be linked both ways through same-page fragment links. Every element ID the renderer generates SHALL start with `user-content-` and SHALL be unique to its view instance. A fragment link SHALL render as a link only when it targets a `#user-content-` ID generated in the same view.
-
-#### Scenario: Footnote reference and back-reference work
+#### Scenario: Footnote reference and definition
 - **WHEN** source contains `Fails on login[^1].` and `[^1]: Only on Chrome.`
-- **THEN** the reference is a link whose `#` target is the ID of the definition element, and that ID starts with `user-content-` and ends with `fn-1`
-- **AND** the definition has a back-link to the reference, whose element ID also starts with `user-content-`
+- **THEN** the reference shows as a superscript `1` without a link
+- **AND** the footnotes section lists `Only on Chrome.` as item 1, without a back-reference
 
 #### Scenario: Two views on one page never share IDs
 - **GIVEN** two views on the same page, each rendering `Note[^1]` and `[^1]: text`
 - **WHEN** both are displayed
 - **THEN** no `id` value appears twice in the page
-- **AND** each view's footnote links target only IDs inside that same view
 
 #### Scenario: Every generated ID is prefixed
 - **WHEN** source contains footnotes named `1`, `note` and `__proto__`
 - **THEN** every `id` attribute in the rendered output starts with `user-content-`
-
-#### Scenario: Author-written fragment links stay plain text
-- **WHEN** source contains `[x](#top)`, `[y](#user-content-fn-missing)` and `[z](#USER-CONTENT-fn-1)`
-- **THEN** none renders as a link element, and their link text is shown
 
 ### Requirement: MDR-05 Failure-safe rendering
 
@@ -133,7 +109,22 @@ When source cannot be rendered, for example because of pathological nesting, the
 
 ### Requirement: MDR-10 Off-main-thread parsing with a time limit
 
-Where the browser provides Web Workers, Markdown SHALL be parsed in a worker, never on the page's main thread. Until a result arrives the view SHALL show the complete source as escaped plain text. A parse that hasn't finished within 1 second SHALL be abandoned, its worker terminated, and the plain text kept. Formatted output SHALL be rendered with the same safety rules as MDR-01..04, 08 and 09.
+Where the browser provides Web Workers, Markdown SHALL be parsed in a worker, never on the page's main thread. Until a result arrives the view SHALL show the complete source as escaped plain text. A parse that hasn't finished within 1 second SHALL be abandoned, its worker terminated, and the plain text kept. Worker output is untrusted. It SHALL be checked again on the main thread and rendered with the safety rules of MDR-01..04 and 08.
+
+#### Scenario: Oversized output is never rendered
+- **WHEN** source of at most 20,000 characters would produce more than 25,000 output nodes, such as 35 tables of 71 columns by 137 rows, or tables totalling more than 10,000 cells
+- **THEN** the complete source shows as escaped plain text, and the main thread never builds the formatted output
+- **AND** the main thread also rejects a worker result over 25,000 nodes
+
+#### Scenario: Malformed or hostile worker results
+- **WHEN** the worker returns a result that isn't a hast root with a children array, or elements carrying class names the renderer never generates
+- **THEN** a malformed result shows the complete source as plain text, and unknown class names are removed
+- **AND** a custom parser that throws or returns a non-promise shows the complete source as plain text
+
+#### Scenario: Queue fairness and cancellation
+- **GIVEN** several views queued on one worker
+- **WHEN** two earlier parses time out, or a view unmounts before its parse is sent
+- **THEN** a queued request that was never sent still gets sent to a worker, and an unmounted view's unsent request is dropped
 
 #### Scenario: Slow parse is abandoned
 - **GIVEN** the worker does not answer for a source
@@ -162,7 +153,13 @@ Where the browser provides Web Workers, Markdown SHALL be parsed in a worker, ne
 
 #### Scenario: No Web Worker available
 - **WHEN** the environment has no Web Worker, such as the test runner or server rendering
-- **THEN** the view parses in-thread behind the MDR-05 pre-check and error boundary, and MDR-01..09 behave as specified
+- **THEN** the view parses in-thread behind the MDR-05 pre-check and error boundary, and MDR-01..08 behave as specified
+
+#### Scenario: The in-thread path has the same output budget
+- **GIVEN** no Web Worker is available
+- **WHEN** source is `"- -\n"` repeated 5,000 times, `">"` repeated 32 times plus `"a\n\n"` repeated 571 times, or `"- "` repeated 16 times plus `"a\n"` repeated 588 times
+- **THEN** each finishes in under 1 second as the complete source in escaped plain text, without building formatted output
+- **AND** ordinary reports render with the same DOM as the worker path
 
 ### Requirement: MDR-06 Write and Preview editing
 

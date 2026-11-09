@@ -121,6 +121,75 @@ Wrap `MarkdownView` in an error boundary that falls back to
   would still parse. That is now addressed by D11; the pre-check stays as a fast
   first filter.
 
+### D12 No links (owner decision 9 Nov, replaces the link rules in D2 and D11)
+After three rounds of link hardening (MDR-09, MDR-11, MDR-12) and a fourth
+review that still found spoofable destinations (punycode joiners, blank
+characters, titles), the owner chose: no links at all.
+- The `a` component never renders an element. It renders its children, then
+  ` (<destination>)` as text when the destination differs from the text.
+  Autolinks, whose text equals the destination, show the address once.
+- `urlTransform` and `safeUrl` no longer decide anything. Their code and
+  MDR-09/11/12/13 are retired. Tasks 3.8 and 3.10 stay complete as history.
+  The unapproved MDR-13 Red test (`MarkdownView.hidden.test.tsx`) is deleted.
+- Footnotes render as superscript numbers and a footnotes section, with no
+  fragment links and no back-references. The fragment trust pass is no longer
+  needed. The per-view ID prefix stays for any generated IDs.
+- Titles are dropped with the link, so they are never rendered.
+- Approved tests that asserted a working link (subset, security, footnotes,
+  urls, mailto, mailto2, suspicious) are rewritten to the new rules. This needs
+  a new baseline review and owner approval (task 3.11).
+
+### D13 Bound the worker result (3.9 security review, 9 Nov)
+The worker moved parsing off the main thread but not rendering. A
+19,708-character source of 35 tables passed the per-table cap and produced a
+708k-node hast. Cloning and rendering it took about 6 s on the main thread in
+jsdom.
+- **Budgets.**
+  - A pre-check caps total table cells at 10,000 across the source.
+  - The worker counts hast nodes and replies `ok:false` above 25,000 nodes.
+  - The main thread counts again iteratively before rendering, because the
+    worker is untrusted. Above 25,000 nodes, it falls back to plain text.
+  - `countHastNodes(root, limit)` stops at the first count above `limit`,
+    returning `limit + 1`.
+- **Shape and classes.** The main thread accepts only a `root` with a
+  children array. `className` is allowlisted per tag to the classes the
+  renderer generates:
+  - `language-*` on `code`;
+  - `contains-task-list`, `task-list-item`, `footnotes` and `sr-only`.
+
+  Each element keeps at most one class: the first allowed one. The renderer
+  never generates more than that, and the cap stops an untrusted worker from
+  sending millions of allowed classes. The 3.9 review hung jsdom with 50
+  elements carrying 200,000 classes each.
+- **Runner.**
+  - Only the request in flight when a worker dies is marked retried, so
+    requests that were never sent are always sent.
+  - The effect cleanup cancels unsent requests.
+  - `runner.parse` is wrapped, so a synchronous throw or a non-promise return
+    falls back to plain text.
+  - Task 3.12.
+
+### D14 One render path and a bounded sanitiser (3.12 security review, 9 Nov)
+The 3.12 review found that the in-thread path, used when no Worker exists
+(tests, SSR), had no node budget. Inputs such as `"- -\n"` ×5000 took 2.7 s.
+- **One path.** The in-thread path renders through `toHast`, then
+  `countHastNodes`, then the same sanitiser and `HastView` as the worker
+  path. It falls back to plain text above `MAX_HAST_NODES`. react-markdown is
+  no longer used to render. The approved dos and limits tests that mocked it
+  are updated to mock the pipeline instead, with their assertions unchanged.
+  That update needs re-approval.
+- **Pre-check.** A new linear check caps the total number of list-item and
+  blockquote containers across all lines, so `toHast` never sees
+  `"- -\n"` ×5000. The limit is chosen so the three review repros fall back
+  and ordinary nested lists still render.
+- **Sanitiser.**
+  - It sanitises once, before counting, and counts the sanitised tree.
+  - It reads only the allowed property keys directly, instead of iterating
+    `Object.keys`.
+  - It scans at most 8 class entries.
+- **Runner.** `pump` is a loop, not recursion.
+- Task 3.14.
+
 ### D11 Parse in a Web Worker with a 1 s budget (owner decision C, 9 Nov)
 The third security review found 6 more constructs under 20,000 characters that
 take 2–12 s on the main thread, after the D4 patch: multi-table totals, nested
