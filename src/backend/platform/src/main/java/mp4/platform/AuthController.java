@@ -61,8 +61,18 @@ final class AuthController {
         this.attempts = attempts;
         this.assignedReports = new AssignedReportListHttpHandler(new AssignedReportStore(dataSource));
         this.checklistDraft = new ChecklistDraftHttpHandler(new ChecklistDraftStore(dataSource));
-        this.checklistShare = new ChecklistShareHttpHandler(new JdbcChecklistShareService(dataSource));
-        this.sharedChecklist = new ChecklistSharedHttpHandler(dataSource, null);
+        this.checklistShare = new ChecklistShareHttpHandler(new JdbcChecklistShareService(dataSource,
+                (connection, request, version, invalidated) ->
+                        mp4.maintainer.storage.SharedReportHistory.checklistPublished(connection, request.reportId(),
+                                request.actor().id(), version, invalidated)));
+        var maintainerReports = new mp4.maintainer.storage.JdbcMaintainerRepository(dataSource);
+        this.sharedChecklist = new ChecklistSharedHttpHandler(dataSource, (actor, reportId) -> {
+            try { return maintainerReports.canViewSharedChecklist(MaintainerController.actor(), reportId); }
+            catch (mp4.maintainer.workflow.MaintainerService.ServiceException denied) {
+                if (denied.statusCode() == 401 || denied.statusCode() == 403) return false;
+                throw new java.sql.SQLException("Maintainer access check unavailable");
+            }
+        });
         this.publicOrigin = publicOrigin;
     }
 

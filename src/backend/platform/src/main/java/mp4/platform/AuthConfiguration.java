@@ -48,7 +48,10 @@ public class AuthConfiguration {
         return ds;
     }
     @Bean Clock authClock() { return Clock.systemUTC(); }
-    @Bean InitializingBean authMigrations(DataSource ds) { return () -> Flyway.configure().dataSource(ds).defaultSchema("public").locations("classpath:db/auth").table("mp4_auth_schema_history").baselineOnMigrate(true).baselineVersion("99").load().migrate(); }
+    @Bean InitializingBean authMigrations(DataSource ds) { return () -> {
+        Flyway.configure().dataSource(ds).defaultSchema("public").locations("classpath:db/auth").table("mp4_auth_schema_history").baselineOnMigrate(true).baselineVersion("99").load().migrate();
+        mp4.maintainer.storage.SharedSchemaBootstrap.initialize(ds);
+    }; }
     @Bean CookieSerializer sessionCookieSerializer(@Value("${mp4.auth.local:false}") boolean local,
             @Value("${server.address:127.0.0.1}") String bind) {
         boolean loopback=bind.equals("127.0.0.1")||bind.equals("::1")||bind.equals("localhost");

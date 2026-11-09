@@ -228,7 +228,7 @@ public final class MaintainerService {
     }
 
     private static void ensureIncrementable(long version) {
-        if (version >= MAX_SAFE_VERSION) throw invalidState();
+        if (version >= MAX_SAFE_VERSION) throw new ServiceException("VERSION_LIMIT", 409, "The report version limit has been reached");
     }
 
     private static void requireStatus(ReportCore report, Status expected) {
@@ -245,7 +245,13 @@ public final class MaintainerService {
 
     private static String requireReason(String reason) {
         String clean = cleanText(reason);
-        if (clean.codePointCount(0, clean.length()) < 1 || clean.codePointCount(0, clean.length()) > 1000) throw validation();
+        if (clean.codePointCount(0, clean.length()) < 1 || clean.codePointCount(0, clean.length()) > 1000
+                || hasMalformedSurrogate(clean)) throw validation();
+        for (int offset = 0; offset < clean.length();) {
+            int cp = clean.codePointAt(offset);
+            if (Character.isISOControl(cp) && cp != '\n' && cp != '\t') throw validation();
+            offset += Character.charCount(cp);
+        }
         return clean;
     }
 

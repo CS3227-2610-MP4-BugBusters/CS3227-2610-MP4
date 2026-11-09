@@ -1,5 +1,6 @@
-import { QueryError, parseSummary, uuid } from "./domain";
-import type { Queries } from "./domain";
+import { QueryError, parseSummary, priorities, statuses, uuid } from "./domain";
+import type { Queries, SummaryFilters } from "./domain";
+import { parseSummaryResult } from "./summary";
 
 const DEADLINE_MS = 10_000;
 const MAX_BODY = 65_536;
@@ -7,8 +8,8 @@ type Csrf = { token: string; headerName: "X-CSRF-TOKEN" };
 
 /** Adds the versioned mutation transport to the ordinary read-only HTTP adapter. */
 export function withHttpActions<T extends Queries>(queries: T, fetcher: typeof fetch = fetch): T & Required<Pick<Queries,
-  "updatePriority" | "assignReport" | "returnResolution" | "closeReport" | "reopenReport" | "addComment">> {
-  const bounded = async (response: Response, signal: AbortSignal): Promise<string> => {
+  "updatePriority" | "assignReport" | "returnResolution" | "closeReport" | "reopenReport" | "addComment" | "summarizeQueue">> {
+  const bounded = async (response: Response, signal: AbortSignal, maxBody = MAX_BODY): Promise<string> => {
     if (!response.body) throw new QueryError("contract");
     const reader = response.body.getReader();
     const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -21,7 +22,7 @@ export function withHttpActions<T extends Queries>(queries: T, fetcher: typeof f
         const { done, value } = await reader.read();
         if (done) break;
         size += value.byteLength;
-        if (size > MAX_BODY) { await reader.cancel(); throw new QueryError("contract"); }
+        if (size > maxBody) { await reader.cancel(); throw new QueryError("contract"); }
         result += decoder.decode(value, { stream: true });
       }
       if (signal.aborted) throw new QueryError("cancelled");
@@ -30,6 +31,24 @@ export function withHttpActions<T extends Queries>(queries: T, fetcher: typeof f
       if (error instanceof QueryError) throw error;
       throw new QueryError("contract");
     } finally { signal.removeEventListener("abort", cancel); reader.releaseLock(); }
+  };
+  const csrfToken = async (signal: AbortSignal): Promise<string> => {
+    const response = await fetcher("/api/auth/csrf", {
+      method: "GET", credentials: "same-origin", cache: "no-store", signal,
+      headers: { Accept: "application/json" },
+    });
+    if (signal.aborted) throw new QueryError("cancelled");
+    if (!response.ok) throw await responseError(response, signal);
+    let csrf: unknown;
+    try { csrf = JSON.parse(await bounded(response, signal)); } catch (error) {
+      if (error instanceof QueryError) throw error;
+      throw new QueryError("contract");
+    }
+    if (!csrf || typeof csrf !== "object" || Array.isArray(csrf) ||
+        typeof (csrf as Record<string, unknown>).token !== "string" ||
+        !(csrf as Record<string, unknown>).token || ((csrf as Record<string, unknown>).token as string).length > 2048 ||
+        (csrf as Record<string, unknown>).headerName !== "X-CSRF-TOKEN") throw new QueryError("contract");
+    return (csrf as Csrf).token;
   };
   const request = async (path: string, body: unknown, method: "POST" | "PUT", caller?: AbortSignal, expected?: { id: string; version: number; priority?: string; assigneeId?: string; status?: string; unassigned?: boolean }) => {
     const controller = new AbortController();
@@ -41,22 +60,7 @@ export function withHttpActions<T extends Queries>(queries: T, fetcher: typeof f
     const timer = globalThis.setTimeout(() => { controller.abort(); rejectAbort(new QueryError("network")); }, DEADLINE_MS);
     const signal = controller.signal;
     const perform = async () => {
-      const csrfResponse = await fetcher("/api/auth/csrf", {
-        method: "GET", credentials: "same-origin", cache: "no-store", signal,
-        headers: { Accept: "application/json" },
-      });
-      if (signal.aborted) throw new QueryError("cancelled");
-      if (!csrfResponse.ok) throw await responseError(csrfResponse, signal);
-      let csrf: unknown;
-      try { csrf = JSON.parse(await bounded(csrfResponse, signal)); } catch (error) {
-        if (error instanceof QueryError) throw error;
-        throw new QueryError("contract");
-      }
-      if (!csrf || typeof csrf !== "object" || Array.isArray(csrf) ||
-          typeof (csrf as Record<string, unknown>).token !== "string" ||
-          !(csrf as Record<string, unknown>).token || ((csrf as Record<string, unknown>).token as string).length > 2048 ||
-          (csrf as Record<string, unknown>).headerName !== "X-CSRF-TOKEN") throw new QueryError("contract");
-      const token = (csrf as Csrf).token;
+      const token = await csrfToken(signal);
       if (signal.aborted) throw new QueryError("cancelled");
       const response = await fetcher(path, {
         method, credentials: "same-origin", cache: "no-store", signal,
@@ -96,6 +100,62 @@ export function withHttpActions<T extends Queries>(queries: T, fetcher: typeof f
   const version = (value: number) => {
     if (!Number.isSafeInteger(value) || value < 0) throw new QueryError("validation");
   };
+  const checkedSummaryFilters = (value: SummaryFilters): SummaryFilters => {
+    if (!value || typeof value !== "object" || Array.isArray(value) ||
+        Object.keys(value).some((key) => !["status", "priority", "assigneeId"].includes(key))) throw new QueryError("validation");
+    if (value.status !== undefined && (!statuses.includes(value.status) || value.status === "Closed")) throw new QueryError("validation");
+    if (value.priority !== undefined && !priorities.includes(value.priority)) throw new QueryError("validation");
+    if (value.assigneeId !== undefined && (typeof value.assigneeId !== "string" || !uuid.test(value.assigneeId))) throw new QueryError("validation");
+    return {
+      ...(value.status === undefined ? {} : { status: value.status }),
+      ...(value.priority === undefined ? {} : { priority: value.priority }),
+      ...(value.assigneeId === undefined ? {} : { assigneeId: value.assigneeId }),
+    };
+  };
+  const summarizeQueue = async (input: { filters: SummaryFilters; regenerate: boolean }, caller?: AbortSignal) => {
+    if (!input || typeof input !== "object" || Array.isArray(input) ||
+        Object.keys(input).some((key) => !["filters", "regenerate"].includes(key)) ||
+        typeof input.regenerate !== "boolean") throw new QueryError("validation");
+    const filters = checkedSummaryFilters(input.filters);
+    const body = { filters, regenerate: input.regenerate };
+    const controller = new AbortController();
+    let resolveAbort!: (reason: QueryError) => void;
+    const aborted = new Promise<QueryError>((resolve) => { resolveAbort = resolve; });
+    if (caller?.aborted) throw new QueryError("cancelled");
+    const abort = () => { controller.abort(); resolveAbort(new QueryError("cancelled")); };
+    caller?.addEventListener("abort", abort, { once: true });
+    const timer = globalThis.setTimeout(() => { controller.abort(); resolveAbort(new QueryError("network")); }, 35_000);
+    const signal = controller.signal;
+    const perform = async () => {
+      const token = await csrfToken(signal);
+      if (signal.aborted) throw new QueryError("cancelled");
+      const response = await fetcher("/api/maintainer/queue-summary", {
+        method: "POST", credentials: "same-origin", cache: "no-store", signal,
+        headers: { Accept: "application/json", "Content-Type": "application/json", "X-CSRF-TOKEN": token },
+        body: JSON.stringify(body),
+      });
+      if (signal.aborted) throw new QueryError("cancelled");
+      if (!response.ok) throw await responseError(response, signal);
+      let value: unknown;
+      try { value = JSON.parse(await bounded(response, signal, 256 * 1024)); } catch (error) {
+        if (error instanceof QueryError) throw error;
+        throw new QueryError("contract");
+      }
+      const result = parseSummaryResult(value);
+      if (JSON.stringify(result.filters) !== JSON.stringify(filters)) throw new QueryError("contract");
+      return result;
+    };
+    try {
+      const result = await Promise.race([perform(), aborted]);
+      if (result instanceof QueryError) throw result;
+      return result;
+    } catch (error) {
+      if (caller?.aborted) throw new QueryError("cancelled");
+      if (error instanceof QueryError) throw error;
+      if (signal.aborted) throw new QueryError("network");
+      throw new QueryError("network");
+    } finally { globalThis.clearTimeout(timer); caller?.removeEventListener("abort", abort); }
+  };
   const text = (value: string, max: number) => {
     const clean = value.trim();
     if ([...clean].length < 1 || [...clean].length > max || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f-\u009f]/.test(clean)) throw new QueryError("validation");
@@ -108,6 +168,7 @@ export function withHttpActions<T extends Queries>(queries: T, fetcher: typeof f
     closeReport: async (v: { reportId: string; expectedVersion: number; proposalId: string; proposalVersion: number; reviewed: true }, s?: AbortSignal) => { version(v.expectedVersion); version(v.proposalVersion); if (!uuid.test(v.proposalId) || v.reviewed !== true) throw new QueryError("validation"); return request(reportPath(v.reportId, "/close"), { expectedVersion: v.expectedVersion, proposalId: v.proposalId, proposalVersion: v.proposalVersion, reviewed: true }, "POST", s, { id: v.reportId, version: v.expectedVersion, status: "Closed" }); },
     reopenReport: async (v: { reportId: string; expectedVersion: number; reason: string }, s?: AbortSignal) => { version(v.expectedVersion); return request(reportPath(v.reportId, "/reopen"), { expectedVersion: v.expectedVersion, reason: text(v.reason, 1000) }, "POST", s, { id: v.reportId, version: v.expectedVersion, status: "Submitted", unassigned: true }); },
     addComment: async (v: { reportId: string; expectedVersion: number; text: string }, s?: AbortSignal) => { version(v.expectedVersion); return request(reportPath(v.reportId, "/comments"), { expectedVersion: v.expectedVersion, text: text(v.text, 4000) }, "POST", s, { id: v.reportId, version: v.expectedVersion }); },
+    summarizeQueue,
   });
 }
 

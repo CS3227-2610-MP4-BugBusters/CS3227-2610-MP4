@@ -13,9 +13,22 @@ public final class JdbcChecklistShareService implements ChecklistShareService {
             List.of("ASSIGNED", "IN_PROGRESS", "RESOLUTION_PROPOSED");
 
     private final DataSource database;
+    private final PublicationObserver publicationObserver;
+
+    /** Shared application integration runs inside the same publication transaction. */
+    @FunctionalInterface
+    public interface PublicationObserver {
+        void published(Connection connection, ShareRequest request, long reportVersion, boolean invalidatedProposal)
+                throws SQLException;
+    }
 
     public JdbcChecklistShareService(DataSource database) {
+        this(database, (connection, request, version, invalidated) -> {});
+    }
+
+    public JdbcChecklistShareService(DataSource database, PublicationObserver publicationObserver) {
         this.database = database;
+        this.publicationObserver = java.util.Objects.requireNonNull(publicationObserver);
     }
 
     @Override
@@ -133,6 +146,7 @@ public final class JdbcChecklistShareService implements ChecklistShareService {
                 updateReport.executeUpdate();
             }
         }
+        publicationObserver.published(connection, request, nextReportVersion, "RESOLUTION_PROPOSED".equals(status));
         return new ShareResult(Outcome.SHARED, nextReportVersion);
     }
 }
