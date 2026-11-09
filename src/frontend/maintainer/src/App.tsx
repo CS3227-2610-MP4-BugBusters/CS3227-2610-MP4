@@ -10,6 +10,7 @@ import {
   type Person,
   type Queries,
 } from "./domain";
+import type { AuthActions } from "./auth-client";
 type Load<T> = {
   state: "loading" | "ready" | "error";
   data?: T;
@@ -21,14 +22,21 @@ const failure = (e: unknown) =>
 export function App({
   queries,
   synthetic = false,
+  authActions,
 }: {
   queries: Queries;
   synthetic?: boolean;
+  authActions?: AuthActions;
 }) {
   const [auth, setAuth] = useState<"loading" | "ready" | "error">("loading"),
     [authError, setAuthError] = useState<QueryError>(),
+    [identity, setIdentity] = useState<{ displayName: string; role: string }>(),
     [session, setSession] = useState(0),
-    [refresh, setRefresh] = useState(0);
+    [refresh, setRefresh] = useState(0),
+    [username, setUsername] = useState(""),
+    [password, setPassword] = useState(""),
+    [authBusy, setAuthBusy] = useState<"signIn" | "signOut">(),
+    [authActionError, setAuthActionError] = useState<QueryError>();
   const [filters, setFilters] = useState<Filters>({ offset: 0, limit: 50 }),
     [list, setList] = useState<Load<Page>>(loading),
     [devs, setDevs] = useState<Load<Person[]>>(loading),
@@ -38,6 +46,8 @@ export function App({
     [devRetry, setDevRetry] = useState(0),
     [detailRetry, setDetailRetry] = useState(0);
   const epoch = useRef(0),
+    authActionGeneration = useRef(0),
+    activeAuthController = useRef<AbortController | undefined>(undefined),
     listEpoch = useRef(0),
     detailEpoch = useRef(0),
     devEpoch = useRef(0),
@@ -48,6 +58,10 @@ export function App({
     return c;
   };
   const clear = () => {
+    authActionGeneration.current++;
+    activeAuthController.current?.abort();
+    activeAuthController.current = undefined;
+    setAuthBusy(undefined);
     controllers.current.forEach((c) => c.abort());
     controllers.current.clear();
     listEpoch.current++;
@@ -77,6 +91,7 @@ export function App({
       .then(
         (u) => {
           if (g !== epoch.current) return;
+          setIdentity({ displayName: u.displayName, role: u.role });
           if (!u.active || u.role !== "MAINTAINER") {
             deny(new QueryError("denied"), g);
             return;
@@ -204,6 +219,62 @@ export function App({
     setAuth("loading");
     setRefresh((v) => v + 1);
   };
+  const signIn = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!authActions || authBusy || authError?.code !== "session") return;
+    setAuthBusy("signIn");
+    setAuthActionError(undefined);
+    const action = ++authActionGeneration.current;
+    const c = control();
+    activeAuthController.current = c;
+    try {
+      await authActions.signIn(username, password, c.signal);
+      if (!c.signal.aborted && action === authActionGeneration.current) {
+        setPassword("");
+        setIdentity(undefined);
+        controllers.current.delete(c);
+        activeAuthController.current = undefined;
+        setAuthBusy(undefined);
+        reload();
+      }
+    } catch (e) {
+      if (!c.signal.aborted && action === authActionGeneration.current) {
+        setPassword("");
+        setAuthActionError(failure(e));
+      }
+    } finally {
+      controllers.current.delete(c);
+      if (action === authActionGeneration.current) {
+        activeAuthController.current = undefined;
+        setAuthBusy(undefined);
+      }
+    }
+  };
+  const signOut = async () => {
+    if (!authActions || authBusy) return;
+    setAuthActionError(undefined);
+    epoch.current++;
+    clear();
+    setAuthError(new QueryError("session"));
+    setAuth("error");
+    setIdentity(undefined);
+    setAuthBusy("signOut");
+    const action = ++authActionGeneration.current;
+    const c = control();
+    activeAuthController.current = c;
+    try {
+      await authActions.signOut(c.signal);
+    } catch (e) {
+      if (!c.signal.aborted && action === authActionGeneration.current)
+        setAuthActionError(failure(e));
+    } finally {
+      controllers.current.delete(c);
+      if (action === authActionGeneration.current) {
+        activeAuthController.current = undefined;
+        setAuthBusy(undefined);
+      }
+    }
+  };
   return (
     <main>
       <header>
@@ -222,12 +293,71 @@ export function App({
       {auth === "loading" ? (
         <p role="status">Checking access…</p>
       ) : auth === "error" ? (
-        <div role="alert">
-          <p>{authError?.message}</p>
-          <button onClick={reload}>Retry access check</button>
-        </div>
+        authActions && authError?.code === "session" ? (
+          <section aria-label="Sign in" className="auth-panel">
+            <h2>Sign in</h2>
+            <p>{authError.message}</p>
+            <form onSubmit={signIn}>
+              <label>
+                Username
+                <input
+                  autoComplete="username"
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={!!authBusy}
+                />
+              </label>
+              <label>
+                Password
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={!!authBusy}
+                />
+              </label>
+              <button type="submit" disabled={!!authBusy}>
+                {authBusy === "signIn" ? "Signing in…" : "Sign in"}
+              </button>
+              {authBusy === "signOut" && <p role="status">Signing out…</p>}
+            </form>
+            {authActionError && (
+              <p role="alert">
+                {authActionError.code === "session"
+                  ? "Sign-in failed. Check your username and password."
+                  : messages[authActionError.code]}
+              </p>
+            )}
+          </section>
+        ) : (
+          <div role="alert">
+            <p>{authError?.message}</p>
+            {identity && (
+              <p>
+                {identity.displayName} · {identity.role}
+              </p>
+            )}
+            {authActions && identity && (
+              <button onClick={signOut} disabled={!!authBusy}>
+                {authBusy === "signOut" ? "Signing out…" : "Sign out"}
+              </button>
+            )}
+            <button onClick={reload}>Retry access check</button>
+          </div>
+        )
       ) : (
         <>
+          {authActions && (
+            <div className="account-bar">
+              <span>{identity?.displayName} · Maintainer</span>
+              <button onClick={signOut} disabled={!!authBusy}>
+                {authBusy === "signOut" ? "Signing out…" : "Sign out"}
+              </button>
+            </div>
+          )}
           <section className="filters" aria-label="Queue filters">
             <label>
               Status

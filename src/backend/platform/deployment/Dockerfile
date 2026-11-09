@@ -1,0 +1,33 @@
+FROM node:22-bookworm-slim AS frontend
+WORKDIR /workspace/src/frontend/maintainer
+COPY src/frontend/maintainer/package.json src/frontend/maintainer/package-lock.json ./
+RUN npm ci
+COPY src/frontend/maintainer/ ./
+RUN npm run build
+
+FROM eclipse-temurin:17-jdk-jammy AS package
+WORKDIR /workspace/src/backend/auth
+COPY src/backend/auth/ ./
+COPY src/backend/platform/ ../platform/
+COPY src/backend/developer/src/ ../developer/src/
+COPY src/backend/platform/deployment/package.gradle ../platform/deployment/package.gradle
+COPY --from=frontend /workspace/src/frontend/maintainer/dist /workspace/frontend-dist
+ARG RENDER_GIT_COMMIT
+ARG GITHUB_SHA
+RUN chmod +x ./gradlew \
+    && ./gradlew --no-daemon -I ../platform/deployment/package.gradle authDistribution \
+    -PbuildRevision="${RENDER_GIT_COMMIT:-${GITHUB_SHA:-unknown}}" \
+    -PfrontendDist=/workspace/frontend-dist
+
+FROM eclipse-temurin:17-jre-jammy AS runtime
+WORKDIR /app
+ENV SERVER_ADDRESS=0.0.0.0
+ENV SERVER_PORT=10000
+COPY --from=package /workspace/src/backend/auth/build/auth-distribution/classes/ ./classes/
+COPY --from=package /workspace/src/backend/auth/build/auth-distribution/lib/ ./lib/
+COPY src/backend/platform/deployment/start.sh ./start.sh
+RUN chmod 0555 /app/start.sh \
+    && chown -R 10001:10001 /app
+USER 10001:10001
+EXPOSE 10000
+ENTRYPOINT ["/app/start.sh"]

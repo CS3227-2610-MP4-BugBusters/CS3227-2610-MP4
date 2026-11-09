@@ -1,12 +1,14 @@
 # Tasks
 
-Status: implemented the bounded operator-create slice: persisted fixed-role accounts,
-duplicate rejection, validation and BCrypt hashes. The frozen provisioning baseline
-and added regressions pass locally; login, reset/disable, sessions/CSRF and shared
-application integration remain future work. Full tasks 2.1/2.2 stay open beyond this
-bounded slice. PR #6's foundation revision `a17abc5` passed all nine remote jobs,
-including setup on Java 17/21; updated-head CI is tracked separately. Reporter-owner
-review remains distinct from agents.
+Status: implemented PostgreSQL account creation, disable/password reset, JDBC
+login/logout sessions, CSRF, current identity, shared login limits and the real
+Developer assigned-list adapter. Added Maintainer browser sign-in/sign-out.
+The approved Red baselines remain unchanged. Independent review found additional
+security and cancellation issues; repaired them with separate regression coverage.
+Real three-role browser checks and final security probes pass. The clean independent backend
+run passed 37 tests and all ten CI jobs passed on `61cb733`. PR #6's provisioning
+foundation has merged; this continuation is PR #7. Reporter-owner review remains
+distinct from agent verification.
 
 For behaviour slices use `workflow/tdd.md`: test_designer, fresh baseline_verifier,
 feature-owner approval, implementer, fresh candidate_verifier and separate
@@ -22,14 +24,14 @@ per bounded slice; scope specialists to one writer per file.
 
 ## 2. Accounts and controlled provisioning
 
-- [ ] 2.1 Implement the auth account migration and operator-only create command through the agreed schema tooling. Verify AUTH-01 for all three persisted roles, UUID/username uniqueness, role constraints, duplicate refusal and no public signup/self-promotion. Record Red/Green with real disposable PostgreSQL; document the secret-input command and role-testing policy.
-- [ ] 2.2 Implement adaptive password storage and operator disable/reset with generation revocation. Verify AUTH-02: hashed-only persistence, secret-safe output/arguments, unchanged UUID/role and old-session denial after account changes. Cover malformed input and 72-byte boundary without truncation; document operator recovery and avoid committed account passwords.
+- [x] 2.1 Implement the auth account migration and operator-only create command through the agreed schema tooling. Verify AUTH-01 for all three persisted roles, UUID/username uniqueness, role constraints, duplicate refusal and no public signup/self-promotion. Record Red/Green with real disposable PostgreSQL; document the secret-input command and role-testing policy.
+- [x] 2.2 Implement adaptive password storage and operator disable/reset with generation revocation. Verify AUTH-02: hashed-only persistence, secret-safe output/arguments, unchanged UUID/role and old-session denial after account changes. Cover malformed input and 72-byte boundary without truncation; document operator recovery and avoid committed account passwords.
 
 ## 3. Sessions and browser security
 
-- [ ] 3.1 Implement AUTH-03 login, AUTH-04 current identity and AUTH-05 logout/session lifecycle using the real security chain and JDBC sessions. Verify all roles, generic unknown/inactive/wrong-password failures, fixation/replay, idle/absolute expiry, fail-closed stores, safe errors and DTO compatibility; document endpoint examples and cookie rules.
-- [ ] 3.2 Implement AUTH-06 CSRF issuance and unsafe-method checks. Verify login/logout/protected writes for missing, foreign and stale tokens, valid recovery after token refresh, no mutation on GET and no credentialed cross-origin access. Include production cookie flags, explicit loopback-only dev settings and ignored spoofed proxy/actor headers; document the frontend token sequence.
-- [ ] 3.3 Implement the shared login admission budget. Verify AUTH-03 with a test clock, atomic concurrent admissions from two app instances, expiry/recovery, correct 429/Retry-After, bounded cleanup and fail-closed database errors. Document the application limits and distinguish them from SoC budgets.
+- [x] 3.1 Implement AUTH-03 login, AUTH-04 current identity and AUTH-05 logout/session lifecycle using the real security chain and JDBC sessions. Verify all roles, generic unknown/inactive/wrong-password failures, fixation/replay, idle/absolute expiry, fail-closed stores, safe errors and DTO compatibility; document endpoint examples and cookie rules.
+- [x] 3.2 Implement AUTH-06 CSRF issuance and unsafe-method checks. Verify login/logout/protected writes for missing, foreign and stale tokens, valid recovery after token refresh, no mutation on GET and no credentialed cross-origin access. Include production cookie flags, explicit loopback-only dev settings and ignored spoofed proxy/actor headers; document the frontend token sequence.
+- [x] 3.3 Implement the shared login admission budget. Verify AUTH-03 with a test clock, atomic concurrent admissions from two app instances, expiry/recovery, correct 429/Retry-After, bounded cleanup and fail-closed database errors. Document the application limits and distinguish them from SoC budgets.
 
 ## 4. Real consumers and handoff
 
@@ -41,3 +43,11 @@ per bounded slice; scope specialists to one writer per file.
 - Carry deployment/environment implementation through `complete-maintainer-role` task 6.2 with Developer-owner review; do not claim deployment from local auth tests.
 - Coordinate account/report transaction locks before claiming deactivation-versus-domain-write atomicity.
 - Archive only after all tasks, required independent checks and team review pass.
+
+## Implemented foundation verification
+
+Recorded candidate `61cb733` and independently verified results in
+`logs/auth/2026-11-09-sessions-candidate.md`. Completed account/session tasks above
+against the auth-owned initializer; this does not claim canonical shared migration
+registration or teammate acceptance. Tasks 1.1, 4.1 and 4.2 remain open for their
+remaining DTO/handoff, shared integration/routing and human-review criteria.

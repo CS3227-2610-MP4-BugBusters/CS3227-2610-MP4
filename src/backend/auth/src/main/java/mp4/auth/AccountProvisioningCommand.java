@@ -12,6 +12,18 @@ public final class AccountProvisioningCommand {
     public static void main(String[] args) {
         int status;
         try {
+            if (args != null && args.length > 0 && (args[0].equals("disable") || args[0].equals("reset-password"))) {
+                String command=args[0];
+                if (args.length != (command.equals("disable") ? 3 : 4) || !args[1].equals("--username")
+                        || (command.equals("reset-password") && !args[3].equals("--password-stdin"))) throw new IllegalArgumentException();
+                String username=ProvisioningRequest.normalizeUsername(args[2]);
+                byte[] secret=command.equals("disable")?null:readPassword();
+                if(secret!=null) ProvisioningRequest.validatePassword(secret);
+                ProvisioningDatabase.Config config=ProvisioningDatabase.Config.fromEnvironment(System.getenv());
+                ProvisioningDatabase.initialize(config);
+                AccountProvisioningService.Lifecycle result=new AccountProvisioningService(config).change(command,username,secret);
+                output(Map.of("code",command.equals("disable")?"ACCOUNT_DISABLED":"PASSWORD_RESET","id",result.id().toString(),"role",result.role())); status=0;
+            } else {
             ProvisioningRequest request = ProvisioningRequest.parse(args);
             byte[] password = readPassword();
             ProvisioningRequest.validatePassword(password);
@@ -20,6 +32,9 @@ public final class AccountProvisioningCommand {
             AccountProvisioningService.Created created = new AccountProvisioningService(config).create(request, password);
             output(Map.of("code", "ACCOUNT_CREATED", "id", created.id().toString(), "role", created.role()));
             status = 0;
+            }
+        } catch (AccountProvisioningService.AccountNotFound e) {
+            output(Map.of("code", "ACCOUNT_NOT_FOUND")); status = 6;
         } catch (CharacterCodingException | IllegalArgumentException e) {
             output(Map.of("code", "VALIDATION_FAILED"));
             status = 2;

@@ -104,3 +104,41 @@ jobs:
         run: npm install --global @fission-ai/openspec@1.16.0
       - name: Validate changes and specifications
         run: openspec validate --all --strict --no-interactive
+
+  application-image:
+    name: Application image / Java 17
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the deployable application image
+        run: docker build --build-arg GITHUB_SHA="$GITHUB_SHA" --file src/backend/platform/deployment/Dockerfile --tag mp4-auth:ci .
+      - name: Check packaged startup, frontend and build revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          config="$(mktemp)"
+          trap 'rm -f "$config"; docker rm -f mp4-image-app mp4-image-db >/dev/null 2>&1 || true; docker network rm mp4-image-check >/dev/null 2>&1 || true' EXIT
+          password="$(openssl rand -hex 32)"
+          limiter="$(openssl rand -hex 32)"
+          printf 'POSTGRES_PASSWORD=%s\nPOSTGRES_DB=mp4_image\nMP4_AUTH_JDBC_URL=jdbc:postgresql://mp4-image-db:5432/mp4_image\nMP4_AUTH_DB_USER=postgres\nMP4_AUTH_DB_PASSWORD=%s\nMP4_AUTH_RATE_LIMIT_SECRET=%s\n' "$password" "$password" "$limiter" > "$config"
+          chmod 600 "$config"
+          docker network create mp4-image-check >/dev/null
+          docker run --detach --name mp4-image-db --network mp4-image-check --env-file "$config" postgres:17 >/dev/null
+          ready=false
+          for attempt in {1..30}; do
+            if docker exec mp4-image-db pg_isready --username postgres --dbname mp4_image >/dev/null 2>&1; then ready=true; break; fi
+            sleep 1
+          done
+          "$ready" || { echo 'Disposable image database did not become ready.' >&2; exit 1; }
+          docker run --detach --name mp4-image-app --network mp4-image-check --env-file "$config" --publish 127.0.0.1:18080:10000 mp4-auth:ci >/dev/null
+          ready=false
+          for attempt in {1..45}; do
+            if curl --silent --fail http://127.0.0.1:18080/api/health >/dev/null; then ready=true; break; fi
+            sleep 1
+          done
+          "$ready" || { echo 'Packaged application did not become healthy.' >&2; exit 1; }
+          curl --silent --show-error --fail http://127.0.0.1:18080/ | grep -q '<div id="root">'
+          actual="$(curl --silent --show-error --fail http://127.0.0.1:18080/assets/revision.txt)"
+          test "$actual" = "$GITHUB_SHA"
+          echo 'Packaged health, frontend and exact build revision passed.'

@@ -46,11 +46,8 @@ record ProvisioningRequest(String username, String displayName, String role, UUI
     }
 
     static String normalizeUsername(String input) {
-        String trimmed = input.trim();
-        if (!trimmed.chars().allMatch(ch -> ch < 128)) throw new InvalidInput();
-        String normalized = trimmed.toLowerCase(java.util.Locale.ROOT);
-        if (normalized.length() < 3 || normalized.length() > 64 || !normalized.matches("[a-z0-9._-]+")) throw new InvalidInput();
-        return normalized;
+        try { return UsernamePolicy.normalize(input); }
+        catch (IllegalArgumentException invalid) { throw new InvalidInput(); }
     }
 
     static void validatePassword(byte[] bytes) throws CharacterCodingException {

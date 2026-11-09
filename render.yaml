@@ -1,0 +1,50 @@
+projects:
+  - name: mp4
+    environments:
+      - name: development
+        permissions:
+          protection: enabled
+        services:
+          - type: web
+            name: mp4-auth-development
+            runtime: docker
+            region: singapore
+            plan: free
+            dockerfilePath: src/backend/platform/deployment/Dockerfile
+            dockerContext: .
+            autoDeployTrigger: 'off'
+            healthCheckPath: /api/health
+            envVars:
+              - key: SERVER_ADDRESS
+                value: 0.0.0.0
+              - key: MP4_AUTH_DB_HOST
+                fromDatabase:
+                  name: mp4-development-db
+                  property: host
+              - key: MP4_AUTH_DB_PORT
+                fromDatabase:
+                  name: mp4-development-db
+                  property: port
+              - key: MP4_AUTH_DB_NAME
+                fromDatabase:
+                  name: mp4-development-db
+                  property: database
+              - key: MP4_AUTH_DB_USER
+                fromDatabase:
+                  name: mp4-development-db
+                  property: user
+              - key: MP4_AUTH_DB_PASSWORD
+                fromDatabase:
+                  name: mp4-development-db
+                  property: password
+              - key: MP4_AUTH_RATE_LIMIT_SECRET
+                generateValue: true
+              - key: MP4_AUTH_PUBLIC_ORIGIN
+                sync: false
+        databases:
+          - name: mp4-development-db
+            region: singapore
+            plan: free
+            databaseName: mp4_dev
+            user: mp4_dev_user
+            ipAllowList: []
