@@ -64,12 +64,12 @@ With JDK 17+, Python 3, OpenSSL, and PostgreSQL server/client tools on PATH,
 run the disposable PostgreSQL and synthetic-session checks:
 
 ```sh
-sh src/backend/developer/test/run-checklist-share-service.sh mp4.developer.JdbcChecklistShareService src/backend/developer/src/JdbcChecklistShareService.java
-sh src/backend/developer/test/run-checklist-share-proposal-guard-regression.sh
-sh src/backend/developer/test/run-checklist-share-closure-race-regression.sh
-sh src/backend/developer/test/run-checklist-share-safe-version-regression.sh
-sh src/backend/developer/test/run-checklist-share-http.sh
-sh src/backend/developer/test/run-checklist-shared-read-http.sh
+bash src/backend/developer/test/run-checklist-share-service.sh mp4.developer.JdbcChecklistShareService src/backend/developer/src/JdbcChecklistShareService.java
+bash src/backend/developer/test/run-checklist-share-proposal-guard-regression.sh
+bash src/backend/developer/test/run-checklist-share-closure-race-regression.sh
+bash src/backend/developer/test/run-checklist-share-safe-version-regression.sh
+bash src/backend/developer/test/run-checklist-share-http.sh
+bash src/backend/developer/test/run-checklist-shared-read-http.sh
 ```
 
 These tests use isolated fixtures. The shared-read adapter requires the host
