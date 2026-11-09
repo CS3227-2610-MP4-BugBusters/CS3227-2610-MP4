@@ -34,6 +34,36 @@ assignment on the server. On a stale draft revision, return HTTP 409
 with `code: "STALE_VERSION"` in the shared
 `{ code, message, requestId }` error response. Leave stored state intact.
 
+## Local Share HTTP contract
+
+The local test adapter uses `POST /api/reports/{reportId}/checklist/share`
+with `{ "expectedDraftRevision": 2, "expectedReportVersion": 7 }`.
+On success it returns HTTP 200 with `{ "reportVersion": 8, "changed": true }`;
+an unchanged Share returns the current version and `changed: false`. The
+request publishes the server-saved draft, not steps supplied by the client.
+Both revisions use nonnegative integers no larger than JavaScript's maximum
+safe integer (`9007199254740991`). A changed Share that cannot increment the
+report version within that range must fail without changing stored data.
+Responses use `Cache-Control: no-store`. Invalid requests return 400,
+unauthorized actors 403, and stale versions, ineligible states and empty
+drafts return 409 with `STALE_VERSION`, `INVALID_STATE` or `EMPTY_DRAFT` in
+the shared `{ code, message, requestId }` shape. A changed Share that reaches
+the maximum safe report version returns 409 `VERSION_LIMIT` without mutation.
+A retry with an old report version can be stale; clients should refresh after
+uncertain outcomes. Real session, CSRF and shared-route integration remain
+separate dependencies.
+
+## Local shared checklist read contract
+
+The local test adapter uses `GET /api/reports/{reportId}/checklist/shared`
+and returns `{ "steps": ["..."] }` with `Cache-Control: no-store`.
+It returns only the persisted shared copy, never draft steps or draft
+revision. An active Reporter may read their own report; an active assigned
+Developer may read the shared copy; an active Maintainer requires an
+explicit trusted report-view permission check. A synthetic permission used
+in local tests is not the production authorization policy. Missing or
+inaccessible reports return 403 without exposing their existence.
+
 ## Transaction boundary
 
 Save, Share, reassignment, and closure lock the same report row before reading or changing its checklist or resolution proposal. Recheck the actor's access, current assignment, report state, and expected versions inside that transaction. A changed Share during Resolution proposed publishes the steps, increments the report version, retains the proposal as superseded, and returns the report to In progress in one commit. A private Save or unchanged Share leaves the proposal and report version intact.

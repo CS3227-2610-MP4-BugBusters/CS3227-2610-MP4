@@ -14,7 +14,15 @@
 
 - [ ] 2.4 (CL-05, MT-11) Enforce lifecycle guards and separate draft revisions from the report version. Verify allowed and denied states, private Save and unchanged Share during review, and changed Share racing with closure in both commit orders using real API and database tests. Check that the persisted checklist, proposal status, and report version match the winning operation.
 
-Local progress: The [checklist migration and private Save](../../../src/backend/developer/README.md) passed PostgreSQL integration checks with a minimal report fixture. The approved current-revision HTTP test also passed in the local harness. Independent verification and the security repair are recorded in the [cycle evidence](../../../logs/developer/2026-11-07-checklist-save-http-cycle-1.md). The stale-revision and former-assignee Save HTTP regression tests also passed in the local synthetic harness. Shared routing and authentication, integrated authorization tests, Share, and the closure race remain open.
+Local progress: The [checklist migration and private Save](../../../src/backend/developer/README.md) passed PostgreSQL integration checks with a minimal report fixture. The approved current-revision HTTP test also passed in the local harness. Independent verification and the security repair are recorded in the [cycle evidence](../../../logs/developer/2026-11-07-checklist-save-http-cycle-1.md). The stale-revision and former-assignee Save HTTP regression tests also passed in the local synthetic harness. Shared routing and authentication, integrated authorization tests, integrated Share, and the closure race remain open.
+
+Further local progress: Share and shared-only read adapters have passed
+synthetic-session tests with disposable PostgreSQL, including private-save
+isolation, empty/stale rejection and review-state publication. The local
+Maintainer grant is a test callback, not a production permission decision.
+Both Share-versus-closure lock orders also passed against a synthetic SQL
+closure transaction. Real shared authentication, report details and closure integration remain
+open, so the acceptance tasks above remain unchecked.
 
 ## 3. Report detail screens
 
