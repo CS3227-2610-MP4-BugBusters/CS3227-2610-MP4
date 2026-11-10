@@ -1,5 +1,28 @@
 # Maintainer SoC integration reference
 
+## MP4 gateway port
+
+The feature owner explicitly requested porting MP3's gateway and adapting it to
+MP4's Reporter, Developer and Maintainer roles on 2026-11-10. The
+[MP4 module](../../src/backend/socllm/README.md) replaces the inactive reference
+import with MP4 packages, role configuration and durable admission. The existing
+Maintainer `SummaryGateway` and `BudgetAndAdmission` ports connect queue summaries
+to the shared module; no new Reporter or Developer feature endpoint is introduced.
+
+Provider activation remains opt-in and requires trusted server configuration.
+Role services retain their authorization, safe context and output validation.
+Application token reservations are not confirmation of SoC total-token quota
+accounting. Confirm the actual model, provider quotas and host connectivity before
+enabling a deployed environment. See [port evidence](../../logs/socllm-port/approval.md)
+for the owner approval and [Red review](../../logs/socllm-port/baseline-review.md)
+for the preserved test baseline.
+
+## Earlier reference investigation
+
+The following records the earlier documentation-only investigation. Its statement
+about copying no code describes that investigation, before the owner requested
+the port above.
+
 Checked MP4's current contracts first, then MP3's current documentation and
 configuration for missing deployment/provider conventions. Read no MP3 application
 implementation and copied no application code, migrations or tests into MP4.

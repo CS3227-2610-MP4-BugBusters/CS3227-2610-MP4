@@ -42,8 +42,12 @@ class VerifyRunnerTests(unittest.TestCase):
         for expected in (
             "src/frontend/developer",
             "src/frontend/maintainer",
+            "src/frontend/shared/markdown",
             "npm run verify",
             "src/backend/auth/test/run_setup.py",
+            "src/backend/reporter/test/run-reporter-db.sh",
+            "src/backend/reporter/test/report_timestamps_migration_test.py",
+            "src/backend/reporter/test/run-reporter-api.sh",
             "workflow/security/check.py",
             "src/backend/platform/deployment/test",
             "workflow/test",
@@ -70,6 +74,30 @@ class VerifyRunnerTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 main(["--group", "tooling", "--frontend", "developer"])
         run.assert_not_called()
+
+    def test_reporter_group_runs_every_reporter_test_file(self):
+        main = self._main()
+        with patch("workflow.verify.subprocess.run") as run:
+            run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
+            result = main(["--group", "reporter"])
+
+        self.assertIn(result, (None, 0))
+        commands = "\n".join(_command_text(call) for call in run.call_args_list)
+        for name in (
+            "report_timestamps_migration_test.py",
+            "create_report_api_test.py",
+            "create_report_validation_test.py",
+            "create_report_rate_limit_test.py",
+            "list_own_reports_api_test.py",
+            "read_own_report_api_test.py",
+            "reporter_access_api_test.py",
+            "edit_report_api_test.py",
+            "reporter_status_api_test.py",
+        ):
+            with self.subTest(test_file=name):
+                self.assertIn(name, commands)
+        self.assertEqual(run.call_count, 3, "migration test plus two API groups")
+        self.assertNotIn("frontend", commands)
 
     def test_failed_child_propagates_failure_and_stops_the_runner(self):
         main = self._main()

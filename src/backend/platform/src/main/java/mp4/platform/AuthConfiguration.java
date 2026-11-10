@@ -51,6 +51,8 @@ public class AuthConfiguration {
     @Bean InitializingBean authMigrations(DataSource ds) { return () -> {
         Flyway.configure().dataSource(ds).defaultSchema("public").locations("classpath:db/auth").table("mp4_auth_schema_history").baselineOnMigrate(true).baselineVersion("99").load().migrate();
         mp4.maintainer.storage.SharedSchemaBootstrap.initialize(ds);
+        Flyway.configure().dataSource(ds).schemas("mp4_socllm").defaultSchema("mp4_socllm").locations("classpath:db/socllm")
+                .table("mp4_socllm_schema_history").load().migrate();
     }; }
     @Bean CookieSerializer sessionCookieSerializer(@Value("${mp4.auth.local:false}") boolean local,
             @Value("${server.address:127.0.0.1}") String bind) {
@@ -104,6 +106,7 @@ public class AuthConfiguration {
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/reports/*/checklist/share").hasRole("DEVELOPER")
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reports/*/checklist/shared").hasAnyRole("REPORTER", "DEVELOPER", "MAINTAINER")
                 .requestMatchers("/api/developer/**").hasRole("DEVELOPER")
+                .requestMatchers("/api/reporter/**").hasRole("REPORTER")
                 .requestMatchers("/api/maintainer/**").hasRole("MAINTAINER").anyRequest().denyAll())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .formLogin(f -> f.disable()).httpBasic(b -> b.disable()).logout(l -> l.disable())

@@ -1,0 +1,89 @@
+{
+  "starting_revision": "6bdba80519ed30996cf401f6b28dc60fb31f3e75",
+  "files": [
+    {
+      "path": "src/backend/auth/build.gradle",
+      "sha256": "32d60afa01a024e208d55d5ec4a3c3101666f55e69886333c6da9edac77e5257"
+    },
+    {
+      "path": "src/backend/auth/src/test/java/mp4/platform/MaintainerSocLlmConfigurationTest.java",
+      "sha256": "26ad66935cce0b18aa6423b8e1f96e18e0a076afdc0c791c5dbd5dbacb71ec70"
+    },
+    {
+      "path": "src/backend/auth/src/test/java/mp4/platform/SocLlmRoleConfigurationTest.java",
+      "sha256": "7d771408e4a46d1cef50c0a6c2697d775e91a69d3528740737b9eeec1cd321f7"
+    },
+    {
+      "path": "src/backend/auth/src/test/java/mp4/socllm/PostgresSocLlmAdmissionTest.java",
+      "sha256": "2229260b337f0b298bcd4cd6afc420d4e265da6c8ca3b9a84a63fb0f3ff15145"
+    },
+    {
+      "path": "src/backend/auth/src/test/java/mp4/socllm/SocLlmHttpProviderTest.java",
+      "sha256": "b9a4e250896e78eb6fd6fd44727e2d7d81e2c25e381b400e3d834acf9c1e59ea"
+    },
+    {
+      "path": "src/backend/auth/src/test/java/mp4/socllm/SocLlmRoleServiceTest.java",
+      "sha256": "89a325929c68417e8bbb72a6aa55fda32e9da10484a25efa753636ee2d474ec3"
+    },
+    {
+      "path": "src/backend/maintainer/README.md",
+      "sha256": "a50a1a1057e5a55923a67e842d74985917dd5cafc4ce95273c48ddf664b48b09"
+    },
+    {
+      "path": "src/backend/platform/src/main/java/mp4/platform/AuthConfiguration.java",
+      "sha256": "f2226b42db07e4f4514d84259760ecd05d1d278e60806d9ac8c3a78578f17019"
+    },
+    {
+      "path": "src/backend/platform/src/main/java/mp4/platform/MaintainerSummaryConfiguration.java",
+      "sha256": "d0b77edf953d81de1fae892ef78a612d50a91ef12838e2fbd9d64621a8738bb8"
+    },
+    {
+      "path": "src/backend/platform/src/main/java/mp4/platform/SocLlmConfiguration.java",
+      "sha256": "ea54a9177b2a7e41f49b3fb1511b13ad4badbf92b6483cd5607341727bc61f2a"
+    },
+    {
+      "path": "src/backend/platform/src/main/java/mp4/platform/SocLlmRoleConfiguration.java",
+      "sha256": "d5a820f6b302fb4ae1bc41a2bf337bc403d9b1265685eef3f14c17cac90108d1"
+    },
+    {
+      "path": "src/backend/socllm/README.md",
+      "sha256": "5c49ab03119a3ccedbaf52432d94a17d8aaa0d22b8217d5ce958d0d3976e792e"
+    },
+    {
+      "path": "src/backend/socllm/import-manifest.json",
+      "sha256": "b836b8fb9ab2a403ea181775b24deba14e48e6f7fa11dce97dedef35718bbe97"
+    },
+    {
+      "path": "src/backend/socllm/src/main/java/mp4/socllm/MaintainerAdmissionAdapter.java",
+      "sha256": "dae09dc7d0df55326f509c7ad65d6b6219b5e3b9b5e28730f4de8bf0f9d67a14"
+    },
+    {
+      "path": "src/backend/socllm/src/main/java/mp4/socllm/PostgresSocLlmAdmission.java",
+      "sha256": "fcdf0c0ca18c36dd7f4321af28ed0a93a9a67940db62a18da8bd07669fd72baa"
+    },
+    {
+      "path": "src/backend/socllm/src/main/java/mp4/socllm/SocLlmContracts.java",
+      "sha256": "7a2fc119c8e35c91db04128d0b7f9c3076535b34783cefc1ec97b886ff93dbcc"
+    },
+    {
+      "path": "src/backend/socllm/src/main/java/mp4/socllm/SocLlmHttpProvider.java",
+      "sha256": "66df282068052e1dc4f07a45aa06e36f7bfe8a6ecfc2f022ddf517e2709cc815"
+    },
+    {
+      "path": "src/backend/socllm/src/main/java/mp4/socllm/SocLlmRoleService.java",
+      "sha256": "e456e143e411d6327f318c8087ffa43c5cd4bd1f7a81f5b01e7a1be46fd6b198"
+    },
+    {
+      "path": "src/backend/socllm/src/main/java/mp4/socllm/SocLlmTransactionBoundary.java",
+      "sha256": "b589a107e5ba1c01a0ecf70eb23c82fa32f55e162fa1773705d7ca0a734b2463"
+    },
+    {
+      "path": "src/backend/socllm/src/main/resources/db/socllm/V1__create_socllm_admission.sql",
+      "sha256": "2057fb4fd485f0be3d2bf4829b5a02ee942aeb78bfe38a30f40727b6c19199c6"
+    },
+    {
+      "path": "workflow/maintainer/soc-integration-reference.md",
+      "sha256": "3a445217cd6c4dbe1729b71e159beb50eab55d937efa4283e24b56d1afa08137"
+    }
+  ]
+}

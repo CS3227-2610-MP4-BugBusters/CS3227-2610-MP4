@@ -24,6 +24,7 @@ dependencies {
     implementation 'org.springframework.session:spring-session-jdbc'
     implementation 'org.postgresql:postgresql'
     implementation 'org.flywaydb:flyway-core'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.20.1'
     runtimeOnly 'org.flywaydb:flyway-database-postgresql'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -32,11 +33,14 @@ dependencies {
 sourceSets.main.java {
     srcDir '../platform/src/main/java'
     srcDir '../developer/src'
+    srcDir '../reporter/src'
     srcDir '../maintainer/src/main/java'
+    srcDir '../socllm/src/main/java'
     include 'mp4/**', 'AssignedReportStore.java', 'AssignedReportListHttpHandler.java', 'ChecklistDraftStore.java',
             'ChecklistShareService.java', 'JdbcChecklistShareService.java',
             'ChecklistShareHttpHandler.java', 'ChecklistSharedHttpHandler.java',
-            'ChecklistDraftHttpHandler.java'
+            'ChecklistDraftHttpHandler.java', 'ReporterJson.java', 'ReporterReportStore.java',
+            'ReporterReportsHttpHandler.java', 'socllm/**'
 }
 
 tasks.named('processResources') {
@@ -50,6 +54,9 @@ tasks.named('processResources') {
     }
     from('../maintainer/src/main/resources/db/shared') {
         into 'db/shared'
+    }
+    from('../socllm/src/main/resources/db/socllm') {
+        into 'db/socllm'
     }
 }
 

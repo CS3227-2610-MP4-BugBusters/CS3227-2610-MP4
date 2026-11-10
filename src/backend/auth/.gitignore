@@ -1,3 +1,4 @@
 /.gradle/
 /build/
 /test/__pycache__/
+/bin/
