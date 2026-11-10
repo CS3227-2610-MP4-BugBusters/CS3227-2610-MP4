@@ -3,7 +3,7 @@
 # Wraps run-reporter-db.sh; builds src/*.java + harness, starts it with a
 # synthetic session, runs Python tests, always stops the harness.
 # Actors: R1, R2 active REPORTER; R3 inactive REPORTER; D1 DEVELOPER; M1 MAINTAINER,
-# plus a pool of 60 fresh active Reporters (MP4_TEST_POOL) so tests that create
+# plus a pool of 120 fresh active Reporters (MP4_TEST_POOL) so tests that create
 # reports never hit the 3-per-minute limit (RPT-08 is task 2.6).
 set -eu
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)

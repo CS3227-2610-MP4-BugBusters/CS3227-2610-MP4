@@ -1,5 +1,5 @@
 import type { Root } from "hast";
-import { exceedsRenderLimits } from "./MarkdownView.limits";
+import { exceedsRenderLimits, MAX_IN_THREAD_SOURCE } from "./MarkdownView.limits";
 import { isHastRoot, toHast } from "./MarkdownView.pipeline";
 
 // Off-main-thread parsing with a per-request time limit (MDR-10, design D11).
@@ -34,6 +34,11 @@ export interface WorkerRunnerOptions {
 }
 
 type Pending = ParseRequest & {
+  /**
+   * "waiting" while queued; "sent" once `pump` takes it; "cancelled" when its
+   * signal aborts while it waits, so `pump` skips it (design D16).
+   */
+  state: "waiting" | "sent" | "cancelled";
   resolve: (outcome: ParseOutcome) => void;
   /** Stops listening for the caller's abort signal. */
   release: () => void;
@@ -46,7 +51,7 @@ const FALLBACK: ParseOutcome = { kind: "fallback" };
  * A timeout or worker error terminates the worker and falls back for that
  * request only; requests still waiting were never sent, so they stay queued
  * and go to a fresh worker (design D13). An aborted request that has not been
- * sent is removed from the queue and never posted.
+ * sent is marked cancelled in O(1) and never posted; `pump` skips it (D16).
  */
 export function createWorkerRunner({
   createWorker,
@@ -57,6 +62,7 @@ export function createWorkerRunner({
   let inFlight: Pending | null = null;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let nextId = 1;
+  let pumping = false;
 
   function settle(outcome: ParseOutcome) {
     const current = inFlight;
@@ -107,24 +113,41 @@ export function createWorkerRunner({
     return created;
   }
 
+  /**
+   * Send the next waiting request. A loop, not recursion (design D14), so a
+   * long queue that fails to send one request after another cannot overflow
+   * the stack. Not re-entrant (design D15): a reply or error delivered
+   * synchronously during `postMessage` calls `pump` again, which returns at
+   * once; the running loop then sends the next request, so runs never nest
+   * and requests go out in order.
+   */
   function pump() {
-    if (inFlight !== null) return;
-    const next = queue.shift();
-    if (next === undefined) return;
-    next.release();
-    inFlight = next;
+    if (pumping) return;
+    pumping = true;
     try {
-      worker ??= startWorker();
-      const request: ParseRequest = { id: next.id, source: next.source, prefix: next.prefix };
-      timer = setTimeout(() => {
-        abandonWorker();
-        pump();
-      }, timeoutMs);
-      worker.postMessage(request);
-    } catch {
-      // No worker could be created or the request could not be sent.
-      abandonWorker();
-      pump();
+      while (inFlight === null) {
+        const next = queue.shift();
+        if (next === undefined) return;
+        if (next.state === "cancelled") continue;
+        next.state = "sent";
+        next.release();
+        inFlight = next;
+        try {
+          worker ??= startWorker();
+          const request: ParseRequest = { id: next.id, source: next.source, prefix: next.prefix };
+          timer = setTimeout(() => {
+            abandonWorker();
+            pump();
+          }, timeoutMs);
+          worker.postMessage(request);
+        } catch {
+          // No worker could be created or the request could not be sent. This
+          // request falls back and the loop moves on to the next one.
+          abandonWorker();
+        }
+      }
+    } finally {
+      pumping = false;
     }
   }
 
@@ -139,14 +162,14 @@ export function createWorkerRunner({
           id: nextId++,
           source,
           prefix,
+          state: "waiting",
           resolve,
           release: () => signal?.removeEventListener("abort", onAbort),
         };
         function onAbort() {
           // Only a request still waiting is dropped; one in flight runs to the end.
-          const index = queue.indexOf(pending);
-          if (index === -1) return;
-          queue.splice(index, 1);
+          if (pending.state !== "waiting") return;
+          pending.state = "cancelled";
           pending.release();
           resolve(FALLBACK);
         }
@@ -159,12 +182,15 @@ export function createWorkerRunner({
 }
 
 /**
- * Parses on the calling thread, behind the MDR-05 pre-check. MarkdownView
- * recognises this runner and renders synchronously instead of calling it.
+ * Parses on the calling thread, behind the MDR-05 pre-check and the in-thread
+ * input cap (design D15). MarkdownView recognises this runner and renders
+ * synchronously instead of calling it.
  */
 export const inThreadRunner: MarkdownRunner = {
   parse(source, prefix) {
-    if (exceedsRenderLimits(source)) return Promise.resolve(FALLBACK);
+    if (source.length > MAX_IN_THREAD_SOURCE || exceedsRenderLimits(source)) {
+      return Promise.resolve(FALLBACK);
+    }
     try {
       return Promise.resolve({ kind: "ok", hast: toHast(source, prefix) });
     } catch {

@@ -70,6 +70,18 @@ The link text compared with the destination under MDR-04 SHALL be the text as di
 - **WHEN** source contains `[docs](https://example.com/a?q=1)` and `[b](https://bücher.example/)`
 - **THEN** the text reads `docs (https://example.com/a?q=1)` and `b (https://bücher.example/)`
 
+### Requirement: MDR-15 Shown destinations are isolated, complete and cheap
+
+A shown ` (<destination>)` SHALL be inside a `bdi dir="ltr"` element. The MDR-14 `<U+XXXX>` rule SHALL also cover controls, lone surrogates, combining marks, default-ignorables, Hangul fillers and U+2800, including in autolink text. Space and non-ASCII brackets SHALL be percent-encoded. Showing destinations SHALL take linear time.
+
+#### Scenario: Repeated references to a costly destination
+- **WHEN** source is `"[r]: <" + "%E2%80".repeat(800) + ">\n\n" + "[r] ".repeat(3000)`
+- **THEN** the view finishes in under 1 second on both paths
+
+#### Scenario: Reordering and look-alikes are neutralised
+- **WHEN** source contains `https://evil.example/‮fdp.exe`, `[‮](moc.knab//:sptth)`, `[x](https://e.x/aㅤb)` and `[x](<https://evil.example/⟯ ⟮https://bank.example>)`
+- **THEN** each shown destination is inside a `bdi dir="ltr"` element, the hidden characters appear as `<U+202E>` and `<U+3164>`, and the brackets and space appear percent-encoded
+
 ### Requirement: MDR-08 GitHub-style footnotes without links
 
 The renderer SHALL show GFM footnotes as numbered superscript references and a footnotes section listing the definitions in reference order, without link elements or back-references. As on GitHub, the section's heading SHALL carry only the class `sr-only`, so that it is announced by screen readers but visually hidden where the page styles that class. Any element ID the renderer generates SHALL start with `user-content-` and SHALL be unique to its view instance.
@@ -159,7 +171,33 @@ Where the browser provides Web Workers, Markdown SHALL be parsed in a worker, ne
 - **GIVEN** no Web Worker is available
 - **WHEN** source is `"- -\n"` repeated 5,000 times, `">"` repeated 32 times plus `"a\n\n"` repeated 571 times, or `"- "` repeated 16 times plus `"a\n"` repeated 588 times
 - **THEN** each finishes in under 1 second as the complete source in escaped plain text, without building formatted output
-- **AND** ordinary reports render with the same DOM as the worker path
+- **AND** ordinary reports of at most 4,000 characters render with the same DOM as the worker path
+
+#### Scenario: The in-thread path is bounded by input size
+- **GIVEN** no Web Worker is available
+- **WHEN** source longer than 4,000 characters is displayed, such as `"- a
+"` plus `"b
+"` repeated 9,990 times, `"a <?"` repeated 5,000 times, or `"a<!--"` repeated 4,000 times
+- **THEN** it finishes in under 1 second as the complete source in escaped plain text, without parsing it
+- **AND** a 4,000-character source built from any of those patterns renders in under 1 second
+
+#### Scenario: Hostile worker result shapes stay cheap
+- **GIVEN** a worker result whose `children` is a sparse array or a Proxy that reports a huge length, or whose class is `language-` followed by whitespace and another class
+- **WHEN** the main thread checks it
+- **THEN** it finishes in under 100 ms, shows the source as escaped plain text or drops the class, and never reads more entries than the node budget
+
+#### Scenario: Rendered text is bounded
+- **GIVEN** a source within the limits whose link references repeat a long destination, such as `"[x]: <" + "a".repeat(10000) + ">
+
+" + "[x] ".repeat(2498)` or the same with a destination of 2,000 U+200B characters or 6,000 `(` characters
+- **WHEN** it is displayed with or without a Web Worker
+- **THEN** if the formatted output would hold more than 100,000 text characters, the view shows the complete source as escaped plain text instead
+- **AND** the worker refuses such a result before replying, and the main thread checks the total again while sanitising
+
+#### Scenario: Autolink literal runs stay fast in-thread
+- **GIVEN** no Web Worker is available
+- **WHEN** source is `"www._"` repeated 800 times
+- **THEN** it finishes in under 250 ms, as plain text or formatted
 
 ### Requirement: MDR-06 Write and Preview editing
 

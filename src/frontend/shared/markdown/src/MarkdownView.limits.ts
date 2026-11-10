@@ -7,6 +7,12 @@
 
 /** Longest source that is formatted at all. */
 export const MAX_SOURCE_LENGTH = 20_000;
+/**
+ * Longest source parsed without a Worker (design D15). Nothing can stop a
+ * synchronous parse, so the in-thread path is bounded by input size; the
+ * Worker path keeps MAX_SOURCE_LENGTH.
+ */
+export const MAX_IN_THREAD_SOURCE = 4_000;
 /** Estimated blockquote, list and footnote container depth on one line. */
 export const MAX_NESTING_DEPTH = 32;
 /**
@@ -20,6 +26,16 @@ export const MAX_TABLE_CELLS = 10_000;
  * Many tables just under the per-table cap still build a huge output tree.
  */
 export const MAX_TOTAL_TABLE_CELLS = 10_000;
+/**
+ * List-item and blockquote container markers summed over every line (design
+ * D14). Parse time grows faster than linearly with containers: `"- -
+"`
+ * repeated takes about 0.15 s at 3,000 containers and 1.8 s at 9,408 in Node,
+ * and more in jsdom. 2,000 keeps the worst known shape well under the 1 s
+ * budget, and its output under MAX_HAST_NODES, while ordinary reports (a few
+ * hundred bullets and quotes) stay far below it.
+ */
+export const MAX_TOTAL_CONTAINERS = 2_000;
 /** Longest run of one emphasis delimiter character (`*`, `_` or `~`). */
 export const MAX_DELIMITER_RUN = 63;
 /** Total `*`, `_` and `~` characters in the source (10% of the length cap). */
@@ -28,6 +44,18 @@ export const MAX_DELIMITERS = 2_000;
 export const MAX_SETEXT_UNDERLINES = 500;
 /** Lines that may be lazy continuations of a blockquote paragraph. */
 export const MAX_LAZY_LINES = 500;
+/**
+ * `www.` occurrences, in any letter case (design D16). The GFM autolink
+ * literal scan is quadratic in them: `"www._"` x800 took 630 ms in-thread.
+ */
+export const MAX_WWW_LITERALS = 200;
+/**
+ * Most characters of displayed text a formatted result may hold (design D16),
+ * five times MAX_SOURCE_LENGTH. Link references repeat their destination, so
+ * a short source can expand into millions of characters. Checked on the parser
+ * output, by the worker and again on the main thread, not by the pre-check.
+ */
+export const MAX_TEXT_CHARS = 100_000;
 
 const SPACE = 0x20;
 const TAB = 0x09;
@@ -45,6 +73,8 @@ const UNDERSCORE = 0x5f;
 const TILDE = 0x7e;
 const LF = 0x0a;
 const CR = 0x0d;
+const LOWER_W = 0x77;
+const ASCII_CASE = 0x20;
 
 function isBlank(code: number): boolean {
   return code === SPACE || code === TAB;
@@ -70,7 +100,7 @@ function listMarkerEnd(source: string, i: number, end: number): number {
   return j === end || isBlank(source.charCodeAt(j)) ? j : -1;
 }
 
-type LineDepth = { depth: number; quoted: boolean };
+type LineDepth = { depth: number; quoted: boolean; containers: number };
 
 /**
  * Over-estimate the container depth a line opens. The line prefix counts one
@@ -79,10 +109,12 @@ type LineDepth = { depth: number; quoted: boolean };
  * footnote definition (`[^label]:`) can open further containers after it:
  * every `]:`, every `>` and every list marker followed by a blank that sits
  * where a container could start (line start, after a blank, `>` or `:`) adds
- * one level. `quoted` reports whether any such `>` was seen.
+ * one level. `quoted` reports whether any such `>` was seen. `containers`
+ * counts the `>` and list markers only (design D14).
  */
 function lineDepth(source: string, start: number, end: number): LineDepth {
   let depth = 0;
+  let containers = 0;
   let indent = 0;
   let quoted = false;
   let separator = false;
@@ -99,6 +131,7 @@ function lineDepth(source: string, start: number, end: number): LineDepth {
     separator = false;
     if (code === GT) {
       depth++;
+      containers++;
       quoted = true;
       separator = true;
       i++;
@@ -107,6 +140,7 @@ function lineDepth(source: string, start: number, end: number): LineDepth {
     const markerEnd = listMarkerEnd(source, i, end);
     if (markerEnd === -1) break;
     depth++;
+    containers++;
     separator = true;
     i = markerEnd;
   }
@@ -123,6 +157,7 @@ function lineDepth(source: string, start: number, end: number): LineDepth {
     const boundary = isBlank(prev) || prev === GT || prev === COLON;
     if (boundary && code === GT) {
       depth++;
+      containers++;
       quoted = true;
       i++;
       continue;
@@ -131,13 +166,14 @@ function lineDepth(source: string, start: number, end: number): LineDepth {
       const markerEnd = listMarkerEnd(source, i, end);
       if (markerEnd !== -1) {
         depth++;
+        containers++;
         i = markerEnd;
         continue;
       }
     }
     i++;
   }
-  return { depth: depth + Math.floor(indent / 2), quoted };
+  return { depth: depth + Math.floor(indent / 2), quoted, containers };
 }
 
 function skipBlanks(source: string, start: number, end: number): number {
@@ -219,9 +255,27 @@ function exceedsDelimiterLimits(source: string): boolean {
   return false;
 }
 
+/** Whether `www.` occurs, in any letter case, more than MAX_WWW_LITERALS times. */
+function exceedsWwwLimit(source: string): boolean {
+  let count = 0;
+  // Consecutive `w`/`W` characters just before index i.
+  let run = 0;
+  for (let i = 0; i < source.length; i++) {
+    const code = source.charCodeAt(i);
+    if ((code | ASCII_CASE) === LOWER_W) {
+      run++;
+      continue;
+    }
+    if (code === DOT && run >= 3 && ++count > MAX_WWW_LITERALS) return true;
+    run = 0;
+  }
+  return false;
+}
+
 export function exceedsRenderLimits(source: string): boolean {
   if (source.length > MAX_SOURCE_LENGTH) return true;
   if (exceedsDelimiterLimits(source)) return true;
+  if (exceedsWwwLimit(source)) return true;
 
   let previousBlank = true;
   // Table estimate: columns of the latest delimiter row and lines since it.
@@ -233,6 +287,7 @@ export function exceedsRenderLimits(source: string): boolean {
   let inQuote = false;
   let lazyLines = 0;
   let setextLines = 0;
+  let totalContainers = 0;
 
   let start = 0;
   while (start <= source.length) {
@@ -256,8 +311,10 @@ export function exceedsRenderLimits(source: string): boolean {
       continue;
     }
 
-    const { depth, quoted } = lineDepth(source, start, end);
+    const { depth, quoted, containers } = lineDepth(source, start, end);
     if (depth > MAX_NESTING_DEPTH) return true;
+    totalContainers += containers;
+    if (totalContainers > MAX_TOTAL_CONTAINERS) return true;
 
     const columns = delimiterColumns(source, start, end);
     if (columns > 0) {

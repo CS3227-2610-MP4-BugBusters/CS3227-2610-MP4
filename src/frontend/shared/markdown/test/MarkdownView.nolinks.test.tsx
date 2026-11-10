@@ -71,7 +71,7 @@ describe("MDR-04 hostile destinations are inert text, destination shown", () => 
   ])("destination %s", (dest) => {
     const c = view(`[t](${dest})`);
     expectNoLinks(c);
-    expect(c.textContent).toContain(`t (${dest})`);
+    expect(c.textContent).toContain(`t (${dest.replace(/\(/g, "%28").replace(/\)/g, "%29")})`);
   });
 
   const payloads: Array<[string, string]> = [
@@ -112,7 +112,7 @@ describe("MDR-04 worker path renders no links", () => {
   it.each([
     ["inline", "[docs](https://example.com/a)", "docs (https://example.com/a)"],
     ["autolink", "<https://example.com/x>", "https://example.com/x"],
-    ["dangerous", "[t](javascript:alert(1))", "t (javascript:alert(1))"],
+    ["dangerous", "[t](javascript:alert(1))", "t (javascript:alert%281%29)"],
     ["footnote", "Note[^1].\n\n[^1]: Def.\n", "Def."],
   ])("%s", async (_n, src, expected) => {
     const { container } = render(

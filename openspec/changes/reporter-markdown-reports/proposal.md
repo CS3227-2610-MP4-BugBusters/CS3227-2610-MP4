@@ -14,7 +14,10 @@ triaging and investigating the bug.
 
 - **RPT-01..07** Reporter backend: create a report, list own reports, and read one
   own report, with server-side ownership checks, validation, the shared error
-  envelope and no client-supplied identity. Edits are out of scope.
+  envelope and no client-supplied identity.
+- **RPT-09..10** (owner decision 10 Nov): a Reporter can edit the title and
+  description of, or permanently delete, their own report while it is unassigned
+  and `SUBMITTED`, with an optimistic `version` check. Once assigned it is locked.
 - A report has **only two Reporter-authored fields: a plain-text `title` and a
   Markdown `description`**. Reproduction steps, expected and actual behavior, and
   environment are not report fields. They are things the future improve-report
@@ -23,6 +26,8 @@ triaging and investigating the bug.
   minute**. Further creates get 429 with `Retry-After`.
 - An additive Reporter-owned migration adds `created_at` and `updated_at`, needed
   for newest-first listing and the rate-limit window. SR-01 has no timestamps.
+- A Reporter-owned migration adds an append-only creation log, so deleting a
+  report cannot reset the rate-limit window.
 - Store `description` as **Markdown source exactly as typed**. The server never
   renders, converts or stores HTML.
 - **MDR-01..05** A shared safe Markdown capability: a GitHub-flavoured subset
@@ -40,7 +45,8 @@ triaging and investigating the bug.
 
 ### Out of Scope
 
-Report editing and its lifecycle interaction (SEC-09), checklist responses,
+Editing or deleting a report after it is assigned, and that lifecycle
+interaction (SEC-09), soft delete or undo, checklist responses,
 discussion, the improve-report AI feature (including its suggestions for
 reproduction steps, expected and actual behavior, and environment), Reporter
 frontend screens beyond the shared editor component, syntax highlighting,

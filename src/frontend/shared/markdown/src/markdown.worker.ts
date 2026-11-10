@@ -1,12 +1,13 @@
-import { exceedsRenderLimits } from "./MarkdownView.limits";
-import { countHastNodes, MAX_HAST_NODES, toHast } from "./MarkdownView.pipeline";
+import { exceedsRenderLimits, MAX_TEXT_CHARS } from "./MarkdownView.limits";
+import { exceedsHastBudget, MAX_HAST_NODES, toHast } from "./MarkdownView.pipeline";
 import type { ParseReply } from "./markdownRunner";
 
 // Markdown parse worker (MDR-10, design D11). Created by the runner with
 // `new Worker(new URL("./markdown.worker.ts", import.meta.url), { type: "module" })`.
 // Receives `{ id, source, prefix }` and replies `{ id, ok: true, hast }`, or
-// `{ id, ok: false }` when the source is over the MDR-05 limits, parsing fails
-// or the output has more than MAX_HAST_NODES nodes (design D13).
+// `{ id, ok: false }` when the source is over the MDR-05 limits, parsing fails,
+// or the output has more than MAX_HAST_NODES nodes (design D13) or more than
+// MAX_TEXT_CHARS characters of text (design D16).
 
 type WorkerScope = {
   onmessage: ((ev: { data: unknown }) => void) | null;
@@ -25,7 +26,7 @@ export function handleParseRequest(data: unknown): ParseReply | null {
       return { id, ok: false };
     }
     const hast = toHast(source, prefix);
-    if (countHastNodes(hast, MAX_HAST_NODES) > MAX_HAST_NODES) return { id, ok: false };
+    if (exceedsHastBudget(hast, MAX_HAST_NODES, MAX_TEXT_CHARS)) return { id, ok: false };
     return { id, ok: true, hast };
   } catch {
     return { id, ok: false };

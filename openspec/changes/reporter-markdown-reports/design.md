@@ -190,6 +190,46 @@ The 3.12 review found that the in-thread path, used when no Worker exists
 - **Runner.** `pump` is a loop, not recursion.
 - Task 3.14.
 
+### D15 Bound the in-thread path by input size (3.14 security review, 10 Nov)
+The 3.14 review again found slow inputs that the pre-check does not list
+(lazy lines, `<?`, `<!--`, CDATA, `]` runs). Without a Worker nothing can stop
+a synchronous parse, so blocklist counters do not converge. Owner decision
+(10 Nov, "loop until it passes the security review") lets this task pick the
+fix.
+- **Input cap.** Without a Worker, a source longer than
+  `MAX_IN_THREAD_SOURCE` (4,000 characters) shows as escaped plain text and is
+  never parsed. The known slow constructs grow at most quadratically, so 4,000
+  characters bounds them to a fraction of the 20,000-character cost. Browsers
+  keep the Worker path and the 20,000-character limit.
+- **Sanitiser.** `cleanTree` checks that `children` is a real dense array
+  (`Array.isArray`, not a Proxy, length within the remaining node budget) and
+  stops after the node budget is spent, whatever `length` claims.
+- **Classes.** `language-` must be followed by one or more characters that are
+  not ASCII whitespace.
+- **Runner.** `pump` ignores re-entrant calls while it is running.
+- Server rendering of untrusted reports is not a supported use; the apps
+  render in browsers.
+- Tasks 3.16 to 3.18.
+
+### D16 Bound the rendered text (3.16 security review, 10 Nov)
+The 3.16 review found that `MAX_HAST_NODES` counts nodes, not characters.
+Each reference to a link definition repeats its destination, and `(` and
+hidden characters expand when shown, so a 20,000-character source can produce
+25M to 63M characters of DOM text and block a real browser for 1.6 to 2.9 s.
+- **Text budget.** `MAX_TEXT_CHARS` = 100,000 (five times
+  `MAX_SOURCE_LENGTH`). The worker sums text `value` lengths while counting
+  nodes and refuses results over the budget. `cleanTree` sums them again as it
+  reads entries. Above the budget the view shows the source as plain text.
+  This is checked on both paths.
+- **Autolink literals.** The pre-check refuses sources with more than 200
+  `www.` occurrences, so the quadratic GFM autolink scan stays small
+  in-thread (`"www._"` ×800 took 630 ms).
+- **Abort cost.** Cancelling a queued request no longer does an `indexOf` and
+  `splice` on the queue. The request is marked cancelled and `pump` skips it.
+- Head-of-line delay from several hostile reports in one queue is accepted:
+  later views stay plain text until their turn, and nothing freezes.
+- Task 3.17.
+
 ### D11 Parse in a Web Worker with a 1 s budget (owner decision C, 9 Nov)
 The third security review found 6 more constructs under 20,000 characters that
 take 2–12 s on the main thread, after the D4 patch: multi-table totals, nested
@@ -264,6 +304,11 @@ blockquotes. The blocklist doesn't converge, so parsing moves off the main threa
   - `POST /api/reporter/reports` returns 201
   - `GET /api/reporter/reports?page&pageSize`
   - `GET /api/reporter/reports/{id}`
+  - `PUT /api/reporter/reports/{id}` (RPT-09) returns 200
+  - `DELETE /api/reporter/reports/{id}?version=N` (RPT-10) returns 204
+- 409 `REPORT_LOCKED` means the report is assigned, past `SUBMITTED`, or still
+  referenced. 409 `VERSION_CONFLICT` means the client's version is stale. Both
+  apply only to the Reporter's own report; otherwise the RPT-05 404 applies.
 - Another Reporter's report returns **404 `REPORT_NOT_FOUND`**, not 403, so a
   Reporter can't probe whether report IDs exist (RPT-05). A malformed UUID in the
   path also returns 404.
@@ -304,10 +349,23 @@ This needs Developer owner approval.
 ### D10 Rate limit counted from stored rows, locked per Reporter
 Inside the create transaction:
 1. `SELECT pg_advisory_xact_lock(<64-bit hash of reporter_id>)`
-2. `SELECT count(*), min(created_at) FROM reports WHERE reporter_id = ? AND
-   created_at > now() - interval '60 seconds'`
+2. `SELECT count(*), min(created_at) FROM reporter_report_creations WHERE
+   reporter_id = ? AND created_at > now() - interval '60 seconds'`
 3. If the count is 3 or more, roll back and return 429. `Retry-After` is
-   `ceil(min(created_at) + 60s - now())`, at least 1. Otherwise insert and commit.
+   `ceil(min(created_at) + 60s - now())`, at least 1. Otherwise insert the report
+   and a `reporter_report_creations` row with the same `created_at`, and commit.
+
+**Revised 10 Nov (owner decision: hard delete, RPT-10).** Counting `reports` rows
+let create, delete, create bypass the limit, so the count now comes from the
+append-only `reporter_report_creations (reporter_id, created_at)` table, indexed
+on `(reporter_id, created_at)`. Deleting a report never deletes its creation
+row. The table holds no report content. It lives in the Reporter-owned migration
+`src/backend/reporter/migrations/001_report_creation_log.sql`, is additive and
+touches no shared table. Pruning rows older than the window is out of scope.
+**Backfill (owner decision 10 Nov).** The migration inserts one log row per
+existing report, with that report's `reporter_id` and `created_at`, so reports
+created shortly before deployment still count toward the window. It is
+idempotent only on a fresh table and runs once with the other migrations.
 
 Why this approach:
 - The lock serialises one Reporter's creates (the RPT-08 concurrency scenario)
@@ -320,8 +378,9 @@ Why this approach:
 Alternatives considered:
 - An in-memory token bucket per Reporter. Rejected because it resets on restart
   and breaks with more than one instance.
-- A separate rate-limit table. Rejected because it duplicates what `created_at`
-  already records.
+- A separate rate-limit table. First rejected because it duplicated
+  `created_at`; adopted on 10 Nov once hard delete made `reports` rows an
+  unreliable record of creates.
 - Checking the limit before validation. Rejected so that an over-limit Reporter
   still gets the more useful 400 for a malformed request. The contract fixes the
   order: session → validation → rate limit.
@@ -330,6 +389,29 @@ Testing: the rollover scenario seeds R1's three earlier reports straight into th
 fixture database with `created_at = now() - interval '61 seconds'` (and 59 s for
 the still-limited case). This avoids a 60-second sleep and needs no production
 clock hook. The concurrency scenario uses real parallel HTTP requests.
+
+### D17 Edit and delete while unassigned (owner decision 10 Nov)
+- **Atomic condition.** Edit is one `UPDATE reports SET title = ?, description = ?,
+  version = version + 1, updated_at = now() WHERE id = ? AND reporter_id = ? AND
+  assignee_id IS NULL AND status = 'SUBMITTED' AND version = ? RETURNING ...`.
+  Delete is the matching `DELETE ... WHERE` with the same conditions. Neither
+  reads then writes, so a concurrent assignment either commits first (the
+  conditional write then matches 0 rows) or waits on the row lock.
+- **Classifying 0 rows.** When the write matches nothing, the same transaction
+  reads the row by `id` and `reporter_id`: no row is 404, an assignee or another
+  status is `REPORT_LOCKED`, otherwise `VERSION_CONFLICT`. The 404 body is the
+  RPT-05 body, so another Reporter's report still looks missing.
+- **Referenced reports.** A foreign-key violation on delete (for example an
+  `investigation_checklists` row) rolls back and returns `REPORT_LOCKED`. No
+  cascade is added.
+- **Version on the wire.** Edit carries `version` in the JSON body; delete
+  carries it as the only query parameter, because DELETE bodies are poorly
+  supported. Both use the version returned by RPT-05.
+- **Assumption.** Assignment by the Maintainer side sets `assignee_id` or changes
+  `status` on the same row. It need not bump `version` for D17 to be safe,
+  because the lock condition is part of the write.
+- Edits and deletes are not rate limited; RPT-08 covers creates only.
+- Tasks 2.8 to 2.11.
 
 ## Risks / Trade-offs
 

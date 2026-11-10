@@ -4,15 +4,16 @@ import { MarkdownView } from "../src/index";
 
 const flags = vi.hoisted(() => ({ blockParser: false, parserCalls: 0 }));
 
-vi.mock("react-markdown", async () => {
-  const actual = await vi.importActual<typeof import("react-markdown")>("react-markdown");
-  const Actual = actual.default;
-  const Wrapped = (props: Parameters<typeof Actual>[0]) => {
+vi.mock("../src/MarkdownView.pipeline", async () => {
+  const actual = await vi.importActual<typeof import("../src/MarkdownView.pipeline")>(
+    "../src/MarkdownView.pipeline",
+  );
+  const wrapped: typeof actual.toHast = (source, prefix) => {
     flags.parserCalls += 1;
     if (flags.blockParser) throw new Error("parser must not be invoked for this input");
-    return Actual(props);
+    return actual.toHast(source, prefix);
   };
-  return { ...actual, default: Wrapped };
+  return { ...actual, toHast: wrapped };
 });
 
 afterEach(() => {
@@ -102,13 +103,13 @@ describe("MDR-05 ordinary reports still render formatted", () => {
     expect(container.querySelectorAll("tbody tr").length).toBe(20);
   }, T);
 
-  it("mid-size 6x200 table renders as a table", () => {
+  it("mid-size 6x100 table renders as a table", () => {
     const head = "|" + "h|".repeat(6);
     const sep = "|" + "-|".repeat(6);
-    const rows = Array.from({ length: 200 }, (_, i) => "|" + `c${i}|`.repeat(6)).join("\n");
+    const rows = Array.from({ length: 100 }, (_, i) => "|" + `c${i}|`.repeat(6)).join("\n");
     const { container } = renderWithSibling([head, sep, rows].join("\n"));
     expect(container.querySelector("table")).not.toBeNull();
-    expect(container.querySelectorAll("tbody tr").length).toBe(200);
+    expect(container.querySelectorAll("tbody tr").length).toBe(100);
   }, T);
 
   it("normal emphasis renders strong and em", () => {

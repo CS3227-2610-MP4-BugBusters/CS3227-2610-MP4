@@ -125,6 +125,6 @@ describe("MDR-04 No links", () => {
     expect(container.querySelectorAll("a")).toHaveLength(0);
     expect(container.querySelector("[href]")).toBeNull();
     const shown = dest.replace(/^<|>$/g, "").trim();
-    expect(container.textContent).toContain(`linktext (${shown})`);
+    expect(container.textContent).toContain(`linktext (${shown.replace(/\(/g, "%28").replace(/\)/g, "%29")})`);
   });
 });

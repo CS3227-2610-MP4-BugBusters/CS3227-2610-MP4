@@ -4,14 +4,15 @@ import { MarkdownView } from "../src/index";
 
 const flags = vi.hoisted(() => ({ forceThrow: false }));
 
-vi.mock("react-markdown", async () => {
-  const actual = await vi.importActual<typeof import("react-markdown")>("react-markdown");
-  const Actual = actual.default;
-  const Wrapped = (props: Parameters<typeof Actual>[0]) => {
+vi.mock("../src/MarkdownView.pipeline", async () => {
+  const actual = await vi.importActual<typeof import("../src/MarkdownView.pipeline")>(
+    "../src/MarkdownView.pipeline",
+  );
+  const wrapped: typeof actual.toHast = (source, prefix) => {
     if (flags.forceThrow) throw new Error("forced render failure");
-    return Actual(props);
+    return actual.toHast(source, prefix);
   };
-  return { ...actual, default: Wrapped };
+  return { ...actual, toHast: wrapped };
 });
 
 afterEach(() => {
