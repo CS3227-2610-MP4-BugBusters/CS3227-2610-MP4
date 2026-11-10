@@ -32,10 +32,25 @@ dependencies {
 sourceSets.main.java {
     srcDir '../platform/src/main/java'
     srcDir '../developer/src'
+    srcDir '../maintainer/src/main/java'
     include 'mp4/**', 'AssignedReportStore.java', 'AssignedReportListHttpHandler.java', 'ChecklistDraftStore.java',
             'ChecklistShareService.java', 'JdbcChecklistShareService.java',
             'ChecklistShareHttpHandler.java', 'ChecklistSharedHttpHandler.java',
             'ChecklistDraftHttpHandler.java'
+}
+
+tasks.named('processResources') {
+    from('../shared/migrations/001_create_reports.sql') {
+        into 'db/shared'
+        rename { 'V1__create_reports.sql' }
+    }
+    from('../developer/migrations/create_investigation_checklists.sql') {
+        into 'db/shared'
+        rename { 'V2__create_investigation_checklists.sql' }
+    }
+    from('../maintainer/src/main/resources/db/shared') {
+        into 'db/shared'
+    }
 }
 
 tasks.withType(JavaCompile).configureEach {

@@ -1,9 +1,10 @@
 # Tasks
 
-Status: migrated future work, not implementation results. All tasks below remain
-unchecked. The existing fake-backed read-only frontend is recorded in the main
-`maintainer-report-browser` spec and its historical logs; do not recreate its
-completion as a newly approved Red baseline.
+Status: implementation in progress in PR #10. Local authentication, Maintainer
+workflow, database and controlled summary checks are implemented. Keep the broad
+tasks unchecked where independent review, owner review or live deployment/provider
+checks remain pending. See the PR and Maintainer backend README for current status;
+historical baseline logs retain their original results.
 
 For each behavior task, follow `workflow/tdd.md`: test_designer, fresh
 baseline_verifier, feature-owner approval of the verified Red, implementer,
@@ -22,7 +23,7 @@ An unavailable contract, fixture or runner is BLOCKED, not a passing Red.
 
 - [ ] 1.1 Review the proposed query/mutation/error/identity DTOs and remaining policies with their component owners, preserving confirmed CL-04/05. Verify a recorded contract decision and example fixtures for each seam before its real adapter is implemented; isolate fakes meanwhile.
 - [ ] 1.2 Integrate trusted identity, query/developer/history services and real shared-only checklist projections. Verify MT-01/02/03, malformed/nested response tests and absence of draft steps/revision in direct and embedded API responses; update role access instructions alongside integration.
-- [ ] 1.3 Establish the actual Java/database verification runner once that scaffold exists and connect the agreed checks to CI. Verify reproducible commands and disposable fixture setup; preserve the existing frontend `npm run verify` command without treating it as backend evidence.
+- [x] 1.3 Establish the actual Java/database verification runner once that scaffold exists and connect the agreed checks to CI. Verify reproducible commands and disposable fixture setup; preserve the existing frontend `npm run verify` command without treating it as backend evidence.
 
 ## 2. Priority and assignment (MNT-P2)
 
@@ -61,3 +62,14 @@ An unavailable contract, fixture or runner is BLOCKED, not a passing Red.
 
 - Archive only after implementation, verification and team review satisfy the change's tasks.
 - Keep historical logs and commit/hash evidence; do not rewrite past results to match new gates.
+
+## Current evidence follow-up
+
+Recorded source c8e66d2 and CI results in logs/2026-11-09-maintainer-integration-checkpoint.md.
+Added the unified verification entry point, explicit release scans and a reviewed
+fix for deployment-hook isolation. Prepared and executed synthetic DEV-SEC/DEV-WF
+fixtures and controlled coordination/reuse comparisons; see logs/security,
+logs/agent-runs and logs/experiments for verdicts and measurement limits. Task 1.3
+has reproducible Java/PostgreSQL setup plus CI execution. Kept broader tasks open
+for remaining shared integration, owner review, live provider/host checks and
+complete evaluation evidence; fixture passes alone do not satisfy those gates.

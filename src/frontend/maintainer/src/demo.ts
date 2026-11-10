@@ -4,6 +4,7 @@ import {
   type Queries,
   type Detail,
   type Person,
+  type SummaryFilters,
 } from "./domain";
 export const fixtureId = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -69,10 +70,32 @@ export const reports: Detail[] = Array.from({ length: 63 }, (_, i) => {
   };
 });
 export function createDemoQueries(
-  source: readonly Detail[] = reports,
+  input?: Detail[],
+  includeActions = input !== undefined,
+  includeSummary = false,
 ): Queries {
+  const source = input ?? reports.map((report) => structuredClone(report));
   const check = (s: AbortSignal) => {
     if (s.aborted) throw new QueryError("cancelled");
+  };
+  const find = (id: string) => {
+    const report = source.find((r) => r.id === id);
+    if (!report) throw new QueryError("missing");
+    return report;
+  };
+  const write = (id: string, version: number) => {
+    const r = find(id);
+    if (!Number.isSafeInteger(version) || version !== r.version) throw new QueryError("conflict");
+    r.version++;
+    r.updatedAt = new Date().toISOString();
+    return r;
+  };
+  const history = (r: Detail, type: string, text: string) => r.history.push({
+    id: fixtureId(10000 + r.history.length + r.version), type, text, actor: author, createdAt: new Date().toISOString(),
+  });
+  const retainProposal = (r: Detail) => {
+    const proposal = r.currentProposal;
+    if (proposal) history(r, "Proposal retained", `Proposal ${proposal.id} (version ${proposal.version}) by ${proposal.author.displayName} [${proposal.author.id}] at ${proposal.createdAt}\n\n${proposal.text}`);
   };
   return {
     async getCurrentUser(s) {
@@ -109,5 +132,66 @@ export function createDemoQueries(
       if (!r) throw new QueryError("missing");
       return r;
     },
+    ...(includeSummary ? { async summarizeQueue({ filters }: { filters: SummaryFilters; regenerate: boolean }, s?: AbortSignal) {
+      if (s?.aborted) throw new QueryError("cancelled");
+      const queue = source.filter((r) => r.status !== "Closed" &&
+        (!filters.status || r.status === filters.status) &&
+        (!filters.priority || r.priority === filters.priority) &&
+        (!filters.assigneeId || r.assignee?.id === filters.assigneeId));
+      const rank = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+      queue.sort((a, b) => rank[a.priority] - rank[b.priority] || Date.parse(a.updatedAt) - Date.parse(b.updatedAt) || a.id.localeCompare(b.id));
+      const included = queue.slice(0, 20).map((r) => ({ id: r.id, version: r.version, truncatedFields: [] as string[] }));
+      const includedSet = new Set(included.map((r) => r.id));
+      const excluded = queue.filter((r) => !includedSet.has(r.id)).map((r) => ({ id: r.id, reason: "Context limit" }));
+      const evidence = included[0];
+      return {
+        capturedAt: new Date().toISOString(), filters: { ...filters }, included, excluded,
+        findings: {
+          overview: evidence ? [{ text: "Review the reports in this queue snapshot.", reportIds: [evidence.id] }] : [],
+          blockers: [], missingInformation: [],
+        },
+        requiresReview: true as const, providerMode: "deterministic" as const,
+        promptVersion: "MNT-SUMMARY-1" as const,
+      };
+    } } : {}),
+    ...(includeActions ? {
+    async updatePriority({ reportId, expectedVersion, priority }: { reportId: string; expectedVersion: number; priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" }) {
+      if (!( ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as string[]).includes(priority)) throw new QueryError("validation");
+      const r = write(reportId, expectedVersion);
+      r.priority = priority; history(r, "Priority changed", priority);
+    },
+    async assignReport({ reportId, expectedVersion, developerId, reason }: { reportId: string; expectedVersion: number; developerId: string; reason?: string }) {
+      const before = find(reportId);
+      if (before.status !== "Submitted" && before.status !== "Assigned" && before.status !== "In progress") throw new QueryError("invalidState");
+      const target = developers.find((d) => d.id === developerId);
+      if (!target) throw new QueryError("validation");
+      const reassignment = before.status !== "Submitted";
+      if (reassignment && before.assignee?.id === developerId) throw new QueryError("validation");
+      const text = reason?.trim() ?? "";
+      if (reassignment && (!text || [...text].length > 1000 || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f-\u009f]/.test(text))) throw new QueryError("validation");
+      const r = write(reportId, expectedVersion);
+      r.assignee = target; r.status = "Assigned"; history(r, reassignment ? "Reassigned" : "Assigned", reassignment ? text : target.displayName);
+    },
+    async returnResolution({ reportId, expectedVersion, proposalId, proposalVersion, reason }: { reportId: string; expectedVersion: number; proposalId: string; proposalVersion: number; reason: string }) {
+      const before = find(reportId);
+      if (before.status !== "Resolution proposed" || before.currentProposal?.id !== proposalId || before.currentProposal.version !== proposalVersion) throw new QueryError("invalidState");
+      if (!reason.trim() || [...reason.trim()].length > 1000 || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f-\u009f]/.test(reason.trim())) throw new QueryError("validation");
+      const r = write(reportId, expectedVersion); retainProposal(r); r.status = "In progress"; r.currentProposal = null; history(r, "Resolution returned", reason.trim());
+    },
+    async closeReport({ reportId, expectedVersion, proposalId, proposalVersion, reviewed }: { reportId: string; expectedVersion: number; proposalId: string; proposalVersion: number; reviewed: true }) {
+      const before = find(reportId);
+      if (before.status !== "Resolution proposed" || before.currentProposal?.id !== proposalId || before.currentProposal.version !== proposalVersion || reviewed !== true) throw new QueryError("invalidState");
+      const r = write(reportId, expectedVersion); r.status = "Closed"; history(r, "Closed", "Proposal reviewed and accepted.");
+    },
+    async reopenReport({ reportId, expectedVersion, reason }: { reportId: string; expectedVersion: number; reason: string }) {
+      if (find(reportId).status !== "Closed") throw new QueryError("invalidState");
+      if (!reason.trim() || [...reason.trim()].length > 1000 || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f-\u009f]/.test(reason.trim())) throw new QueryError("validation");
+      const r = write(reportId, expectedVersion); retainProposal(r); r.status = "Submitted"; r.assignee = null; r.currentProposal = null; history(r, "Reopened", reason.trim());
+    },
+    async addComment({ reportId, expectedVersion, text }: { reportId: string; expectedVersion: number; text: string }) {
+      const clean = text.trim();
+      if (!clean || [...clean].length > 4000 || /[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f-\u009f]/.test(clean)) throw new QueryError("validation");
+      const r = write(reportId, expectedVersion); r.comments.push({ id: fixtureId(20000 + r.comments.length + r.version), author, text: clean, createdAt: r.updatedAt }); history(r, "Comment added", clean);
+    } } : {}),
   };
 }

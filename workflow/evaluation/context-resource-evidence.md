@@ -38,7 +38,11 @@ App acceptance evidence should include an ordinary valid case, unauthorized/unre
 
 Use clear task boundaries and link the relevant files; use subagents when independent review or parallel work adds value, not automatically for every task. Keep concise notes: goal, current state, decisions, findings, open questions, next action and change log. Apply the existing TDD/security gates and avoid duplicate runs without a reason.
 
-## Comparable experiment (optional, agree before running)
+## Comparable experiment (team-plan commitment)
+
+Follow team-plan section 12 for the controlled comparison. The assignment requires
+concrete experiments and result analysis; the team plan selects this protocol.
+Freeze the fixtures and budget before running, and record any agreed revision.
 
 1. Choose the same well-scoped task, starting revision, acceptance criteria and evaluation tests for each workflow. Use isolated copies and ensure neither run sees the other's solution.
 2. Define the workflow variants and model/effort settings in advance. Include the coordinator and specialists in the multi-agent total. Keep the required project workflow for the version integrated into the feature branch.

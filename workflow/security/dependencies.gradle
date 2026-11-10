@@ -1,0 +1,24 @@
+import groovy.json.JsonOutput
+
+allprojects {
+    afterEvaluate { project ->
+        if (!project.plugins.hasPlugin('java')) return
+        project.tasks.register('writeSecurityInventory') {
+            group = 'verification'
+            description = 'Exports resolved runtime and test dependencies for OSV without changing dependency selection.'
+            doLast {
+                def modules = ['runtimeClasspath', 'testRuntimeClasspath'].collectMany { name ->
+                    project.configurations.getByName(name).resolvedConfiguration.resolvedArtifacts.collect { artifact ->
+                        def id = artifact.moduleVersion.id
+                        [name: "${id.group}:${id.name}".toString(), version: id.version, ecosystem: 'Maven']
+                    }
+                }.unique().sort { a, b -> a.name <=> b.name ?: a.version <=> b.version }
+                if (modules.isEmpty()) throw new GradleException('Resolved dependency inventory is empty')
+                def output = project.layout.buildDirectory.file('security/osv-scanner.json').get().asFile
+                output.parentFile.mkdirs()
+                output.setText(JsonOutput.toJson([results: [[packages: modules.collect { [package: it] }]]]), 'UTF-8')
+                println "Exported ${modules.size()} resolved Maven dependencies for security verification."
+            }
+        }
+    }
+}

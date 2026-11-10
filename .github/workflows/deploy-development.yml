@@ -1,23 +1,47 @@
-name: Deploy development
+name: Deploy application
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      target_environment:
+        required: true
+        type: string
 
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  group: deploy-development
+  group: deploy-${{ inputs.target_environment || 'development' }}
   cancel-in-progress: false
 
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (!inputs.target_environment || inputs.target_environment == 'development' || inputs.target_environment == 'production')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    environment: development
+    environment: ${{ inputs.target_environment || 'development' }}
     steps:
+      - uses: actions/checkout@v4
+        if: inputs.target_environment == 'production'
+        with:
+          persist-credentials: false
+
+      - name: Require actual production reviewer protection
+        if: inputs.target_environment == 'production'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          curl --silent --show-error --fail \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${REPOSITORY}/environments/production" \
+            | python3 src/backend/platform/deployment/production_protection.py
+
       - name: Require successful CI for this exact main revision
         env:
           GH_TOKEN: ${{ github.token }}
@@ -29,30 +53,29 @@ jobs:
             --header "Authorization: Bearer ${GH_TOKEN}" \
             --header 'Accept: application/vnd.github+json' \
             --header 'X-GitHub-Api-Version: 2022-11-28' \
-            "https://api.github.com/repos/${REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${EXPECTED_SHA}&branch=main&status=completed&per_page=100")" \
+            "https://api.github.com/repos/${REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${EXPECTED_SHA}&branch=main&per_page=100")" \
             || { echo 'Could not read CI status for this revision.' >&2; exit 1; }
           printf '%s' "$response" | python3 -c '
           import json, os, sys
           try:
               data = json.load(sys.stdin)
               expected = os.environ["EXPECTED_SHA"]
-              ok = any(run.get("head_sha") == expected
-                       and run.get("head_branch") == "main"
-                       and run.get("event") == "push"
-                       and run.get("status") == "completed"
-                       and run.get("conclusion") == "success"
-                       for run in data.get("workflow_runs", []))
+              matching = [run for run in data.get("workflow_runs", [])
+                          if isinstance(run, dict) and run.get("head_sha") == expected
+                          and run.get("head_branch") == "main" and run.get("event") == "push"]
+              latest = max(matching, key=lambda run: (int(run["id"]), int(run.get("run_attempt", 1))))
+              ok = latest.get("status") == "completed" and latest.get("conclusion") == "success"
           except Exception:
               ok = False
           if not ok:
-              print("No successful CI push run was found for this main revision.", file=sys.stderr)
+              print("The latest CI push run has not succeeded for this main revision.", file=sys.stderr)
               sys.exit(1)
           print("Successful CI verified for the selected revision.")
           '
 
       - name: Request Render deployment for this revision
         env:
-          RENDER_DEV_DEPLOY_HOOK: ${{ secrets.RENDER_DEV_DEPLOY_HOOK }}
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
           EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
@@ -64,10 +87,10 @@ jobs:
           import urllib.parse
           import urllib.request
 
-          hook = os.environ.get("RENDER_DEV_DEPLOY_HOOK", "")
+          hook = os.environ.get("RENDER_DEPLOY_HOOK", "")
           sha = os.environ["EXPECTED_SHA"]
           if not hook or not sha:
-              print("Development deploy hook is not configured.", file=sys.stderr)
+              print("The selected environment deploy hook is not configured.", file=sys.stderr)
               sys.exit(1)
           try:
               parts = urllib.parse.urlsplit(hook)
@@ -92,9 +115,9 @@ jobs:
               elif status == 202:
                   print("Render queued the selected revision behind an active deployment; no deploy id was returned.")
               else:
-                  print("Render did not accept the development deployment request.", file=sys.stderr)
+                  print("Render did not accept the deployment request.", file=sys.stderr)
                   sys.exit(1)
           except Exception:
-              print("Could not request the development deployment.", file=sys.stderr)
+              print("Could not request the deployment.", file=sys.stderr)
               sys.exit(1)
           PY
