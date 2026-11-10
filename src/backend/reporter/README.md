@@ -10,12 +10,13 @@ Reporters can create reports, list their own reports, read one, and edit one whi
 | `GET /api/reporter/reports?page&pageSize` | List own reports, newest first. |
 | `GET /api/reporter/reports/{id}` | Read own report. Another Reporter's report gives the same 404 as a missing one. |
 | `PUT /api/reporter/reports/{id}` | Edit `{title, description, version}` while unassigned and `SUBMITTED`. 409 `REPORT_LOCKED` or `VERSION_CONFLICT`. |
+| `GET`, `POST /api/reporter/reports/{id}/comments` | Read or post the discussion thread of an own report (report-discussion task 2.2, `workflow/reporter/report-discussion-api-contract.md`). Served by `src/backend/discussion/`. |
 
-Reporters never change a report's status. Closing is a Maintainer-only action. Any path below a report, such as `/close`, gives the read 404.
+Reporters never change a report's status. Closing is a Maintainer-only action. Any path below a report, such as `/close`, gives the read 404, except `{id}/comments`; any path below `/comments` gives the read 404 too.
 
 ## Layout
 
-- `src/`: `ReporterReportsHttpHandler` (routing, validation, errors), `ReporterReportStore` (JDBC) and `ReporterJson` (strict JSON reader). Plain JDK and JDBC only.
+- `src/`: `ReporterReportsHttpHandler` (routing, validation, errors) and `ReporterReportStore` (JDBC). Plain JDK and JDBC only. The strict JSON reader (`StrictJson`, formerly `ReporterJson`) and the text rules (`TextRules`) now live in `src/backend/discussion/` so the discussion endpoints share them.
 - `test/`: the synthetic-session harness, the runners and the black-box API tests.
 - `migrations/`: Reporter-owned additive migrations, applied after every shared migration. There are none yet.
 
@@ -32,9 +33,10 @@ Reporters never change a report's status. Closing is a Maintainer-only action. A
 ## Migrations
 
 - **Timestamp migration (design D7).** It lives with the shared reports schema at `src/backend/shared/migrations/002_add_report_timestamps.sql`. It adds `created_at` and `updated_at` (`timestamptz NOT NULL DEFAULT now()`) to `reports`. It also adds an index on `(reporter_id, created_at DESC, id)`, used by the newest-first list and by the rate-limit window count.
-- **Order in the test runners.** Every `src/backend/shared/migrations/*.sql` file runs in name order (`001`, then `002`). This directory's migrations run next, then `src/backend/developer/migrations/create_investigation_checklists.sql`.
+- **Order in the test runners.** Every `src/backend/shared/migrations/*.sql` file runs in name order (`001`, `002`, then `003`). This directory's migrations run next, then `src/backend/developer/migrations/create_investigation_checklists.sql`.
 - **Test databases are fresh.** The runners build each test database from scratch and do not track applied versions.
 - **The deployed app uses Flyway.** It applies `src/backend/auth/src/main/resources/db/shared/V4__reporter_report_timestamps.sql`. That file is the same change written idempotently, because the Maintainer's `V3` already adds the two columns. If you change `002`, change `V4` to match.
+- **Report comments (report-discussion D1).** `src/backend/shared/migrations/003_report_comments.sql` adds `report_comments`. Its comment column is `text`, as in the Maintainer's table; the API field is `body`. In the deployed app the Maintainer's `V3` already creates `report_comments` without `author_role`, so Flyway's `V5__report_comments.sql` (same directory as `V4`) upgrades that table instead of creating it: it adds `author_role`, backfills existing rows with `'MAINTAINER'`, then adds `NOT NULL`, the role check and both indexes. It is idempotent. If you change `003`, change `V5` so both give the same shape.
 
 ## Run the tests
 
@@ -76,6 +78,13 @@ Expected results, all `OK`:
 
 Each runner exits non-zero if any test file fails.
 
+The report-discussion tests run separately (task 2.1 migration: 11 PASS lines; task 2.2 API: 17 tests, `OK`):
+
+```sh
+sh $T/run-reporter-db.sh python -B $T/report_comments_migration_test.py
+sh $T/run-reporter-api.sh $T/report_discussion_api_test.py
+```
+
 ### What the runners do
 
 `run-reporter-db.sh`:
@@ -87,7 +96,8 @@ Each runner exits non-zero if any test file fails.
 Set `MP4_TEST_PG_IMAGE` to use a different image.
 
 `run-reporter-api.sh` wraps `run-reporter-db.sh`. It also:
-- compiles `src/*.java` with `test/ReporterApiHarness.java`;
+- compiles `src/*.java` and `../discussion/src/mp4/discussion/*.java` with `test/ReporterApiHarness.java`;
+- creates the auth accounts table from `src/backend/auth/src/main/resources/db/auth/V100__create_auth_accounts.sql` and adds one row per synthetic actor, so comment display names come from the real table;
 - creates the synthetic actors and a pool of 120 fresh Reporters;
 - starts the harness on a loopback port, with a 16-thread executor so that parallel requests really overlap;
 - runs each Python test given on the command line. With no arguments it runs only the two create test files.
@@ -101,10 +111,10 @@ Set `MP4_TEST_PG_IMAGE` to use a different image.
 ## The deployed app
 
 The auth server packages the Reporter backend. This was task 1.4 of `openspec/changes/report-discussion`.
-- `src/backend/auth/build.gradle` compiles the three `src/` files.
+- `src/backend/auth/build.gradle` compiles the two `src/` files and `../discussion/src`.
 - `AuthConfiguration` allows `/api/reporter/**` only for `hasRole("REPORTER")`, behind the existing session and CSRF rules.
 - `AuthController` passes the session user's id and role to the handler.
-- The deployment Dockerfile copies `src/`.
+- The deployment Dockerfile copies `src/` and `src/backend/discussion/src/`.
 
 To check the mount through the real server, use the auth integration test `src/backend/auth/src/test/java/mp4/auth/ReporterApiMountTest.java`:
 

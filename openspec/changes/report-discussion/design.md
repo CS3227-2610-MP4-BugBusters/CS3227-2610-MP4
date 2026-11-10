@@ -53,13 +53,27 @@ report_comments (
   report_id uuid NOT NULL REFERENCES reports(id),
   author_id uuid NOT NULL,
   author_role text NOT NULL CHECK (author_role IN ('REPORTER','DEVELOPER','MAINTAINER')),
-  body text NOT NULL,
+  text text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 )
 ```
 
 It also adds the index `(report_id, created_at, id)` for the thread, and the index
 `(author_id, created_at)` for the rate limit.
+
+**Reconciled with the Maintainer table (owner decision 10 Nov).** The Maintainer's
+`V3__maintainer_evidence.sql` already creates `report_comments` in the deployed
+database with `id, report_id, author_id, text, created_at` and no `author_role`.
+This change adopts that table rather than replacing it:
+- The comment column is `text`, as in V3. The API field is still `body`; only the
+  storage column is named `text`.
+- `003` (test runners, fresh databases) creates the final shape above directly.
+- The deployed Flyway copy `V5__report_comments.sql` is an `ALTER` on the V3
+  table. It adds `author_role`, backfills existing rows with `'MAINTAINER'`
+  (before this change only the Maintainer repository wrote comments), then sets
+  `NOT NULL`, adds the role check and adds both indexes. It is idempotent.
+- The Maintainer repository's comment `INSERT` sets `author_role = 'MAINTAINER'`.
+  This needs Maintainer owner sign-off (task 1.1).
 
 - The table lives in `shared/`, because every role reads it. This is the same
   reasoning as D7 in `reporter-markdown-reports`.

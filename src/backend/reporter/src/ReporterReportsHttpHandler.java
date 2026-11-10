@@ -17,18 +17,27 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import javax.sql.DataSource;
+import mp4.discussion.ReportDiscussionJson;
+import mp4.discussion.ReportDiscussionService;
+import mp4.discussion.StrictJson;
+import mp4.discussion.TextRules;
 import mp4.reporter.ReporterReportStore.Page;
 import mp4.reporter.ReporterReportStore.RateLimited;
 import mp4.reporter.ReporterReportStore.Refused;
 import mp4.reporter.ReporterReportStore.Report;
 import mp4.reporter.ReporterReportStore.Summary;
 
-/** HTTP adapter for Reporter report create, list, read and edit; authentication supplies the actor. */
+/**
+ * HTTP adapter for Reporter report create, list, read and edit, and for the Reporter's report discussion
+ * thread ({id}/comments, served by {@link ReportDiscussionService}); authentication supplies the actor.
+ */
 public final class ReporterReportsHttpHandler {
     private static final String COLLECTION_PATH = "/api/reporter/reports";
     private static final String ITEM_PREFIX = COLLECTION_PATH + "/";
+    private static final String COMMENTS_SUFFIX = "/comments";
     private static final Set<String> CREATE_FIELDS = Set.of("title", "description");
     private static final Set<String> EDIT_FIELDS = Set.of("title", "description", "version");
+    private static final Set<String> COMMENT_FIELDS = Set.of("body");
     // Largest legal body is about 121 KB: 20,200 code units written as 6-byte \\u escapes, plus syntax.
     private static final int MAX_BODY_BYTES = 128 * 1024;
     private static final int MAX_TITLE_UNITS = 200;
@@ -62,9 +71,11 @@ public final class ReporterReportsHttpHandler {
     }
 
     private final ReporterReportStore store;
+    private final ReportDiscussionService discussion;
 
     public ReporterReportsHttpHandler(DataSource database) {
         this.store = new ReporterReportStore(database);
+        this.discussion = new ReportDiscussionService(database);
     }
 
     public void handle(HttpExchange exchange, UUID actorId, String role, boolean active) throws IOException {
@@ -74,11 +85,16 @@ public final class ReporterReportsHttpHandler {
         String rest = path != null && path.startsWith(ITEM_PREFIX) ? path.substring(ITEM_PREFIX.length()) : null;
         // RPT-09: Reporters never change status, so any path below a report, such as /close, is the read 404.
         boolean item = rest != null && rest.indexOf('/') < 0;
-        if (!collection && !item) {
+        // {id}/comments exactly; anything below /comments is the read 404 too (no single-comment path).
+        String threadId = rest != null && rest.endsWith(COMMENTS_SUFFIX)
+                && rest.indexOf('/') == rest.length() - COMMENTS_SUFFIX.length()
+                ? rest.substring(0, rest.length() - COMMENTS_SUFFIX.length()) : null;
+        boolean thread = threadId != null;
+        if (!collection && !item && !thread) {
             sendError(exchange, ErrorCode.REPORT_NOT_FOUND);
             return;
         }
-        String allow = collection ? "GET, POST" : "GET, PUT";
+        String allow = collection || thread ? "GET, POST" : "GET, PUT";
         if (!List.of(allow.split(", ")).contains(method)) {
             exchange.getResponseHeaders().set("Allow", allow);
             sendError(exchange, ErrorCode.METHOD_NOT_ALLOWED);
@@ -96,6 +112,10 @@ public final class ReporterReportsHttpHandler {
             if (collection) {
                 if (method.equals("POST")) create(exchange, actorId);
                 else list(exchange, actorId);
+            } else if (thread) {
+                var actor = new ReportDiscussionService.Actor(actorId, role, active);
+                if (method.equals("POST")) postComment(exchange, actor, threadId);
+                else listComments(exchange, actor, threadId);
             } else if (method.equals("PUT")) {
                 edit(exchange, actorId, rest);
             } else {
@@ -173,6 +193,47 @@ public final class ReporterReportsHttpHandler {
         sendJson(exchange, 200, detailJson(report));
     }
 
+    /** Discussion thread GET. Session is checked in handle, then the query, then the report (contract). */
+    private void listComments(HttpExchange exchange, ReportDiscussionService.Actor actor, String rawId)
+            throws IOException, SQLException {
+        int[] paging;
+        try {
+            paging = parsePaging(exchange.getRequestURI().getRawQuery());
+        } catch (IllegalArgumentException invalidQuery) {
+            sendError(exchange, ErrorCode.VALIDATION_FAILED);
+            return;
+        }
+        UUID reportId = canonicalId(rawId);
+        Optional<ReportDiscussionService.Page> page = reportId == null
+                ? Optional.empty() : discussion.list(actor, reportId, paging[0], paging[1]);
+        if (page.isEmpty()) {
+            sendError(exchange, ErrorCode.REPORT_NOT_FOUND);
+            return;
+        }
+        sendJson(exchange, 200, ReportDiscussionJson.page(page.get()));
+    }
+
+    /** Discussion thread POST. Session, then the body, then the report; the report row is never changed (D3). */
+    private void postComment(HttpExchange exchange, ReportDiscussionService.Actor actor, String rawId)
+            throws IOException, SQLException {
+        String body;
+        try {
+            body = parseComment(readBounded(exchange));
+        } catch (BodyTooLarge | IOException | IllegalArgumentException invalidBody) {
+            sendError(exchange, ErrorCode.VALIDATION_FAILED);
+            return;
+        }
+        UUID reportId = canonicalId(rawId);
+        Optional<ReportDiscussionService.Comment> comment = reportId == null
+                ? Optional.empty() : discussion.post(actor, reportId, body);
+        if (comment.isEmpty()) {
+            sendError(exchange, ErrorCode.REPORT_NOT_FOUND);
+            return;
+        }
+        exchange.getResponseHeaders().set("Location", ITEM_PREFIX + reportId + COMMENTS_SUFFIX);
+        sendJson(exchange, 201, ReportDiscussionJson.comment(comment.get()));
+    }
+
     /** NOT_FOUND reuses the read 404, so another Reporter's report looks the same as a missing one. */
     private static void sendRefusal(HttpExchange exchange, Refused refused) throws IOException {
         sendError(exchange, switch (refused.reason()) {
@@ -188,7 +249,7 @@ public final class ReporterReportsHttpHandler {
     }
 
     private static NewReport parseCreate(byte[] body) {
-        Map<String, String> fields = ReporterJson.parseStringObject(body);
+        Map<String, String> fields = StrictJson.parseStringObject(body);
         if (!fields.keySet().equals(CREATE_FIELDS)) {
             throw new IllegalArgumentException("Body must contain exactly title and description");
         }
@@ -197,7 +258,7 @@ public final class ReporterReportsHttpHandler {
     }
 
     private static ReportEdit parseEdit(byte[] body) {
-        Map<String, Object> fields = ReporterJson.parseObject(body);
+        Map<String, Object> fields = StrictJson.parseObject(body);
         if (!fields.keySet().equals(EDIT_FIELDS)
                 || !(fields.get("title") instanceof String title)
                 || !(fields.get("description") instanceof String description)
@@ -208,42 +269,28 @@ public final class ReporterReportsHttpHandler {
         return new ReportEdit(title, description, version);
     }
 
+    /**
+     * Contract basic rules: a JSON object with exactly one key, {@code body}, holding a non-blank string.
+     * The DSC-03 length cap, U+0000 and unpaired-surrogate rules are task 2.3.
+     */
+    private static String parseComment(byte[] body) {
+        Map<String, String> fields = StrictJson.parseStringObject(body);
+        if (!fields.keySet().equals(COMMENT_FIELDS) || TextRules.isBlank(fields.get("body"))) {
+            throw new IllegalArgumentException("Body must contain exactly a non-blank body");
+        }
+        return fields.get("body");
+    }
+
     /** RPT-02 field rules, shared by create and edit. */
     private static void validateText(String title, String description) {
-        if (!isStorableText(title) || isBlank(title) || title.length() > MAX_TITLE_UNITS
+        if (!TextRules.isStorableText(title) || TextRules.isBlank(title) || title.length() > MAX_TITLE_UNITS
                 || title.indexOf('\r') >= 0 || title.indexOf('\n') >= 0) {
             throw new IllegalArgumentException("Invalid title");
         }
-        if (!isStorableText(description) || isBlank(description) || description.length() > MAX_DESCRIPTION_UNITS) {
+        if (!TextRules.isStorableText(description) || TextRules.isBlank(description)
+                || description.length() > MAX_DESCRIPTION_UNITS) {
             throw new IllegalArgumentException("Invalid description");
         }
-    }
-
-    /** False for U+0000 or an unpaired surrogate, which PostgreSQL text cannot hold faithfully. */
-    private static boolean isStorableText(String value) {
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            if (c == '\0' || Character.isLowSurrogate(c)) return false;
-            if (Character.isHighSurrogate(c)) {
-                if (i + 1 >= value.length() || !Character.isLowSurrogate(value.charAt(i + 1))) return false;
-                i++;
-            }
-        }
-        return true;
-    }
-
-    private static boolean isBlank(String value) {
-        for (int i = 0; i < value.length();) {
-            int codePoint = value.codePointAt(i);
-            if (!isUnicodeWhitespace(codePoint)) return false;
-            i += Character.charCount(codePoint);
-        }
-        return true;
-    }
-
-    /** The Unicode White_Space property: Zs, Zl and Zp plus U+0009..U+000D and U+0085. */
-    private static boolean isUnicodeWhitespace(int codePoint) {
-        return Character.isSpaceChar(codePoint) || (codePoint >= 0x09 && codePoint <= 0x0D) || codePoint == 0x85;
     }
 
     /** Returns {page, pageSize}. Only page and pageSize, each at most once, as positive decimal integers. */
@@ -299,10 +346,10 @@ public final class ReporterReportsHttpHandler {
     }
 
     private static String detailJson(Report report) {
-        return "{\"id\":" + ReporterJson.quote(report.id().toString())
-                + ",\"title\":" + ReporterJson.quote(report.title())
-                + ",\"description\":" + ReporterJson.quote(report.description())
-                + ",\"status\":" + ReporterJson.quote(report.status())
+        return "{\"id\":" + StrictJson.quote(report.id().toString())
+                + ",\"title\":" + StrictJson.quote(report.title())
+                + ",\"description\":" + StrictJson.quote(report.description())
+                + ",\"status\":" + StrictJson.quote(report.status())
                 + ",\"version\":" + report.version()
                 + ",\"createdAt\":" + timestamp(report.createdAt())
                 + ",\"updatedAt\":" + timestamp(report.updatedAt()) + "}";
@@ -314,9 +361,9 @@ public final class ReporterReportsHttpHandler {
         for (Summary item : page.items()) {
             if (!first) result.append(',');
             first = false;
-            result.append("{\"id\":").append(ReporterJson.quote(item.id().toString()))
-                    .append(",\"title\":").append(ReporterJson.quote(item.title()))
-                    .append(",\"status\":").append(ReporterJson.quote(item.status()))
+            result.append("{\"id\":").append(StrictJson.quote(item.id().toString()))
+                    .append(",\"title\":").append(StrictJson.quote(item.title()))
+                    .append(",\"status\":").append(StrictJson.quote(item.status()))
                     .append(",\"createdAt\":").append(timestamp(item.createdAt()))
                     .append(",\"updatedAt\":").append(timestamp(item.updatedAt())).append('}');
         }
@@ -327,13 +374,13 @@ public final class ReporterReportsHttpHandler {
 
     /** ISO-8601 UTC with milliseconds; sub-millisecond digits are truncated, as PostgreSQL's MS does. */
     private static String timestamp(Instant instant) {
-        return ReporterJson.quote(TIMESTAMP.format(instant.truncatedTo(ChronoUnit.MILLIS)));
+        return StrictJson.quote(TIMESTAMP.format(instant.truncatedTo(ChronoUnit.MILLIS)));
     }
 
     private static void sendError(HttpExchange exchange, ErrorCode error) throws IOException {
-        sendJson(exchange, error.status, "{\"code\":" + ReporterJson.quote(error.name())
-                + ",\"message\":" + ReporterJson.quote(error.message)
-                + ",\"requestId\":" + ReporterJson.quote(UUID.randomUUID().toString()) + "}");
+        sendJson(exchange, error.status, "{\"code\":" + StrictJson.quote(error.name())
+                + ",\"message\":" + StrictJson.quote(error.message)
+                + ",\"requestId\":" + StrictJson.quote(UUID.randomUUID().toString()) + "}");
     }
 
     private static void sendJson(HttpExchange exchange, int status, String body) throws IOException {
