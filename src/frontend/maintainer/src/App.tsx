@@ -14,6 +14,7 @@ import {
 } from "./domain";
 import type { AuthActions } from "./auth-client";
 import { createRoleWorkspace } from "../../shared/RoleWorkspace";
+import { createRoleSignIn } from "../../shared/RoleSignIn";
 import { parseSummaryResult } from "./summary";
 type Load<T> = {
   state: "loading" | "ready" | "error";
@@ -414,44 +415,30 @@ export function App({
         <p role="status">Checking access…</p>
       ) : auth === "error" ? (
         authActions && authError?.code === "session" ? (
-          <section aria-label="Sign in" className="auth-panel">
-            <h2>Sign in</h2>
-            <p>{authError.message}</p>
-            <form onSubmit={signIn}>
-              <label>
-                Username
-                <input
-                  autoComplete="username"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  disabled={!!authBusy}
-                />
-              </label>
-              <label>
-                Password
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={!!authBusy}
-                />
-              </label>
-              <button type="submit" disabled={!!authBusy}>
-                {authBusy === "signIn" ? "Signing in…" : "Sign in"}
-              </button>
-              {authBusy === "signOut" && <p role="status">Signing out…</p>}
-            </form>
-            {authActionError && (
-              <p role="alert">
-                {authActionError.code === "session"
-                  ? "Sign-in failed. Check your username and password."
-                  : messages[authActionError.code]}
-              </p>
-            )}
-          </section>
+          createRoleSignIn(
+            (type, props, ...children) => createElement(type, props as never, ...(children as ReactNode[])),
+            {
+              role: "Maintainer",
+              description: "Review reports and investigation evidence.",
+              username,
+              password,
+              busy: !!authBusy,
+              requiredCredentials: true,
+              busyLabel: authBusy === "signIn" ? "Signing in…" : "Sign in",
+              onUsernameChange: setUsername,
+              onPasswordChange: setPassword,
+              onSubmit: signIn,
+              notice: <p>{authError.message}</p>,
+              status: authBusy === "signOut" ? <p role="status">Signing out…</p> : null,
+              feedback: authActionError ? (
+                <p role="alert">
+                  {authActionError.code === "session"
+                    ? "Sign-in failed. Check your username and password."
+                    : messages[authActionError.code]}
+                </p>
+              ) : null,
+            },
+          )
         ) : (
           <div role="alert">
             <p>{authError?.message}</p>

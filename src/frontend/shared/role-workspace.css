@@ -109,6 +109,77 @@ body {
   grid-column: 1;
 }
 
+.role-sign-in {
+  display: grid;
+  gap: 0.75rem;
+  box-sizing: border-box;
+  width: min(100%, 29rem);
+  margin: 2rem auto;
+  padding: clamp(1.35rem, 4vw, 2rem);
+  border: 1px solid #d8e4e4;
+  border-radius: 0.8rem;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(24, 52, 58, 0.07);
+}
+
+.role-sign-in__eyebrow {
+  margin: 0 0 -0.35rem;
+  color: #087c80;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+}
+
+.role-sign-in h2,
+.role-sign-in__intro {
+  margin: 0;
+}
+
+.role-sign-in__intro {
+  margin-top: -0.4rem;
+  color: #52666b;
+  font-size: 0.94rem;
+}
+
+.role-sign-in form {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.role-sign-in label {
+  display: grid;
+  gap: 0.3rem;
+  color: #31545a;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.role-sign-in input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.9rem;
+}
+
+.role-sign-in button[type="submit"] {
+  margin-top: 0.35rem;
+}
+
+.role-sign-in button[type="submit"]:not(:disabled) {
+  border-color: #087c80;
+  color: #fff;
+  background: #087c80;
+}
+
+.role-sign-in button[type="submit"]:hover:not(:disabled) {
+  border-color: #075d60;
+  background: #075d60;
+}
+
+.role-sign-in [role="alert"] {
+  margin: 0.25rem 0 0;
+  color: #9a3434;
+}
+
 .role-workspace__content > main {
   width: 100%;
   max-width: none;

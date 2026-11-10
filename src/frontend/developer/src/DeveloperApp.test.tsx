@@ -316,7 +316,11 @@ describe("DeveloperApp authenticated report journey", () => {
 
   it("checks the session, signs in with the session CSRF token, and renders only the assigned list", async () => {
     render(<DeveloperApp />);
-    await screen.findByLabelText("Username");
+    const signInRegion = await screen.findByRole("region", { name: "Sign in" });
+    expect(signInRegion.classList.contains("role-sign-in")).toBe(true);
+    expect(within(signInRegion).getByLabelText("Username")).toBeTruthy();
+    expect(within(signInRegion).getByLabelText("Password")).toBeTruthy();
+    expect(within(signInRegion).getByRole("button", { name: "Sign in" })).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledWith(currentUserPath, expect.anything());
     expect(fetchMock.mock.calls.some(([path]) => String(path) === reportsPath)).toBe(false);
 

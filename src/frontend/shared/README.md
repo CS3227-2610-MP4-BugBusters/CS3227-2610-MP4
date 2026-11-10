@@ -1,9 +1,15 @@
 # Shared role workspace
 
-`RoleWorkspace.ts` provides the common application frame for the separately
-built role frontends. It accepts the framework's element factory, so each app
-can reuse the shell without adding a dependency from this shared directory to
-one app's `node_modules`.
+`RoleWorkspace.ts` and `RoleSignIn.ts` provide a common application frame and
+sign-in presentation for the separately built role frontends. They accept the
+framework's element factory, so each app can reuse the shared presentation
+without adding a dependency from this directory to one app's `node_modules`.
+
+`RoleSignIn.ts` renders controlled username and password fields, the submit
+button, and optional status, notice, or error content. The consuming app owns
+credential state, event handlers, busy state, and authentication. The shared
+presentation does not choose a role, call an API, redirect, or authorize a
+user.
 
 The shell accepts a role label, optional signed-in identity, an authenticated
 flag, navigation entries, optional account actions, and the role's own content.
@@ -15,7 +21,7 @@ Import `role-workspace.css` from the role app's stylesheet. When building the
 frontends in Docker, copy this directory beside both app directories so their
 relative imports resolve in the same way as local builds.
 
-Reporter can use the same interface when its frontend and authorized services
+Reporter can use the same interfaces when its frontend and authorized services
 are available. This directory does not implement a Reporter screen or imply
 that Reporter integration has been tested.
 

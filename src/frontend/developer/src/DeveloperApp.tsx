@@ -3,6 +3,7 @@ import { DeveloperChecklist } from "./DeveloperChecklist";
 import { DeveloperPrivateNotes } from "./DeveloperPrivateNotes";
 import { DeveloperNotifications } from "./DeveloperNotifications";
 import { createRoleWorkspace } from "../../shared/RoleWorkspace";
+import { createRoleSignIn } from "../../shared/RoleSignIn";
 
 type User = {
   id: string;
@@ -391,35 +392,19 @@ export function DeveloperApp() {
     <main>
       <h1>Developer reports</h1>
       {sessionState === "checking" && <p role="status">Checking your session…</p>}
-      {sessionState === "signed-out" && (
-        <section className="developer-sign-in" aria-label="Sign in">
-          <p className="developer-sign-in__eyebrow">DEVELOPER WORKSPACE</p>
-          <h2>Sign in</h2>
-          <p className="developer-sign-in__intro">Sign in to view and investigate your assigned reports.</p>
-          <form onSubmit={(event) => void signIn(event)}>
-            <label htmlFor="username">Username</label>
-            <input
-              id="username"
-              name="username"
-              autoComplete="username"
-              value={username}
-              disabled={busy}
-              onChange={(event) => setUsername(event.target.value)}
-            />
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              disabled={busy}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-            <button type="submit" disabled={busy}>Sign in</button>
-          </form>
-          {error && <p role="alert">{error}</p>}
-        </section>
+      {sessionState === "signed-out" && createRoleSignIn(
+        (type, props, ...children) => createElement(type, props as never, ...(children as ReactNode[])),
+        {
+          role: "Developer",
+          description: "Sign in to view and investigate your assigned reports.",
+          username,
+          password,
+          busy,
+          onUsernameChange: setUsername,
+          onPasswordChange: setPassword,
+          onSubmit: (event: FormEvent<HTMLFormElement>) => void signIn(event),
+          feedback: error ? <p role="alert">{error}</p> : null,
+        },
       )}
       {sessionState === "denied" && (
         <section>
