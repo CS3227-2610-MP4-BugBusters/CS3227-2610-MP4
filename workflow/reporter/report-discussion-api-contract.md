@@ -1,6 +1,6 @@
 # Report discussion backend contract
 
-**Status:** Draft for feature-owner approval, 10 November 2026 (task 1.3).
+**Status:** revision 1 **approved** by the feature owner, 10 November 2026 (task 1.3). The approved body is the draft with sha256 026dc8e3 (LF), unchanged apart from this line.
 
 **Source requirements:**
 - `openspec/changes/report-discussion/specs/report-discussion/spec.md` (DSC-01..06)

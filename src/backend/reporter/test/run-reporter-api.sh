@@ -25,7 +25,7 @@ case "$(uname -s)" in
 ' "$1"; } ;;
 esac
 srcs=""
-for f in "$here"/../src/*.java; do [ -e "$f" ] && srcs="$srcs $f"; done
+for f in "$here"/../src/*.java "$here"/../../discussion/src/mp4/discussion/*.java; do [ -e "$f" ] && srcs="$srcs $f"; done
 # shellcheck disable=SC2086
 javac --release 17 --add-modules jdk.httpserver -cp "$(native "$POSTGRES_JDBC_JAR")" -d "$(native "$scratch/classes")" $srcs "$(native "$here/ReporterApiHarness.java")"
 python -B "$here/make_actors.py" > "$scratch/env"
@@ -34,6 +34,16 @@ python -B "$here/make_actors.py" > "$scratch/env"
 export MP4_TEST_ACTORS MP4_TEST_POOL
 export MP4_TEST_ID_R1 MP4_TEST_ID_R2 MP4_TEST_ID_R3 MP4_TEST_ID_D1 MP4_TEST_ID_M1
 export MP4_TEST_TOKEN_R1 MP4_TEST_TOKEN_R2 MP4_TEST_TOKEN_R3 MP4_TEST_TOKEN_D1 MP4_TEST_TOKEN_M1
+# Discussion display names come from the real auth accounts table (V100), with one row per synthetic actor.
+accounts_sql="$here/../../auth/src/main/resources/db/auth/V100__create_auth_accounts.sql"
+python -B -c 'import os
+rows = []
+for n, entry in enumerate(e for e in os.environ["MP4_TEST_ACTORS"].split(";") if e):
+    uid, role, active = entry.split("=", 1)[1].split(":")
+    rows.append("(%r,%r,%r,%r,%r,%s)" % (uid, "actor-%d" % n, "Test %s %d" % (role.title(), n), "unused", role, active))
+print("INSERT INTO public.app_accounts (id,username,display_name,password_hash,role,active) VALUES %s;" % ",".join(rows))' > "$scratch/accounts.sql"
+cat "$accounts_sql" "$scratch/accounts.sql" | docker exec -i "$MP4_TEST_PG_CONTAINER" \
+  psql -v ON_ERROR_STOP=1 -q -U mp4_fixture -d "$MP4_TEST_DATABASE_NAME"
 java --add-modules jdk.httpserver -cp "$(native "$scratch/classes")$sep$(native "$POSTGRES_JDBC_JAR")" mp4.reporter.ReporterApiHarness > "$scratch/origin" &
 pid=$!
 i=0

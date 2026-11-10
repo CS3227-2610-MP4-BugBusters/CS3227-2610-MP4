@@ -31,3 +31,19 @@ databases only. Only the Reporter runner
 (`src/backend/reporter/test/run-reporter-db.sh`) applies it; the shared and
 Developer runners apply `001` only, so their schemas do not include these
 columns.
+
+## 003 report comments
+
+`migrations/003_report_comments.sql` (report-discussion D1) adds the
+`report_comments` table (`id, report_id, author_id, author_role, text,
+created_at`) with indexes on `(report_id, created_at, id)` and
+`(author_id, created_at)`. The comment column is `text`, as in the Maintainer's
+table; the API field is `body`. Apply it after `002`, on fresh databases only.
+Only the Reporter runner applies it.
+
+The deployed database already has `report_comments` from the Maintainer's
+`V3__maintainer_evidence.sql`, without `author_role`. The deployed app applies
+`src/backend/auth/src/main/resources/db/shared/V5__report_comments.sql`, which
+does not create the table: it adds `author_role`, backfills existing rows with
+`'MAINTAINER'`, sets it `NOT NULL`, adds the role check and both indexes. It is
+idempotent, and the resulting shape is the same as `003`'s.

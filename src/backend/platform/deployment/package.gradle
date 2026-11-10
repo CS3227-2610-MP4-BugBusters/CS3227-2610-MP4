@@ -47,6 +47,17 @@ allprojects {
                     }
                 }
 
+                def reporterFrontend = project.providers.gradleProperty('reporterFrontendDist').orNull
+                if (reporterFrontend != null) {
+                    if (!new File(reporterFrontend).isDirectory()) {
+                        throw new GradleException('Reporter frontend distribution is unavailable.')
+                    }
+                    project.copy {
+                        from reporterFrontend
+                        into new File(classesDirectory, 'static/reporter')
+                    }
+                }
+
                 def revision = project.providers.gradleProperty('buildRevision').orElse('unknown').get()
                 if (!(revision ==~ /[A-Za-z0-9._-]{1,128}/)) {
                     throw new GradleException('Build revision is invalid.')

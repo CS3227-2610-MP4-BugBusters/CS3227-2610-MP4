@@ -328,3 +328,183 @@ The security review is still running.
 - `_csrf` is accepted as a query parameter. This comes from the global configuration.
 
 All stated checks have passed. Task 2.11 (`reporter-markdown-reports`) and task 1.4 (`report-discussion`) are ticked.
+
+## Task 1.3: discussion contract approved (10 Nov)
+
+**Summary:** The feature owner approved the report-discussion API contract ("approve discussion contract"). Only the status line changed. From now on the file is read-only for every agent, and any later change resets the dependent Red baselines.
+
+- File: `workflow/reporter/report-discussion-api-contract.md`, revision 1.
+- Draft body sha256 (LF-normalised): `026dc8e35a254a01cf9b7dc13664b086a5904586c3cbde2063237d51bbba6f4d`.
+- Approved file sha256 (LF-normalised, with the new status line): `c8bb2249da3a435675217b9b5067e8b799a65357b85b6336ff01808d37037642`.
+- Revision: HEAD `d9a04eb` plus this working-tree change.
+- Still blocking group 2: task 1.1 (Maintainer owner approval of D3 and D4, and Developer and Maintainer sign-off of migration `003_report_comments.sql`).
+
+## Exception: 2.1 started before 1.1 (10 Nov)
+
+The feature owner said "just start" when told that group 2 waits on 1.1. Task 2.1 (migration `003_report_comments.sql`) therefore begins its Red step without the Maintainer owner's D3/D4 approval and without Developer and Maintainer sign-off of the migration. Task 1.1 stays open. If those owners ask for changes, the 2.1 baseline and implementation are revisited.
+
+## Task 2.1 Red: migration `003_report_comments.sql` (10 Nov)
+
+**Summary:** `test_designer` wrote `src/backend/reporter/test/report_comments_migration_test.py` (LF sha256 `e173b46f894c2b3984cf8da8a4b719588b5f10acf6bc3de08be1d89c682acfd3`). All 8 checks fail because the table and file don't exist; the control `report_timestamps_migration_test.py` passes 6/6 in the same runner. A fresh `baseline_verifier` returned **RED-CONFIRMED** with LOW/info findings only: the negative role probe covers ADMIN, `reporter` and the empty string; error-text matching; and the shared-storage suite must be run at Green (task 2.1 says so).
+
+- Revision: HEAD `d9a04eb` plus working tree.
+- Command: `sh src/backend/reporter/test/run-reporter-db.sh python -B src/backend/reporter/test/report_comments_migration_test.py` (rc 1, 8/8 FAIL, missing relation or file).
+- Awaiting feature-owner approval of the baseline.
+
+**Owner approval (10 Nov):** "approve 2.1". The baseline at LF sha256 `e173b46f…2acfd3` is approved, and the owner also approved adding the Flyway copy `src/backend/auth/src/main/resources/db/shared/V5__report_comments.sql` (idempotent, same schema as `003`) so the deployed app gets the table.
+
+## Task 2.1 Green and verification (10 Nov)
+
+**Summary:** `implementer` added `src/backend/shared/migrations/003_report_comments.sql` (LF `e3014538a1f2…`) and the idempotent Flyway copy `src/backend/auth/src/main/resources/db/shared/V5__report_comments.sql` (LF `719d9ae84193…`), and updated `src/backend/reporter/README.md` and `src/backend/shared/README.md`. A fresh `candidate_verifier` returned **PASS** with no blocking findings. Task 2.1 is ticked.
+
+- Baseline `report_comments_migration_test.py` LF `e173b46f…2acfd3` unchanged: 8/8 PASS. Control timestamps test: 6/6 PASS.
+- Shared-storage suite: PASS (SR-01, SR-02, SR-03). It ran in a disposable postgres:17 container because the host has no `initdb`. It applies only 001, so it doesn't exercise 003.
+- Flyway: `SharedSchemaStartupIntegrationTest` 4/4 and `ReporterApiMountTest` 5/5 (implementer run; `mp4_shared_schema_history` showed V5 applied). The verifier reran the startup test 4/4, applied V5 via psql on 001+002 databases (also twice, and after 003), and found 003 and V5 schema-identical. There is no other V5 in any `db/shared` location.
+- LOW: the verifier did not itself drive V5 through Flyway history (the implementer's run did). Index names are not fixed by D1. V5's `IF NOT EXISTS` would skip a pre-existing, different table, the same tradeoff as V4.
+- Not yet in CI: `report_comments_migration_test.py` is not in the `reporter` group of `workflow/verify.py`.
+
+## Task 2.2 Red: Reporter comment endpoint (10 Nov)
+
+**Summary:** `test_designer` wrote `src/backend/reporter/test/report_discussion_api_test.py` (LF sha256 `371cc0956c7d6e55114f577df16cf9f78c82f98ba5a08ab715eea5361a12a9fc`) against the approved contract (`c8bb2249…`). There are no runner, harness or fixture changes. Of 17 tests, 15 fail because the endpoint doesn't exist (every `/comments` request currently gets the RPT-05 404). The other 2 are regression guards that already pass: the RPT-05 404 for other, missing and malformed IDs, and the 404 below `/comments`. Control `read_own_report_api_test.py`: 5/5 OK. A fresh `baseline_verifier` returned **RED-CONFIRMED** with two MINOR findings:
+1. Lines 148-150 assert a POST with an unknown query parameter gives 400. The contract defines query parameters only for GET.
+2. The uppercase-UUID 404 case. The live read endpoint already returns 404 for it, since the guard test passes today, so the two stay consistent.
+
+Info: `author.displayName` is asserted only as a key, because the harness database has no accounts table.
+
+- Command: `sh src/backend/reporter/test/run-reporter-api.sh src/backend/reporter/test/report_discussion_api_test.py` (rc 1, `failures=39, errors=3` across subtests).
+- Awaiting feature-owner decisions and approval.
+
+**Owner approval (10 Nov):** "approve 2.2, drop the POST query check". The orchestrator removed the unknown-query-parameter POST 400 assertion (old lines 148-150) and renamed the test to `test_dsc01_identity_header_never_selects_the_author`. Nothing else changed. The uppercase-UUID case stays, because the read endpoint already gives the same 404. `displayName` is to be checked with real accounts in 2.4.
+- Approved baseline LF sha256: `8edbb0f951413d9694eb0796859bc4938cfcf3801b4015cf0bb97af3866489c2`.
+
+## Task 2.2 Green: blocked on a schema conflict (10 Nov)
+
+**Summary:** `implementer` made the approved baseline pass in the harness (17/17), with no regressions:
+- Reporter API tests: 116/116.
+- 2.1 migration test: 8/8.
+- Auth `ReporterApiMountTest` 5/5 and `SharedSchemaStartupIntegrationTest` 4/4.
+- `docker build`: succeeded.
+
+Through a real auth-server session, however, comment POST and GET return **500**. The cause is that the Maintainer's `V3__maintainer_evidence.sql` already creates `report_comments (id, report_id, author_id, text, created_at)`, with `text` instead of `body` and no `author_role`. `JdbcMaintainerRepository` and `JdbcQueueSnapshotReader` use it. The 2.1 `V5__report_comments.sql` (`CREATE TABLE IF NOT EXISTS`) is therefore a no-op on the deployed database. The 2.1 Green and its verification missed this, because the harness applies `003` and never V3, and the Flyway tests don't check the table's shape. Task 2.1's V5 part is reopened.
+
+Implementer's changes, uncommitted:
+- New package `src/backend/discussion/src/mp4/discussion/`: `ReportDiscussionService`, `ReportDiscussionJson`, `StrictJson` (moved from `ReporterJson`) and `TextRules`.
+- Routing of `/comments` in `ReporterReportsHttpHandler`.
+- `auth/build.gradle`, the Dockerfile, and the READMEs.
+- Flagged infra change in `run-reporter-api.sh`: it compiles the discussion sources, applies the real auth `V100` accounts migration and inserts an account row per synthetic actor, so `displayName` is read by the same LEFT JOIN on `app_accounts` as in production. A missing account gives `null`.
+
+Candidate verification and the security review are on hold until the owner decides the schema fix.
+
+**Owner decision (10 Nov): "Keep `text`, add role".** Design D1 now has a "Reconciled with the Maintainer table" section:
+- The storage column is `text`; the API field stays `body`.
+- `003` creates the final shape.
+- V5 becomes an idempotent ALTER on the V3 table: it adds `author_role`, backfills `'MAINTAINER'`, and adds the check and both indexes.
+- The Maintainer comment INSERT sets `author_role = 'MAINTAINER'`.
+
+This still needs Maintainer owner sign-off (1.1). `openspec validate report-discussion --strict` passes. `test_designer` is re-doing the 2.1 Red (column rename plus deployed-path checks V1→V5) and changing the column name in the 2.2 seeding, which resets both baselines.
+
+## Re-Red after the schema decision (10 Nov)
+
+**Summary:**
+- `report_comments_migration_test.py` was amended to LF `860f4de3591979e6181cf64e6b4bab711e9aa9469e668f90e8f2b39bd1f15f01`. The column is now `text`, and new deployed-path checks apply V1→V5 on a V3-style table with a legacy row, check that V5 is idempotent, and check that the fresh and deployed shapes are identical.
+- `report_discussion_api_test.py` was amended to LF `2a9e3fe5431543cc1e50e2762a85a559eda5a4d16e8c368db45cef34fdbaff60`, with one seeding column changed from `body` to `text`.
+
+A fresh `baseline_verifier` returned **RED-CONFIRMED**. The migration test gives rc 1 with 9 FAIL and 3 PASS (primary key, indexes, fresh apply order), because `003` still uses `body` and V5 doesn't alter the V3 table. A V5 that drops and recreates the table is caught by the legacy-row check. Findings are LOW only: error-text matching, and the exact `now()` default comparison. The 2.2 file's one-line diff was verified by structure only, because the old file isn't in git. Awaiting owner approval.
+
+**Owner approval (10 Nov):** "approve" for both amended baselines (`860f4de3…` and `2a9e3fe5…`). Task 2.1 is unticked until it is re-verified.
+
+## Tasks 2.1 and 2.2 Green with the `text` column (10 Nov)
+
+**Summary:** `implementer` changed four files:
+- `003`: the column is now `text` (LF `3dbc7aad…`).
+- V5: rewritten as an idempotent ALTER of the Maintainer V3 table (LF `6e20f9cc…`).
+- The discussion service: it uses `text` (LF `ad3f4356…`).
+- `JdbcMaintainerRepository`: one line, so the comment INSERT sets `author_role='MAINTAINER'` (LF `23589178…`).
+
+No test fixtures changed. Results:
+- Migration test: 11/11 PASS.
+- Discussion API: 17/17.
+- Reporter API: 116/116.
+- Full auth Gradle suite: 143 tests, 0 failures, including the Maintainer integration and unit tests.
+- `docker build`: OK.
+- Real-session check on the schema built by the auth server's own Flyway run: V3–V5 applied. A Reporter's comment POST gave 201 and GET gave 200, with the author from the session and `displayName` from `app_accounts`, and the report version unchanged. A Maintainer comment added through the existing Maintainer endpoint appears in the Reporter GET with role MAINTAINER.
+
+Gaps:
+- The Maintainer owner's sign-off is still pending (1.1).
+- The Maintainer comment endpoint still bumps the report version, which is its existing behaviour and conflicts with D3 until 1.1.
+- The V5 backfill on real legacy rows is exercised only by the migration test.
+
+A fresh `candidate_verifier` and `security_reviewer` are running.
+
+### Security review, 2.1 and 2.2 (10 Nov)
+
+A fresh `security_reviewer` gave **PASS for the 2.2 scope, with no CRITICAL or HIGH findings**.
+
+**What held:**
+- Identity comes only from the session (spoofing headers, query, method-override and body keys were all tried).
+- The participation check and the insert are one atomic INSERT…SELECT, and the deactivation recheck is effective.
+- Not-found responses are byte-identical apart from `requestId`, in both the harness and the deployed app.
+- Pagination bounds hold, SQL is parameterised, response fields match the contract, and headers and CSRF are correct.
+- D3 holds.
+- V5 is idempotent and matches `003`.
+- Nothing test-only is packaged.
+
+**MEDIUM findings (block deployment, not merge):**
+1. No comment length cap or rate limit yet, and the Reporter mount is live. Reporter comments also feed the Maintainer AI queue summary (`JdbcQueueSnapshotReader.java:103`, the latest 3 updates), so they can crowd out history events and are an injection surface. Fix: don't deploy 2.2 without 2.3, and add a check that the AI context frames comments as untrusted data.
+2. Existing Maintainer comments, written under MNT-DISC-01 before Reporters could see discussion, become visible to the owning Reporter after the V5 backfill. Sign-off is needed under 1.1, or legacy rows are excluded.
+
+**LOW and INFO findings:**
+- A lone surrogate is stored lossily as `?`, and U+0000 gives 500. Both are deferred to 2.3.
+- An authenticated OPTIONS gets Spring's 200 (pre-existing, same as the 1.4 LOW).
+- A rolling deploy briefly breaks the old Maintainer INSERT after V5 sets NOT NULL.
+- A deactivation racing a post gives 401 rather than 403, which is the existing pattern.
+
+### Candidate verification, 2.1 and 2.2 (10 Nov)
+
+A fresh `candidate_verifier` returned **PASS**:
+- Hashes: both baselines and the contract are unchanged.
+- Scope: the `git status` scope matches the candidate exactly.
+- Tests: migration test 11/11, discussion API 17/17, Reporter API 116/116. Full auth Gradle suite 143/143 against postgres:17-alpine, with Flyway applying V3–V5 and the result matching `003`'s shape.
+- Code review: matches the contract. `StrictJson` and `TextRules` are behaviour-preserving moves. The `run-reporter-api.sh` change is acceptable test infrastructure.
+
+**INFO findings:**
+- 405 is checked before the session (the existing ordering; the contract doesn't fix it).
+- `displayName` is null for a missing account (the contract doesn't fix it).
+- Developer and Maintainer roles fail closed until 2.4.
+
+Tasks 2.1 and 2.2 are ticked. **Deployment hold:** don't deploy until 2.3 (length cap and rate limit) is done and 1.1 is signed off, including the visibility of existing Maintainer comments to Reporters (security MEDIUM 1 and 2).
+
+## Reporter web app (10 Nov, owner instruction, no TDD)
+
+**Summary:** On the feature owner's instruction ("dont use tdd Do the front end for reporter using github alike design"), I built `src/frontend/reporter`, a React 19 and Vite 8 app at `/reporter/` in an issue-tracker style:
+- a list with open/closed state icons, status labels, filters and pagination;
+- a report page with a state badge and a timeline (description first, then comments), plus a sidebar;
+- a Write | Preview composer using the shared `MarkdownEditor`;
+- `MarkdownView` rendering in the shared worker;
+- create and edit (while `SUBMITTED`);
+- comments on any status;
+- drafts kept on failure, fixed error messages, and the `Retry-After` wait time shown.
+
+No independent baseline, candidate or security review was run, on the owner's instruction. Both `reporter-markdown-reports` (design non-goal) and `report-discussion` (design non-goal) exclude a Reporter app, so this is outside both changes' tasks. A new OpenSpec change should record it.
+
+**Server wiring:**
+- `AuthConfiguration` adds a `/reporter/` forward and anonymous GET on `/reporter/**`.
+- `package.gradle` copies `-PreporterFrontendDist` to `static/reporter`.
+- The Dockerfile has a `reporter-frontend` stage, which also runs `npm ci` in `shared/markdown`.
+- `src/frontend/reporter/.gitignore` ignores `node_modules` and `dist`.
+
+**Checks:**
+- `npm run verify` in `src/frontend/reporter`: typecheck, vitest 8/8, and `vite build`. The worker chunk has no `document.` reference.
+- `docker build -f src/backend/platform/deployment/Dockerfile .`: OK. This needed `start.sh` converted to LF locally; it was restored afterwards.
+- The image ran against postgres:17-alpine, with accounts created by `provisionAccount`:
+  - `/reporter/`, the JS, CSS and worker assets all return 200, and the API returns 401 without a session.
+  - A Reporter signs in, creates a report (201) and comments (201).
+  - A Maintainer comment (201) appears in the Reporter thread with role MAINTAINER.
+  - A 4th create within a minute gives 429 with `Retry-After`.
+
+**Not done:**
+- No real-browser visual check.
+- The app isn't in `workflow/verify.py`, the CI frontend matrix or the OSV lockfile scan.
+- `.gitattributes` for `*.sh` is still missing.
+
+**Seen in the run:** the Maintainer comment endpoint bumps the report version, so a Reporter edit opened before a Maintainer comment gets 409 `VERSION_CONFLICT` (the D3 conflict, task 1.1).

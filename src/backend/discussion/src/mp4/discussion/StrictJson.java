@@ -1,4 +1,4 @@
-package mp4.reporter;
+package mp4.discussion;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -8,7 +8,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Minimal strict JSON (RFC 8259) reading and writing for the Reporter API, JDK only.
+ * Minimal strict JSON (RFC 8259) reading and writing for the Reporter and discussion APIs, JDK only.
+ * Moved unchanged from {@code mp4.reporter.ReporterJson} (report-discussion design D2).
  *
  * <p>Reading accepts only what a request body may legally be: a UTF-8 object whose values are
  * strings or non-negative JSON integers that fit a PostgreSQL {@code bigint}. Anything else (other
@@ -18,10 +19,10 @@ import java.util.Map;
  * {@code \\u} escapes are decoded verbatim, so an escaped unpaired surrogate stays in the result
  * for the caller to reject instead of being replaced.
  */
-final class ReporterJson {
-    private ReporterJson() {}
+public final class StrictJson {
+    private StrictJson() {}
 
-    static Map<String, String> parseStringObject(byte[] body) {
+    public static Map<String, String> parseStringObject(byte[] body) {
         var result = new LinkedHashMap<String, String>();
         for (var field : parseObject(body).entrySet()) {
             if (!(field.getValue() instanceof String value)) {
@@ -33,7 +34,7 @@ final class ReporterJson {
     }
 
     /** Values are {@link String} or {@link Long} (0 to {@link Long#MAX_VALUE}). */
-    static Map<String, Object> parseObject(byte[] body) {
+    public static Map<String, Object> parseObject(byte[] body) {
         String text;
         try {
             text = StandardCharsets.UTF_8.newDecoder()
@@ -52,7 +53,7 @@ final class ReporterJson {
         return object;
     }
 
-    static String quote(String value) {
+    public static String quote(String value) {
         var result = new StringBuilder(value.length() + 2).append('"');
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);

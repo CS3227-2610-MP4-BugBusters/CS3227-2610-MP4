@@ -203,7 +203,7 @@ public final class JdbcMaintainerRepository implements Repository {
         @Override public void insertComment(UUID id, Comment comment) {
             requireReport(id);
             execute(c -> {
-                try (var insert = c.prepareStatement("INSERT INTO report_comments(id,report_id,author_id,text,created_at) VALUES(?,?,?,?,?)")) {
+                try (var insert = c.prepareStatement("INSERT INTO report_comments(id,report_id,author_id,author_role,text,created_at) VALUES(?,?,?,'MAINTAINER',?,?)")) {
                     insert.setObject(1, comment.id()); insert.setObject(2, id); insert.setObject(3, comment.author().id());
                     insert.setString(4, comment.text()); insert.setTimestamp(5, Timestamp.from(comment.createdAt()));
                     if (insert.executeUpdate() != 1) throw unavailable();

@@ -37,6 +37,7 @@ public class AuthConfiguration {
         return new WebMvcConfigurer() {
             @Override public void addViewControllers(ViewControllerRegistry registry) {
                 registry.addViewController("/developer/").setViewName("forward:/developer/index.html");
+                registry.addViewController("/reporter/").setViewName("forward:/reporter/index.html");
             }
         };
     }
@@ -101,6 +102,7 @@ public class AuthConfiguration {
         return http.csrf(c -> c.csrfTokenRepository(csrf))
             .authorizeHttpRequests(r -> r.requestMatchers("/api/health", "/api/auth/**", "/", "/index.html", "/assets/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/developer", "/developer/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/reporter", "/reporter/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reports/*/checklist/draft").hasRole("DEVELOPER")
                 .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/reports/*/checklist/draft").hasRole("DEVELOPER")
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/reports/*/checklist/share").hasRole("DEVELOPER")

@@ -14,6 +14,17 @@ COPY src/frontend/developer/ ./
 COPY src/frontend/shared/ ../shared/
 RUN npm run build
 
+FROM node:22-bookworm-slim AS reporter-frontend
+WORKDIR /workspace/src/frontend/shared/markdown
+COPY src/frontend/shared/markdown/package.json src/frontend/shared/markdown/package-lock.json ./
+RUN npm ci
+COPY src/frontend/shared/markdown/ ./
+WORKDIR /workspace/src/frontend/reporter
+COPY src/frontend/reporter/package.json src/frontend/reporter/package-lock.json ./
+RUN npm ci
+COPY src/frontend/reporter/ ./
+RUN npm run build
+
 FROM eclipse-temurin:17-jdk-jammy AS package
 WORKDIR /workspace/src/backend/auth
 COPY src/backend/auth/ ./
@@ -22,18 +33,21 @@ COPY src/backend/maintainer/ ../maintainer/
 COPY src/backend/socllm/ ../socllm/
 COPY src/backend/developer/src/ ../developer/src/
 COPY src/backend/reporter/src/ ../reporter/src/
+COPY src/backend/discussion/src/ ../discussion/src/
 COPY src/backend/developer/migrations/ ../developer/migrations/
 COPY src/backend/shared/migrations/ ../shared/migrations/
 COPY src/backend/platform/deployment/package.gradle ../platform/deployment/package.gradle
 COPY --from=frontend /workspace/src/frontend/maintainer/dist /workspace/frontend-dist
 COPY --from=developer-frontend /workspace/src/frontend/developer/dist /workspace/developer-frontend-dist
+COPY --from=reporter-frontend /workspace/src/frontend/reporter/dist /workspace/reporter-frontend-dist
 ARG RENDER_GIT_COMMIT
 ARG GITHUB_SHA
 RUN chmod +x ./gradlew \
     && ./gradlew --no-daemon -I ../platform/deployment/package.gradle authDistribution \
     -PbuildRevision="${RENDER_GIT_COMMIT:-${GITHUB_SHA:-unknown}}" \
     -PfrontendDist=/workspace/frontend-dist \
-    -PdeveloperFrontendDist=/workspace/developer-frontend-dist
+    -PdeveloperFrontendDist=/workspace/developer-frontend-dist \
+    -PreporterFrontendDist=/workspace/reporter-frontend-dist
 
 FROM eclipse-temurin:17-jre-jammy AS runtime
 WORKDIR /app

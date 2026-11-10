@@ -11,7 +11,7 @@ import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 
-/** Verifies fresh and Reporter V4 databases advance through shared migrations safely. */
+/** Verifies fresh and Reporter V5 databases advance through shared migrations safely. */
 class SharedMigrationVersionTest {
     private record Database(String url, String user, String password, String name, String adminUrl)
             implements AutoCloseable {
@@ -57,9 +57,10 @@ class SharedMigrationVersionTest {
         try (Database db = Database.create()) {
             var flyway = db.flyway();
             db.flyway().migrate();
-            assertEquals("6", flyway.info().current().getVersion().getVersion());
+            assertEquals("7", flyway.info().current().getVersion().getVersion());
             try (Connection c = db.connect(); Statement s = c.createStatement()) {
                 assertTrue(tableExists(c, "reports"));
+                assertTrue(tableExists(c, "report_comments"));
                 assertTrue(tableExists(c, "developer_private_notes"));
                 assertTrue(tableExists(c, "developer_notifications"));
                 s.execute("INSERT INTO reports(id,title,description,reporter_id) VALUES ('" + UUID.randomUUID()
@@ -68,18 +69,29 @@ class SharedMigrationVersionTest {
         }
     }
 
-    @Test void ReporterV4UpgradePreservesExistingReportAndAddsDeveloperStorage() throws Exception {
+    @Test void ReporterV5UpgradePreservesExistingReportAndCommentAndAddsDeveloperStorage() throws Exception {
         try (Database db = Database.create()) {
-            var flyway = db.flyway("4");
+            var flyway = db.flyway("5");
             flyway.migrate();
             UUID reportId = UUID.randomUUID();
             UUID reporterId = UUID.randomUUID();
+            UUID commentId = UUID.randomUUID();
+            UUID commentAuthorId = UUID.randomUUID();
             try (Connection c = db.connect(); var insert = c.prepareStatement(
                     "INSERT INTO reports(id,title,description,reporter_id) VALUES (?,?,?,?)")) {
                 insert.setObject(1, reportId);
                 insert.setString(2, "Reporter V4 title");
                 insert.setString(3, "preserve this report");
                 insert.setObject(4, reporterId);
+                insert.executeUpdate();
+            }
+            try (Connection c = db.connect(); var insert = c.prepareStatement(
+                    "INSERT INTO report_comments(id,report_id,author_id,author_role,text) VALUES (?,?,?,?,?)")) {
+                insert.setObject(1, commentId);
+                insert.setObject(2, reportId);
+                insert.setObject(3, commentAuthorId);
+                insert.setString(4, "REPORTER");
+                insert.setString(5, "preserve this Reporter V5 comment");
                 insert.executeUpdate();
             }
 
@@ -97,14 +109,26 @@ class SharedMigrationVersionTest {
                     assertNotNull(row.getTimestamp("updated_at"));
                     assertFalse(row.next());
                 }
+                try (var comment = c.prepareStatement(
+                        "SELECT author_id,author_role,text FROM report_comments WHERE id=? AND report_id=?")) {
+                    comment.setObject(1, commentId);
+                    comment.setObject(2, reportId);
+                    try (var row = comment.executeQuery()) {
+                        assertTrue(row.next());
+                        assertEquals(commentAuthorId, row.getObject("author_id", UUID.class));
+                        assertEquals("REPORTER", row.getString("author_role"));
+                        assertEquals("preserve this Reporter V5 comment", row.getString("text"));
+                        assertFalse(row.next());
+                    }
+                }
                 assertTrue(tableExists(c, "developer_private_notes"));
                 assertTrue(tableExists(c, "developer_notifications"));
             }
-            assertEquals("6", flyway.info().current().getVersion().getVersion());
+            assertEquals("7", flyway.info().current().getVersion().getVersion());
         }
     }
 
-    @Test void sharedMigrationVersionsAreUniqueAndPreserveReporterV4AndDeveloperV5V6() {
+    @Test void sharedMigrationVersionsAreUniqueAndKeepReporterCommentsBeforeDeveloperStorage() {
         var config = ProvisioningDatabase.Config.fromEnvironment(Map.of(
                 "MP4_AUTH_JDBC_URL", System.getenv("MP4_AUTH_TEST_JDBC_URL"),
                 "MP4_AUTH_DB_USER", System.getenv("MP4_AUTH_TEST_DB_USER"),
@@ -121,9 +145,11 @@ class SharedMigrationVersionTest {
         assertTrue(migrations.stream().anyMatch(m -> m.getVersion().getVersion().equals("4")
                 && m.getScript().contains("reporter_report_timestamps")), "Reporter timestamps retain shared V4");
         assertTrue(migrations.stream().anyMatch(m -> m.getVersion().getVersion().equals("5")
-                && m.getScript().contains("developer_private_notes")), "Developer private notes use shared V5");
+                && m.getScript().contains("report_comments")), "Reporter comments use shared V5");
         assertTrue(migrations.stream().anyMatch(m -> m.getVersion().getVersion().equals("6")
-                && m.getScript().toLowerCase().contains("notification")), "Developer notifications use shared V6");
+                && m.getScript().contains("developer_private_notes")), "Developer private notes use shared V6");
+        assertTrue(migrations.stream().anyMatch(m -> m.getVersion().getVersion().equals("7")
+                && m.getScript().toLowerCase().contains("notification")), "Developer notifications use shared V7");
     }
 
     private static boolean tableExists(Connection c, String table) throws Exception {
