@@ -11,7 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 import javax.sql.DataSource;
 
-/** Creates and reads reports owned by a Reporter resolved by the application's authentication layer. */
+/** Creates, reads, edits and closes reports owned by a Reporter resolved by the authentication layer. */
 public final class ReporterReportStore {
     public record Report(UUID id, String title, String description, String status, long version,
             Instant createdAt, Instant updatedAt) {}
@@ -36,6 +36,22 @@ public final class ReporterReportStore {
         /** Whole seconds, 1..60, until the oldest counted create leaves the window. */
         public long retryAfterSeconds() {
             return retryAfterSeconds;
+        }
+    }
+
+    /** Thrown when an edit or close matched no row; nothing was changed (design D17). */
+    public static final class Refused extends Exception {
+        public enum Reason { NOT_FOUND, LOCKED, VERSION_CONFLICT }
+
+        private final Reason reason;
+
+        Refused(Reason reason) {
+            super(null, null, false, false);
+            this.reason = reason;
+        }
+
+        public Reason reason() {
+            return reason;
         }
     }
 
@@ -86,6 +102,17 @@ public final class ReporterReportStore {
         }
     }
 
+    /** RPT-09: replaces both fields of the Reporter's unassigned SUBMITTED report at the given version. */
+    public Report edit(UUID reporterId, UUID reportId, long version, String title, String description)
+            throws SQLException, Refused {
+        return updateUnlocked(reporterId, reportId, version, "title = ?, description = ?", title, description);
+    }
+
+    /** RPT-10: closes the Reporter's unassigned SUBMITTED report at the given version; text is unchanged. */
+    public Report close(UUID reporterId, UUID reportId, long version) throws SQLException, Refused {
+        return updateUnlocked(reporterId, reportId, version, "status = 'CLOSED'");
+    }
+
     public Page list(UUID reporterId, int page, int pageSize) throws SQLException {
         long offset = ((long) page - 1) * pageSize;
         try (Connection connection = database.getConnection()) {
@@ -127,6 +154,67 @@ public final class ReporterReportStore {
                     failure.addSuppressed(rollbackFailure);
                 }
                 throw failure;
+            }
+        }
+    }
+
+    /**
+     * D17: one conditional UPDATE, so a concurrent assignment either commits first (0 rows) or waits on the
+     * row lock. {@code assignments} is a fixed SQL fragment from this class whose placeholders take
+     * {@code values}. On 0 rows the same READ COMMITTED transaction reads the row to classify the refusal.
+     */
+    private Report updateUnlocked(UUID reporterId, UUID reportId, long version, String assignments,
+            String... values) throws SQLException, Refused {
+        try (Connection connection = database.getConnection()) {
+            connection.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+            connection.setAutoCommit(false);
+            try {
+                Optional<Report> updated;
+                try (var write = connection.prepareStatement("UPDATE reports SET " + assignments + """
+                        , version = version + 1, updated_at = now()
+                        WHERE id = ? AND reporter_id = ? AND assignee_id IS NULL AND status = 'SUBMITTED'
+                          AND version = ?
+                        RETURNING id, title, description, status, version, created_at, updated_at
+                        """)) {
+                    int index = 1;
+                    for (String value : values) write.setString(index++, value);
+                    write.setObject(index++, reportId);
+                    write.setObject(index++, reporterId);
+                    write.setLong(index, version);
+                    try (var row = write.executeQuery()) {
+                        updated = row.next() ? Optional.of(readReport(row)) : Optional.empty();
+                    }
+                }
+                if (updated.isPresent()) {
+                    connection.commit();
+                    return updated.get();
+                }
+                Refused.Reason reason = refusalReason(connection, reporterId, reportId);
+                connection.rollback();
+                throw new Refused(reason);
+            } catch (SQLException | RuntimeException failure) {
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackFailure) {
+                    failure.addSuppressed(rollbackFailure);
+                }
+                throw failure;
+            }
+        }
+    }
+
+    /** Another Reporter's report is NOT_FOUND, never LOCKED or VERSION_CONFLICT. */
+    private static Refused.Reason refusalReason(Connection connection, UUID reporterId, UUID reportId)
+            throws SQLException {
+        try (var query = connection.prepareStatement("""
+                SELECT assignee_id IS NOT NULL OR status <> 'SUBMITTED'
+                FROM reports WHERE id = ? AND reporter_id = ?
+                """)) {
+            query.setObject(1, reportId);
+            query.setObject(2, reporterId);
+            try (var row = query.executeQuery()) {
+                if (!row.next()) return Refused.Reason.NOT_FOUND;
+                return row.getBoolean(1) ? Refused.Reason.LOCKED : Refused.Reason.VERSION_CONFLICT;
             }
         }
     }

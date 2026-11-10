@@ -43,3 +43,16 @@ Each run:
 
 Override the image with `MP4_TEST_PG_IMAGE`. Build and test steps for the store
 and handler are added by task 2.7.
+
+## Run the API tests
+
+Needs Docker, a JDK 17+ (`javac`, `java`), Python 3 and the PostgreSQL JDBC jar.
+The runner compiles `src/*.java` with the test harness (plain JDK plus JDBC, no
+other libraries), starts it on a loopback port against a disposable database,
+runs the given Python tests (default: both create test files) and stops the
+harness and container on exit.
+
+```sh
+POSTGRES_JDBC_JAR=/path/to/postgresql-42.x.jar sh src/backend/reporter/test/run-reporter-api.sh
+POSTGRES_JDBC_JAR=... sh src/backend/reporter/test/run-reporter-api.sh src/backend/reporter/test/create_report_api_test.py
+```

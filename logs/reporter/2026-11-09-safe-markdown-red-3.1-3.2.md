@@ -1243,3 +1243,1298 @@ Dispatched in parallel. They write separate files.
 
 The 3.14 `test_designer` was dispatched against `snap-3.14`, a copy of the
 3.12 candidate `snap-3.12g`.
+
+## 2.3 Red: Reporter create API (9 Nov)
+
+`test_designer` wrote these files in `src/backend/reporter/test/`:
+
+| File | sha256 prefix |
+|---|---|
+| `ReporterApiHarness.java` | `b276f4d6` |
+| `run-reporter-api.sh` | `63df5a49` |
+| `make_actors.py` | `a0343133` |
+| `reporter_api_support.py` | `f7b823e9` |
+| `create_report_api_test.py` | `46a50005` |
+| `create_report_validation_test.py` | `887a9868` |
+
+**How the harness works.** It loads `mp4.reporter.ReporterReportsHttpHandler`
+by reflection and answers 501 until that class exists. The actors are R1 and
+R2 (active Reporters), R3 (inactive Reporter), D1, M1, and a pool of 60 fresh
+Reporters so tests don't hit the rate limit.
+
+**Result.** All 33 tests fail with 108 subtest failures. Every one is a
+`501 != expected` status mismatch, and there are no setup errors. The Docker
+container and the Java process are cleaned up afterwards.
+
+**Verification.** A fresh `baseline_verifier` gave **PASS**. Every RPT-01..03
+scenario is covered with exact assertions. Static reading shows the tests
+resist partial fixes that trim input, normalise CRLF, count code points,
+accept unknown keys or `null`, store on failure, echo input, omit `no-store`,
+take identity from the body or a header, or validate before the session check.
+
+Non-blocking findings:
+- `test_rpt02_duplicate_key_or_case_variant_rejected` only tests a
+  case-variant key. Its name over-promises.
+- The 401 and 403 message checks are tautological. The contract doesn't fix
+  that text.
+- The read-back tests use GET list and read, so the 2.3 Green needs a minimal
+  version of the 2.4 GET endpoints.
+- The contract's status line still says "Draft", although the owner approved
+  it (sha256 `2153c287`).
+
+The 2.3 baseline is **awaiting feature-owner approval**.
+
+## Feature-owner approval 9 (9 Nov)
+
+The owner replied "yes", approving the 2.3 baseline (6 files, listed above).
+The 2.3 `implementer` was dispatched. Its scope includes the minimal GET read
+and list endpoints that the read-back tests need.
+
+## 3.13 Green: BLOCKED on a test conflict (9 Nov)
+
+The `implementer` changed only `MarkdownView.pipeline.ts` (now `b86b79ed…`).
+
+**Results**
+- The destinations test passes 81/81.
+- The depth-5,000 unlink takes 4.3–4.6 ms. The limit is 100 ms.
+- `tsc` is clean.
+
+**Blocker.** 12 rows in the approved `nolinks` and `security` tests expect
+raw parentheses in the shown destination, for example
+`t (javascript:alert(1))`. These rows were written before MDR-14. MDR-14 and
+the approved destinations test require `%28`/`%29`, for example
+`a (https://e.x/b%28c%29)`. No implementation can satisfy both. Fixing it
+needs the owner to approve updating those 12 expectations.
+
+**Other notes**
+- The owner committed `fdb8435` and `da7e75d` during the run.
+- The 3.14 `test_designer` is editing the dos, limits and inthread tests.
+  The 18 extra failures it caused are the expected 3.14 Red.
+
+## 3.14 Red: in-thread budget and bounded sanitiser (9 Nov)
+
+`test_designer` produced three test files, run against `snap-3.14` (the 3.12
+candidate):
+
+| File | Status | sha256 prefix |
+|---|---|---|
+| `inthread` | new | `7d483e71` |
+| `dos` | changed | `5849b8ca` |
+| `limits` | changed | `e4598bb9` |
+
+**dos and limits changes.** Only the mock moved, from react-markdown to the
+pipeline's `toHast`. No assertion changed. These files need re-approval.
+
+**Results.**
+- Focused run: 13 failed and 33 passed. That splits as inthread 12 failed
+  and 15 passed, limits 1 failed (the forced-throw case), and dos all
+  passing.
+- Full suite: 13 failed and 164 passed.
+- `tsc` is clean.
+
+**Red reasons.** Each failure is a missing D14 behavior:
+- no container cap;
+- react-markdown is still called in-thread;
+- no in-thread node budget;
+- property bloat takes 1.0–1.5 s;
+- the class scan reads 100k entries;
+- `children` is counted before it is cleaned;
+- `pump` overflows the stack.
+
+**Next.** A fresh `baseline_verifier` is checking the files.
+
+### 3.14 baseline verification
+
+A fresh `baseline_verifier` gave **PASS**.
+
+- **Hashes and diffs:** they match. The dos and limits diffs change only the
+  mocks.
+- **Coverage:** the three repros appear verbatim, the in-thread budget is
+  tested, and parity holds.
+- **Partial fixes:** every partial fix is caught. The one exception is a
+  recursive `pump` that happens to fit a larger stack.
+- **Timing:** a correct key read takes about 0.1 ms. The candidate takes
+  about 1.2 s, against a 300 ms bound.
+- **Counts:** 13 failed and 164 passed, both plain and shuffled. `tsc` exits 0.
+
+**Non-blocking:**
+- No guard covers a realistic report of about 300 mixed `- a` / `  - b`
+  lines. A `MAX_TOTAL_CONTAINERS` value that is too low would therefore go
+  uncaught.
+- The `pump` limitation above.
+- The absolute timings could be flaky on CI.
+
+## Feature-owner decision 11 (9 Nov): "update the 12"
+
+The owner approved updating 12 rows in the approved `nolinks` and `security`
+tests, so they expect `%28`/`%29` per MDR-14. A `test_designer` was
+dispatched to make the change.
+
+The 3.14 baseline (`inthread` 7d483e71, `dos` 5849b8ca, `limits` e4598bb9)
+has not been approved yet. The suggested 300-line nested-list guard was not
+requested.
+
+### 12-row parenthesis amendment
+
+`test_designer` changed 3 lines in two test files:
+- `nolinks` is now `116be7ff…`.
+- `security` is now `861eca10…`.
+
+Each change maps `(` to `%28` and `)` to `%29`, in the shown destination only.
+
+Results:
+- On the 3.13 candidate, nolinks, security and destinations give 145/145.
+- On a pre-3.13 copy, exactly the intended 12 rows fail.
+- `tsc` exits 0.
+
+A fresh `baseline_verifier` was dispatched. The 3.14 `test_designer` was
+resumed to add the nested-list guards (owner: "add the guard").
+
+### Verification of the amendment and of 3.14 revision 2
+
+- **12-row amendment:** a fresh `baseline_verifier` gave **PASS**. The diff
+  touches 3 lines and only the destination slot. Exactly the 12 intended
+  rows fail before 3.13 and pass after it. `tsc` exits 0. This unblocks the
+  3.13 Green, which is now frozen at `scratchpad/snap-3.13g` for candidate
+  verification and security review.
+- **3.14 revision 2:** `inthread` is now `032833fd…`. Two nested-list guards
+  were added: 300 alternating bullets, and a mixed report of 150 bullets plus
+  quotes and headings. The full suite gives 13 failed and 166 passed. A
+  re-verification was dispatched.
+
+### 3.13 candidate verification
+
+A fresh `candidate_verifier` gave **PASS** on `snap-3.13g`.
+
+- Only `pipeline.ts` changed (`b86b79ed`). All hashes match.
+- 247 tests passed and 13 failed, with the same result when shuffled. All 13
+  failures are the pending 3.14 Red tests: 12 in `inthread` and 1 in `limits`.
+  Every approved 3.13 file passes. `tsc` exits 0.
+- The diff matches the brief:
+  - the unlink is a linear explicit-stack pass;
+  - image alt text counts toward the displayed text;
+  - both paths share `destinationSuffix`.
+- The implementer's choices are acceptable:
+  - (a) ASCII-only trim;
+  - (b) raw HTML counted as displayed text;
+  - (c) a hidden character forces the suffix;
+  - (d) only the characters the spec names are escaped.
+- Parity holds on 12 sources. Timings:
+  - unlink at depth 5,000: 2.0 ms;
+  - unlink at depth 20,000: 3.9 ms;
+  - a 26k-character hostile destination: 18.9 ms.
+- Non-blocking: the footnote parity source didn't render the footnote body.
+
+3.13 closes once the `security_reviewer` passes.
+
+### 3.14 revision 2 verification
+
+A fresh `baseline_verifier` gave **PASS**.
+
+- **Diff and guards:** the diff only adds the two guards.
+- **Container counts:** the guards bracket the cap from below and the repros
+  from above. Any cap from 300 to 9,407 satisfies both:
+
+  | Input | Containers |
+  |---|---|
+  | Guard 1 | 300 |
+  | Guard 2 | 170 |
+  | Repro 1 | 10,000 |
+  | Repro 2 | 18,272 |
+  | Repro 3 | 9,408 |
+
+- **Counts:** 13 failed and 166 passed. `tsc` exits 0.
+
+**Non-blocking findings:**
+- Shuffled runs of `inthread` gave 11–13 failures.
+  - The 2M class-list test with a 300 ms bound passed once on the candidate,
+    so it is timing-dependent.
+  - `guard: link as text`, in the parity group from revision 1, failed once
+    under shuffle. This suggests state leaks between tests.
+- The two new guards aren't involved.
+
+## 2.3 Green: BASELINE DEFECT (9 Nov)
+
+The `implementer` finished, with HEAD now at `da7e75d`.
+
+**New and changed files**
+
+| File | sha256 prefix |
+|---|---|
+| `ReporterReportsHttpHandler.java` | `b61ad941` |
+| `ReporterReportStore.java` | `cc9177e1` |
+| `ReporterJson.java` | `b35d87b4` |
+| `README.md` | `3f351393` |
+
+**Results**
+- Each approved file passes when run alone: the API tests 12/12 and the
+  validation tests 21/21.
+- A scratch smoke test of list, read, 404 equivalence, 405 and auth behaved
+  as the contract requires.
+- The migration test passes 6/6.
+
+**Defect.** The required combined run fails 3 validation "accepted" tests with
+`count 2 != 1`. The cause is `reporter_api_support.fresh_reporter()`: it keeps
+its pool cursor in memory, so each Python process starts again at index 0 and
+reuses Reporters that already have reports. The fix belongs in the test
+support code, which needs owner approval.
+
+**Implementer choices, for review**
+- The JSON reader is strict and JDK-only: UTF-8 is strict, duplicate keys
+  are rejected, and the body is capped at 128 KiB.
+- `now()` comes from the same INSERT, so both timestamps share one database
+  instant.
+- The rate-limit slot sits inside the create transaction.
+- Fixed messages are used for every error code.
+- Routing is checked first, then the method, then the session. A 405 is
+  therefore returned before a 401.
+- Only lowercase canonical UUIDs are accepted; anything else returns 404.
+
+### 3.13 security review (10 Nov)
+
+`security_reviewer` on `snap-3.13g` gave **FAIL**: 1 HIGH, 1 MEDIUM and
+3 LOW findings.
+
+**1. HIGH: CPU DoS regression.** `showPercentRun` throws and catches a
+`URIError` for every invalid UTF-8 lead byte. It also runs again for every
+reference to the same definition. Repro:
+
+```
+"[r]: <" + "%E2%80"×800 + ">\n\n" + "[r] "×3000
+```
+
+This is 16.8k characters.
+
+| Path | 3.12 | 3.13 |
+|---|---|---|
+| `toHast` | 98 ms | 46 s |
+| In-thread | 149 ms | 43 s |
+
+Even valid `%E2%80%8B`×530 with 3,000 references takes about 1 s.
+
+**2. MEDIUM: an RLO in the link text reverses the shown suffix.** The suffix
+has no bidi isolation. This affects:
+- autolinks with a hidden character, which keep the raw character in the text;
+- inline links of the form `[‮](moc.knab//:sptth)`.
+
+The visual effect was reasoned from UAX #9, not rendered in a browser.
+
+**3. LOW: some invisible characters show raw, with no marker.** These are not
+Cf or Z, so they fall outside the current rule:
+- Hangul fillers;
+- U+2800;
+- variation selectors;
+- combining marks;
+- C0 and C1 controls;
+- lone surrogates.
+
+**4. LOW: lookalike parentheses can forge a second suffix.** Fullwidth,
+ornate, small and superscript forms, and ⟮⟯, all work. An ASCII space is not
+escaped.
+
+**5. LOW, hostile worker only:** text under an `input` is counted but never
+displayed, which suppresses the suffix.
+
+**No issue found** in:
+- marker coverage for every Cf, Z and NEL character, whether raw, encoded or
+  entity;
+- the omission rule;
+- the linear unlink (25k deep in 25 ms or less);
+- 0 `a` and 0 `href`;
+- footnotes;
+- the 262 probes from 3.11;
+- parity.
+
+3.13 stays open.
+
+## Feature-owner decision 12 (10 Nov): "fix both"
+
+Two test fixes were dispatched in parallel. They touch separate files.
+
+1. **2.3 test support.** `fresh_reporter()` will skip pool Reporters that
+   already have reports. Afterwards, Red will be re-proved without the
+   candidate.
+2. **3.14 `inthread` flakiness.**
+   - Isolate the state that leaks between tests.
+   - Add structural assertions alongside the timing bounds: a class-index read
+     count, and an `ownKeys` count.
+   - Run the file shuffled 5 times with different seeds.
+
+**Not yet decided:** the proposed 3.13 rework for the security review
+findings (HIGH DoS, MEDIUM bidi, and 3 LOW).
+
+### 2.3 pool amendment
+
+`test_designer` changed `reporter_api_support.py` (now `b060ff51…`). It
+replaced the in-memory cursor with a set of Reporters already handed out and a
+database count check. If the pool is exhausted, it raises a clear error.
+
+Results:
+- With the candidate: 12 + 21 tests pass.
+- Without the candidate: every failure is a 501.
+- The source hashes were restored afterwards.
+
+A fresh `baseline_verifier` gave **PASS**:
+- only `fresh_reporter()` changed, and no assertion was touched;
+- three consecutive runs each gave 12 OK and 21 OK;
+- no containers or harness processes were left behind.
+
+Note: the validation file takes about 71 s because each call runs one
+`docker exec`.
+
+The amendment is **awaiting owner approval**. After that, the 2.3 candidate
+goes to `candidate_verifier` and `security_reviewer`.
+
+## Feature-owner approval 10 (10 Nov): "approve for me"
+
+The owner delegated the open decisions to the orchestrator, which applied its
+own recommendations:
+
+1. **2.3 test-support amendment** (`b060ff51`): approved. The 2.3 candidate
+   now goes to `candidate_verifier` and `security_reviewer`.
+2. **3.14 revision 3** (`inthread` e92d8810, `dos` 5849b8ca, `limits`
+   e4598bb9): approved, on condition that the running re-verification
+   passes. The 3.14 `implementer` starts after that.
+3. **"fix 3.13"**: approved, as recommended. The spec gains new requirement
+   MDR-15, "Shown destinations are isolated, complete and cheap", with two
+   scenarios. New task 3.15 covers all five findings, and 3.13 closes when
+   3.15 passes. `openspec validate --strict` reports valid.
+- The 3.14 revision 3 re-verification passed: 5 seeds each gave exactly 12
+  failures, and the full suite gave 13 failed and 166 passed. Approval of 3.14
+  is now unconditional.
+- Orchestrator refinement to MDR-15: the suffix is isolated with a
+  `bdi dir="ltr"` element, not with U+2066/2069 characters. This keeps the
+  text content identical, so the approved exact-text expectations across the
+  test files stay valid.
+
+### 2.3 candidate verification (10 Nov)
+
+A fresh `candidate_verifier` gave **PASS**.
+
+**Integrity.** All hashes match. No test, migration or contract changed,
+except the approved support amendment.
+
+**Test runs.**
+- API tests 12/12 and validation tests 21/21.
+- Migration test passes.
+
+**Code review.**
+- SQL is fully parameterised.
+- Checks run in order: session, then validation, then store. The store runs
+  in a transaction, so nothing is stored on a 400.
+- Lengths are counted in UTF-16 units.
+- NUL and lone surrogates are rejected after decoding.
+- The JSON parser is strict.
+- The 128 KiB cap is enforced. A body of exactly 131072 bytes is accepted and
+  131073 is rejected.
+- Both timestamps come from a single `now()`.
+- Responses use the error envelope and `no-store`.
+- Read and list are both filtered by `reporter_id`.
+
+**Black-box checks.**
+- 405 on PUT, DELETE and PATCH.
+- Paging edges.
+- 404 responses for another owner's report, a missing id, a malformed id and
+  an uppercase id are byte-identical apart from `requestId`.
+
+**Non-blocking findings.**
+- A 405 is returned before a 401.
+- An unknown path returns `REPORT_NOT_FOUND`.
+- A `RuntimeException` produces a bare 500 from the harness, with no envelope
+  and no `no-store`. This path is currently unreachable. Fix: catch it in
+  `handle()`.
+- A percent-encoded paging value returns 400.
+
+**Status.** 2.3 closes after the `security_reviewer` passes.
+
+## 3.15 Red: MDR-15 (10 Nov)
+
+`test_designer` wrote `test/MarkdownView.destinations2.test.tsx`
+(`7e9c510b…`).
+
+**Result:** 130 tests, 116 failed, 14 passed. The 14 passes are 7 guards,
+each run on both paths. `tsc` is clean.
+
+**Red timings:**
+- DoS repro: `toHast` takes 30.8 s; the in-thread render 40.2 s; the worker
+  path 48.9 s.
+- Valid ×530 case: about 1.2 s against a 1 s bound. This is narrow.
+
+A fresh `baseline_verifier` was dispatched.
+
+### 2.3 security review (10 Nov)
+
+**Verdict:** PASS from `security_reviewer`. No CRITICAL or HIGH findings.
+Task 2.3 is marked complete.
+
+**What held:**
+- **Authorization:** 401 and 403 on every endpoint. Identity in headers, query
+  or body is ignored or rejected.
+- **404 equivalence:** identical bytes across 9 id forms. Timing for "other
+  owner" and "missing" is indistinguishable (|z| < 2, and the sign flips
+  between runs).
+- **Strict JSON:** over 60 hostile bodies were rejected, each in under 100 ms.
+- **Body cap:** holds for chunked bodies and for bodies with no
+  `Content-Length`.
+- **Boundaries:** exact.
+- **SQL:** fully parameterised.
+- **Database outage:** returns a 500 with the error envelope and `no-store`.
+- **Headers:** correct on every status.
+
+**Findings:**
+
+| Severity | Finding | Fix |
+|---|---|---|
+| MEDIUM (harness) | The harness runs on a single dispatcher thread, and `readBounded` has no deadline. A stalled body blocks every other request. The 2.6 concurrency test would pass without the advisory lock. | Give the harness an executor (thread pool) before the 2.6 Red. Production needs read timeouts. |
+| LOW | A `RuntimeException` produces a bare 500 (code review only). | Also catch `RuntimeException` in `handle()`. |
+| LOW | Titles accept U+2028, U+2029, NEL, VT, FF, TAB, ESC and RLO. The contract only names `\r` and `\n`. | Owner decision. |
+| LOW | `Content-Type` is not checked, which would allow CSRF once cookie sessions arrive. | Owner decision. |
+
+**Info:**
+- Errors raised by the JDK HTTP layer itself are `text/html` without
+  `no-store`.
+- Keep READ COMMITTED for D10, and compute `Retry-After` from the same `now()`.
+
+### 3.15 baseline verification (10 Nov)
+
+`baseline_verifier` gave **FAIL**, because the recorded evidence does not
+match a re-run. The test file itself is sound.
+
+**Correction to the counts above.** The Red result is 114 failed and 16
+passed, not 116 and 14. The command must include `--environment jsdom`.
+
+**Why the counts differ.** The two "valid ×530" tests pass on the candidate
+(765 and 665 ms), so they are guards, not Red tests. The designer's earlier
+1.2 s measurement depended on machine load.
+
+**Non-blocking findings:**
+- The toHast-only bound of 500 ms is stricter than the spec.
+- The void-element cases run on the worker path only.
+- No test forces memoising. That is fine, because linear time is what the
+  spec requires.
+- The assertions that `bdi` carries only `dir` and that no element has
+  `[style]` are deliberate hardening, recorded by the orchestrator.
+
+**What held:**
+- Contract coverage.
+- Partial-fix resistance for the `bdi` element, raw and percent-encoded
+  forms, supplementary-plane characters, surrogates and all ten brackets.
+- Raw controls and surrogates reach the parsed URL intact.
+
+**Fix in progress (revision 2):**
+- Relabel the two valid tests as guards.
+- Relax the toHast bound to 1000 ms.
+- Document why the void-element cases are worker-only.
+
+## 3.14 Green: one render path (10 Nov)
+
+The `implementer` reported GREEN.
+
+**Changed files**
+
+| File | New hash |
+|---|---|
+| `limits` | `32830b3a` |
+| `MarkdownView.tsx` | `63a28827` |
+| `runner` | `74c27763` |
+
+`pipeline.ts` is unchanged at the 3.13 version, `b86b79ed`.
+
+**What changed**
+
+- `MAX_TOTAL_CONTAINERS` is set to 2,000. The guards contain 300 and 170
+  containers; the repros contain 9,408 or more. At this cap, `toHast` takes
+  about 150 ms or less in Node.
+- In-thread rendering now uses `toHast`, then `sanitizeHast` (clean first,
+  then count), then `HastView`. react-markdown is no longer imported from
+  `src`. The package dependency stays, because the approved inthread test
+  mocks it.
+- Properties are read from a fixed key list. Each element reads at most 8
+  class entries.
+- `pump` is now a loop.
+
+**Results**
+
+- All approved files pass: inthread 29/29, limits 4/4, dos 15/15, and every
+  other file. `tsc` is clean.
+- 3 shuffled seeds each give 276 passed and 114 failed. All 114 failures are
+  in the 3.15 Red file `destinations2`, as expected.
+
+**Implementer notes**
+
+- `markdown.worker.ts` still counts the raw `toHast` output.
+- `inThreadRunner.parse` does not count nodes.
+- The container count over-counts prose like " - ".
+
+**Next:** the candidate is frozen at `scratchpad/snap-3.14g`.
+`candidate_verifier` and `security_reviewer` were dispatched in parallel.
+
+### 3.15 revision 2 verification
+
+`destinations2` is now `392fef4a…`. A fresh `baseline_verifier` gave **PASS**.
+
+- **Runs:** 114 failed and 16 passed, both plain and shuffled. `tsc` exits 0.
+- **Passing tests:** 14 tests in the "MDR-15 guards" describe, plus 2
+  tests prefixed `guard:`. Two tests in the guards describe ("suffix sits in a
+  bdi") fail, as expected for Red.
+- **DoS timings:** still Red at the 1000 ms bound: `toHast` takes 20.9 to
+  28.5 s, and the in-thread and worker renders take 24.7 to 28.5 s.
+
+The 3.15 baseline is **awaiting feature-owner approval**.
+
+### 3.14 candidate verification (10 Nov)
+
+A fresh `candidate_verifier` ran on `snap-3.14g` and gave **PASS**.
+
+- **Scope of change:** only the 3 intended source files changed.
+- **Tests:** every approved and regression file passes, 276 tests in total.
+  The only failures are 114 in the pending 3.15 file. Two shuffle seeds gave
+  the same result. `tsc` exits 0.
+- **Diff review:** every D14 item was confirmed.
+  - react-markdown is no longer imported from `src`.
+  - `toHast` runs inside the boundary, after the pre-check.
+  - `sanitizeHast` is shared: it cleans, then unlinks, then counts.
+  - Properties are read from a fixed key list.
+  - At most 8 class entries are read per element.
+  - `pump` is a loop.
+- **`MAX_TOTAL_CONTAINERS` = 2000 is reasonable:** 1,500 to 2,000 bullets
+  render in 186 to 232 ms, and 2,100 falls back to `pre` in 3 ms.
+- **Parity and repros:** the worker and in-thread paths match on 10 sources.
+  The repro substitutes fall back to `pre` in 1 to 3 ms.
+
+**Non-blocking findings:**
+- A custom runner that returns a Proxy with a huge fake `length` makes
+  `cleanTree` loop unbounded (51 s at 3e8). Only trusted, app-supplied runners
+  can do this. Fix: bound the loop by the node limit, or check
+  `Array.isArray`.
+- The depth estimate from 3.13 treats a mid-line "N. " as nesting. As a
+  result, prose with many such markers on one line falls back to plain text.
+
+**Status:** 3.14 waits for its `security_reviewer`.
+
+### 3.14 security review (10 Nov)
+
+`security_reviewer` gave **FAIL** on `snap-3.14g`.
+
+All five 3.12 findings are fixed. The new pre-check, sanitiser and `pump` loop
+hold against the attacks they were built for.
+
+**Findings:**
+
+1. **HIGH, already present in 3.13.** Lazy continuation lines after a list
+   item or footnote are not counted by the pre-check. In-thread rendering
+   takes 3.0–3.6 s:
+   - `"- a\n" + "b\n"×9990`
+   - `"[^a]: a\n" + "b\n"×9980`
+2. **HIGH, already present.** In-thread `toHast` has no timer. Constructs
+   that D11 had moved to the worker take 1.9–5.3 s:
+   - `"a <?"×5000`
+   - `"a<!--"×4000`
+   - `"a <!X"`
+   - CDATA runs
+   - `]` runs
+3. **MEDIUM.** `cleanTree` loops over every index of a sparse array or a
+   Proxy, so its time is not bounded:
+   - a sparse array with length 1e8 takes 2.2 s;
+   - a sparse array with length 2^32−1 would take about 94 s
+     (extrapolated);
+   - a sparse array survives structured clone in 40 bytes.
+4. **LOW.** The `language-` prefix check allows whitespace inside the class
+   name. A hostile worker can therefore inject page classes, for example
+   `language-y\fsr-only`.
+5. **LOW, test seam only.** `pump` can re-enter itself through a synchronous
+   `onerror` or reply.
+
+**Context.** The in-thread path is only used where Worker doesn't exist:
+tests, jsdom and SSR. In browsers the worker's 1 s limit bounds parsing.
+Findings 1 and 2 show again that the pre-check is a blocklist that does not
+converge (see D11).
+
+3.14, 3.12, 3.9 and 3.3 stay open. An owner decision is needed.
+
+### Owner decision after the 3.14 security review (10 Nov)
+
+The owner asked to "start the 2.4–2.6 backend tests" and to "do a loop until
+3.18 or you solve it, pass the security review".
+
+- **Frontend.** A new design D15 bounds the in-thread path by input size:
+  without a Worker, a source over 4,000 characters shows as plain text
+  without being parsed. That ends the blocklist loop for the two High
+  findings. Findings 3–5 are fixed directly:
+  - dense-array and node-budget checks on worker `children`;
+  - `language-` classes without whitespace;
+  - a non-re-entrant `pump`.
+
+  These changes are recorded in tasks 3.16 to 3.18 and in two new MDR-10
+  scenarios ("The in-thread path is bounded by input size" and "Hostile
+  worker result shapes stay cheap"). The in-thread equality scenario is
+  narrowed to reports of at most 4,000 characters.
+  `openspec validate --strict` passes.
+- **Delegated approval.** The owner delegated approval of the baselines
+  inside this loop. Each delegated approval is still logged. If 3.18 fails
+  its security review, the loop stops and the owner decides.
+- **Backend.** The 2.4–2.6 Red tests have started. The harness gets a
+  multi-thread executor, which is the 2.3 security review's MEDIUM finding.
+  The optional contract changes ("reject title controls", "require json")
+  were not chosen, so the approved contract 2153c287 is unchanged. The
+  backend baselines still need the owner's approval before Green.
+- **Pending.** 3.15 (destinations2 392fef4a) still awaits "approve 3.15".
+
+### Owner delegation (10 Nov): "auto approve until 3.18"
+
+The owner delegated approval of every baseline the baseline_verifier passes,
+up to and including task 3.18. Approval is not given before a verifier PASS.
+
+That covers:
+- the backend tasks 2.4, 2.5 and 2.6;
+- 3.15;
+- the loop tasks 3.16 to 3.18.
+
+3.15 Green starts after the 3.16 loop settles, because both change the same
+files. Each use of this delegation is logged where it happens.
+
+### 3.16 Red baseline (10 Nov)
+
+`test_designer` wrote:
+- `test/MarkdownView.inthread2.test.tsx`, sha256 `e0d75aa77ccf4e37…`;
+- an amendment to `test/MarkdownView.dos.test.tsx`, sha256 `17edf3a7eb54d357…`. A 6×200 table became 6×100, because the larger table is over the 4,000-character cap.
+
+A fresh `baseline_verifier` gave **PASS**:
+- Red: 25 failed and 10 passed (35). Every failure is missing behaviour.
+- All other files except destinations2 pass: 251 tests.
+- `tsc` is clean.
+- The Red run takes about 4 minutes, because the 2^32−1 sparse tests time out on the current source.
+
+**Approved under the owner's "auto approve until 3.18" delegation**,
+including the dos amendment. The implementer starts.
+
+### 2.4–2.6 Red (10 Nov)
+
+`test_designer` wrote four new test files in `src/backend/reporter/test/`:
+
+| File | Tests | sha256 prefix |
+|---|---|---|
+| `list_own_reports_api_test.py` | 12 | `2bb20f72312f` |
+| `read_own_report_api_test.py` | 5 | `60b2c49f8bdf` |
+| `reporter_access_api_test.py` | 17 | `bb7564fcbdae` |
+| `create_report_rate_limit_test.py` | 14 | `ad7d35c7dea7` |
+
+It also added the helper `reporter_report_fixtures.py` (`8ed1fcc7aafa`) and changed three existing files:
+
+| File | Change | New sha256 |
+|---|---|---|
+| `ReporterApiHarness.java` | A 16-thread executor; fixes the 2.3 MEDIUM finding | `c7928264f0d8` |
+| `make_actors.py` | Reporter pool raised from 60 to 120 | `cd32d1aa0b14` |
+| `run-reporter-api.sh` | Reporter pool raised from 60 to 120 | `ff29eb2c7edd` |
+
+**Results:**
+- **2.6 is Red.** Every RPT-08 test gets 201 where 429 is expected. Five parallel creates all return 201, which also shows that the harness now overlaps requests.
+- **2.4 and 2.5 are not Red.** Their 34 tests already pass, because the 2.3 implementation already includes list, read and the access rules. This is a process deviation: that behaviour went in before its tests existed.
+- The 2.3 tests still pass on the multi-thread harness: 12 and 21 tests.
+
+For 2.4 and 2.5, the baseline verifier is asked to judge the tests as
+characterization tests, checking them with mutations of a scratch copy of
+the code.
+
+### 3.16 Green (10 Nov)
+
+The `implementer` changed three files:
+
+| File | sha256 prefix |
+|---|---|
+| `MarkdownView.limits.ts` | `47f89baa24f8` |
+| `MarkdownView.tsx` | `173297aeb369` |
+| `markdownRunner.ts` | `f6416eccade6` |
+
+Results:
+- inthread2: 35/35 passed.
+- All other files except destinations2: 295 passed.
+- `tsc`: clean.
+- destinations2: 113 failed and 17 passed. Before, it was 114 and 16. The in-thread timing case with 3,000 references now passes because of the cap. Its worker and direct `toHast` variants still fail.
+
+A fresh `candidate_verifier` and a `security_reviewer` are running in
+parallel.
+
+### 3.16 candidate verification (10 Nov)
+
+A fresh `candidate_verifier` gave **PASS**. It checked:
+- The baseline is unchanged: every hash matches.
+- Results: 425 tests, 312 passed and 113 failed. Every failure is in destinations2, the pending Red for 3.15.
+- `tsc` and `npm run verify` show the same counts.
+- Each D15 bullet was checked against the code. No defects.
+
+Open item for 3.15: the in-thread timing case with 3,000 references now passes only because of the cap, so it no longer tests the fix. Amend it to a source under 4,000 characters when 3.15 is reworked. The worker and direct `toHast` variants still cover the fix.
+
+The security review is still running.
+
+### 2.4–2.6 baseline verification (10 Nov)
+
+A fresh `baseline_verifier` gave **PASS** for all three tasks:
+- **2.4 and 2.5: PASS (characterization, no Red possible).** In a scratch copy, every mutation was caught. The mutations were:
+  - list and read ignoring the owner;
+  - the tie-break order flipped;
+  - no `no-store` header on 404;
+  - `pageSize` silently capped;
+  - unknown parameters ignored;
+  - the actor taken from a header.
+- **2.6: genuine Red.** A correct implementation in the scratch copy passed all 14 tests. A rate limit with no lock failed the parallel test, so the harness does overlap requests.
+- The 2.3 tests still pass. No container was left running.
+
+**Approved under the owner's "auto approve until 3.18" delegation.** This
+includes accepting 2.4 and 2.5 as characterization tests, as the verifier
+recommended.
+
+Minor follow-ups, not blocking:
+- Add a page-overflow case (`page=99999999999` → 400) when 2.7 is done.
+- The 429 message text is the implementer's choice.
+
+The `implementer` starts 2.6.
+
+### 3.16 security review (10 Nov): FAIL, so the loop continues to 3.17
+
+`security_reviewer` confirmed that all five 3.14 findings are fixed.
+
+**New findings:**
+
+1. **HIGH: rendered text is not bounded.** Link references repeat their destination, and the shown destination expands `(` into `%28` and hidden characters into `<U+XXXX>`.
+   - `"[x]: <" + "a"×10000 + ">\n\n" + "[x] "×2498` produced 25M characters. It took 1.6 s of main-thread time in headless Edge with a real Worker.
+   - The `(` variant produced 63M characters and took 2.9 s.
+   - A 3,997-character in-thread source produced 8M characters.
+2. **LOW:** `"www._"×800` takes 630 ms in-thread (GFM autolink, quadratic).
+3. **LOW:** queue head-of-line delay of about 1 s per hostile report. Accepted by design.
+4. **LOW:** cancelling 20,000 queued requests takes 261 ms (O(n²)).
+
+**Response:** design D16, task 3.17, and two new MDR-10 scenarios ("Rendered text is bounded" and "Autolink literal runs stay fast in-thread"). D16 has three parts:
+- a 100,000-character text budget, checked in the worker and in `cleanTree`;
+- at most 200 `www.` occurrences;
+- O(1) cancellation.
+
+`openspec validate --strict` passes.
+
+### 2.6 Green (10 Nov)
+
+The `implementer` changed two files:
+- `ReporterReportStore.java`, now `e105a1428f96`;
+- `ReporterReportsHttpHandler.java`, now `7ac17e6aa8dc`.
+
+**What changed:**
+- **Rate limit.** In the create transaction, the store takes a per-Reporter advisory lock and counts that Reporter's rows created in the last 60 s.
+- **429 response.** The response is `RATE_LIMITED`, with `Retry-After` clamped to 1–60 s and a fixed message.
+- **Runtime exceptions.** `RuntimeException` now gets the fixed 500 envelope. This closes the 2.3 LOW finding.
+
+All 6 backend test files pass in one run: 81 tests. No container is left
+running. A candidate verification and a security review of 2.4–2.6 follow.
+
+### 3.17 Red baseline (10 Nov)
+
+`test_designer` added the new test file `test/MarkdownView.textbudget.test.tsx` (sha256 `686396c7c5e9c3ac…`). It has 13 tests that are expected to fail before the fix, plus 5 guards that already pass.
+
+A fresh `baseline_verifier` gave **PASS**:
+- **Repro size:** the in-thread repros are 3,993 characters each and produce about 746,000 characters of output text.
+- **Timing:** three reruns confirm the timing failures are stable. The `www.` test took 562–617 ms against its 250 ms limit, and aborts took about 290 ms against their 50 ms limit.
+- **Guards:** they rule out an implementation that turns everything into plain text.
+
+The verifier found two minor gaps:
+1. There is no direct test at the 200 `www.` boundary.
+2. The cancellation test asserts the queue's internal behaviour.
+
+**Approved under the "auto approve until 3.18" delegation.** Both minor gaps are accepted. The `implementer` starts.
+
+### 2.4–2.6 security review (10 Nov)
+
+`security_reviewer` gave **PASS**, with LOW findings only.
+
+**Held under attack:**
+- Ownership on read and list. Twenty ID variants were tried, and all returned 404 identical to a missing ID.
+- Identity in the header and in the query.
+- The rate limit. A burst of 30 parallel creates for one Reporter and 10 for another left exactly 3 rows each, and Retry-After was correct at the boundaries.
+- Pagination overflow.
+- The 405 responses.
+- Request smuggling.
+- No ownership timing oracle.
+- The 2.3 RuntimeException fix is confirmed.
+
+**LOW findings, recorded and not fixed:**
+1. 400 responses that the JDK HttpServer generates itself have no `no-store` and no JSON envelope.
+2. A slow request body holds a server thread with no timeout. This is the harness's 16 threads. Production needs read timeouts.
+3. The path and method checks run before the 401 check, so routes can be discovered.
+4. The create has no `lock_timeout`. `created_at` is the transaction start time.
+5. When the window holds more than 3 rows, Retry-After is computed from the oldest row. This cannot happen through the API.
+6. Harness only: with duplicate `Authorization` headers, the first one is used.
+
+The 2.3 LOW findings the owner left open (title control characters and no Content-Type check) are unchanged.
+
+### 2.4–2.6 candidate verification (10 Nov): PASS. Tasks 2.4, 2.5 and 2.6 are complete
+
+A fresh `candidate_verifier` gave **PASS**:
+- The baseline is intact: the 11 files match their hashes before and after the run.
+- 81 of 81 tests pass across the 6 files. The migration test passes, with 6 PASS lines.
+- The implementation matches D10 and the contract, and nothing goes beyond them.
+- No container was left running.
+
+One optional point: the Retry-After upper clamp of 60 is not in D10's text.
+
+All stated checks have passed, together with the security review above. Tasks 2.4, 2.5 and 2.6 are ticked in `tasks.md`.
+
+Revisions tested:
+- `ReporterReportStore.java` e105a1428f96
+- `ReporterReportsHttpHandler.java` 7ac17e6aa8dc
+- `ReporterJson.java` b35d87b47537
+
+### 3.17 Green: BASELINE DEFECT (10 Nov)
+
+The `implementer` built the D16 candidate. sha256 of each changed file, with the earlier value:
+
+| File | sha256 | Was |
+|---|---|---|
+| `limits.ts` | `f64a41087d41` | `47f89baa24f8` |
+| `pipeline.ts` | `814603225b64` | `b86b79edd635` |
+| `MarkdownView.tsx` | `7a4850eaf9ca` | `173297aeb369` |
+| `markdown.worker.ts` | `2ca3193534cd` | `764c63380d25` |
+| `markdownRunner.ts` | `0b8435b74f2f` | `f6416eccade6` |
+
+The candidate includes:
+- **Text budget.** Checked in the worker, in `cleanTree`, and again after `rehypeNoLinks`, so the suffixes it adds are counted.
+- **`www.` limit.** A case-insensitive count of `www.`.
+- **Cancellation.** Cancelled requests are only flagged, so each abort is O(1).
+
+Results:
+- textbudget: 16 of 17 pass.
+- `tsc` is clean.
+
+**Baseline defect.** The test "20,000 queued aborts under 50 ms" cannot pass:
+- Under vitest, `abort()` with no reason builds a DOMException with a stack trace.
+- That alone costs 105–223 ms per 20,000 aborts, before the runner does anything.
+- The runner's own share is about 20–58 ms.
+
+Response: `test_designer` is asked to amend only that test so it passes a reason to `abort()`. The bound it chooses must still fail an O(n²) runner. This is a baseline amendment under the delegation, and a fresh verifier will check it.
+
+**Conflict with 3.15.** D16 makes the pending 3.15 guard "valid %E2%80%8B ×530, 3000 references [worker]" impossible: it expects 12.7M characters of formatted text. destinations2 is now 114 failed and 16 passed. When 3.15 resumes, it must amend this guard and the in-thread case that the cap makes trivial.
+
+### 3.17 baseline amendment and candidate verification (10 Nov)
+
+**Baseline amendment.** `test_designer` changed one test in textbudget, which is now sha256 `d4b19997a482…`:
+- the test now calls `abort("cancelled")`;
+- its time bound is now 250 ms.
+
+Abort-loop timings for 20,000 aborts:
+
+| Runner | Time |
+|---|---|
+| O(1) candidate | 21–39 ms |
+| O(n²) scratch runner | 901–959 ms |
+
+A fresh `baseline_verifier` is re-checking this amendment.
+
+**Candidate verification.** A fresh `candidate_verifier` gave **PASS**:
+- 328 passed and 114 failed. Every failure is in destinations2.
+- The newly failing destinations2 guard ("valid %E2%80%8B ×530, 3000 references [worker]") fails because of D16.
+- `tsc` and `verify` agree with these counts.
+- The code matches D16.
+- Counting `alt` and `href` toward the text budget is in scope.
+
+Timing margins:
+- `www.` test: about 80×.
+- Abort test: about 2.5×. It ran at 95–112 ms while other agents were running.
+
+The security review is still running.
+
+### 3.17 amendment re-check: FAIL (10 Nov)
+
+The fresh `baseline_verifier` gave **FAIL**. At 20,000 requests with a
+250 ms bound, the amended abort test still passes an O(n²) `indexOf` +
+`splice` runner:
+
+| Runner | Forward order | Reverse order |
+|---|---|---|
+| O(n²) `indexOf` + `splice` | 55–83 ms | 89–113 ms |
+| O(1) candidate | 36–49 ms | 40–71 ms |
+
+The designer's figure of 901–959 ms could not be reproduced.
+
+Response: `test_designer` is asked to amend the test again. The new version must:
+- separate the two runners, preferably with a scaling ratio between N and 4N in the worst-case abort orders;
+- fail the O(n²) runner and pass the candidate on every one of 5 or more runs.
+
+### Plan revision: Reporter edit and delete of unassigned reports (10 Nov)
+
+Request: the owner ran `/openspec-update-change "add edit and delete unassigned report"`.
+
+Owner decisions:
+- **Delete:** hard delete.
+- **Concurrency:** an optimistic `version` check.
+- The owner confirmed "Apply all".
+
+Revisions:
+- **Spec.** Two new requirements:
+  - RPT-09, edit: `PUT`, 200, 409 `REPORT_LOCKED` or `VERSION_CONFLICT`, and the RPT-05 404.
+  - RPT-10, delete: `DELETE ?version=N`, 204. A report that other records still reference is locked.
+
+  RPT-08 is amended so that deleting a report never frees a rate-limit slot. It adds the scenario "Deleting a report does not free a slot".
+- **Design.**
+  - D6 gains the new endpoints.
+  - D10 now counts creates from a Reporter-owned append-only table, `reporter_report_creations`.
+  - A new D17 covers the atomic conditional write and how a 0-row result is classified.
+- **Proposal.** Edits are now in scope until the report is assigned. Out of scope: changes after assignment, soft delete and undo.
+- **Tasks.** New tasks 2.8 to 2.11:
+  - 2.8 is a contract revision that needs owner approval;
+  - 2.9 is the creation log;
+  - 2.10 is edit;
+  - 2.11 is delete.
+
+  2.7 now covers 2.2 to 2.11.
+
+`openspec validate --strict` passes. No code was edited. 2.4 to 2.6 stay
+checked; 2.9 reworks the 2.6 storage through TDD.
+
+### 3.17 abort test, second amendment (10 Nov)
+
+`test_designer` split the test in two. The file is now
+`a7a02cbe7e4c…`.
+
+1. **Scaling test.** It measures aborting 10,000 and then 80,000 queued requests, in forward and in reverse order. The 80,000 time must be under 20× the 10,000 time.
+2. **Behaviour test.** It checks fallback, posting and the later request. It is no longer timed.
+
+| Runner | Forward ratio | Reverse ratio | Result |
+|---|---|---|---|
+| O(1) candidate | 6.0–8.2 | 8.2–9.0 | Passes 6 of 6 runs |
+| O(n²) | 17–24 | 36–42 | Fails 6 of 6 runs; reverse order decides it |
+
+The earlier 901–959 ms figure was probably from a stale package copy. It is
+not relied on. A fresh verifier re-checks this amendment.
+
+### 3.17 second amendment verified (10 Nov)
+
+A fresh `baseline_verifier` gave **PASS**.
+
+- **Scope of the change.** A hash-verified diff against `d4b19997…` shows that only the cancellation `describe` block changed.
+- **Scaling test:**
+
+  | Runner | Quiet | Loaded |
+  |---|---|---|
+  | O(1) candidate | 6 of 6 pass | 6 of 6 pass |
+  | O(n²) `indexOf` + `splice` | 6 of 6 fail | 6 of 6 fail |
+
+  A variant that filters the whole queue fails with a ratio of 360.
+- **Margin.** The forward-order margin is narrow: ratios of 20.7–24 on 4 of 12 runs. Reverse order gives the decisive margin.
+- **Other results.** The behaviour test passes. The file runs in 6 s. The full suite has 114 failures, all in destinations2.
+
+**Approved under the "auto approve until 3.18" delegation.** The candidate
+source has not changed (runner `0b8435b74f2f`). The verifier's full-suite run
+on the candidate passes the amended baseline, so the earlier `candidate_verifier`
+PASS stands for the amended file. The 3.17 security review is still running.
+
+### 2.8: contract revision 2 drafted (10 Nov)
+
+The `/openspec-apply-change` run drafted revision 2 of
+`workflow/reporter/reporter-reports-api-contract.md`. The new file's sha256 is
+`e48b7c983285…`; it was `2153c287`.
+
+**Revision 2 adds:**
+- `PUT` edit, taking `{title, description, version}` and returning 200;
+- `DELETE ?version=N`, returning 204;
+- an outcome table covering 404, 409 `REPORT_LOCKED` (including a report that is still referenced) and 409 `VERSION_CONFLICT`;
+- the check order: session, then validation, then the report;
+- `Allow` headers;
+- the creation-log basis for RPT-08, with edit and delete not rate-limited;
+- no `Content-Type` on a 204.
+
+This revision awaits the feature owner's approval. No Red for 2.9–2.11 starts
+until then.
+
+### 3.17 security review: PASS. The loop ends at 3.17 (10 Nov)
+
+`security_reviewer` gave **PASS**. It found no HIGH issue. It checked the
+hashes at the start and at the end.
+
+**3.16 findings re-checked:**
+- **Finding 1 is fixed.** It was checked in headless Edge with a real Vite build and Worker. Every amplification repro falls back to plain text, and the main-thread gaps were 7–25 ms. Text within the budget still renders formatted.
+- **Finding 2 is fixed** for the exact repro.
+- **Finding 4 is fixed.** Cancellation is O(1).
+- **The 1 s timeout really terminates the worker.**
+
+**Remaining findings:**
+- **F1, MEDIUM, functional and fail-safe.**
+  - **Cause:** Vite resolves the `browser` export condition, so the DOM build of `decode-named-character-reference` ends up in the worker.
+  - **Effect:** the worker throws `document is not defined` on load, so every view stays plain text.
+  - **Status:** this is latent until groups 4 and 5 add the dependency. It blocks closing 3.9 and 3.3.
+- **F2, LOW.** The worker builds every destination suffix before the budget check: up to 2.7 s and +430 MB, killed by the 1 s timer. Fix: keep a running total inside `linkAsText`.
+- **F3, LOW, only reachable with a hostile worker.** `cleanTree` has no depth cap. 2,000 nested blockquotes hang Edge's layout. Markdown source cannot produce this.
+- **F4, LOW.** A `www.` variant takes about 300 ms in-thread at 4,000 characters.
+- **F5, LOW.** Draining cancelled entries with `queue.shift()` is quadratic above 50,000 entries.
+
+**Elements and attributes:** across 10 hostile sources and an injected tree,
+none of these elements appeared: `a`, `img`, `iframe`, `script` or `style`.
+None of these attributes appeared: `href`, `src`, `style` or event handlers.
+
+**Tasks closed:** 3.17, 3.16, 3.14 and 3.12. Their candidate and security
+reviews have passed.
+
+**Still open:**
+- **3.9 and 3.3** stay open on F1 and the consuming-app `npm run build` check.
+- **3.18** is not needed, and the owner can remove it.
+- **3.13 and 3.15** stay open. When 3.15 restarts, the destinations2 guard
+  ("valid %E2%80%8B ×530 [worker]") and the in-thread case that the cap now
+  makes trivial must be amended.
+
+### 2.8 approved; 2.9–2.11 started (10 Nov)
+
+The owner said: "approve contract do 2.9-2.11".
+
+- **Contract:** revision 2 is marked approved. sha256 `9d0ad9b0bb9a…`. It is now read-only for every agent.
+- **Task 2.8:** ticked.
+- **Tasks 2.9–2.11:** started as one Red/Green batch. They share the same handler and store files, so a single implementer handles them.
+- **Baseline approval:** a verifier PASS on these baselines will be treated as approved under the owner's "do 2.9-2.11" together with the standing "auto approve until 3.18" delegation.
+
+### 2.9–2.11 Red (10 Nov)
+
+`test_designer` wrote three new test files in `src/backend/reporter/test/`:
+
+| File | Tests | sha256 prefix |
+|---|---|---|
+| `edit_report_api_test.py` | 31 | `be20f83fa66f` |
+| `delete_report_api_test.py` | 24 | `a3f207641d3c` |
+| `report_creation_log_migration_test.py` | 6 | `ac117bcb5689` |
+
+It also amended three existing files:
+
+| File | Before | After | Change |
+|---|---|---|---|
+| `create_report_rate_limit_test.py` | `ad7d35c7dea7` | `e6f675ab79d7` | Two lines now use `seed(..., log=True)`. Seven new 2.9 tests. |
+| `reporter_report_fixtures.py` | `8ed1fcc7aafa` | `3f96a9e8fda7` | Seed and backdate also move rows in the creation log. |
+| `reporter_api_support.py` | `b060ff517b7c` | `f72f3d6f5b19` | `fresh_reporter` skips Reporters that have log rows. |
+
+**Red results:**
+- The 2.3–2.5 tests pass unchanged.
+- Every failure has one of four causes:
+  - PUT or DELETE returns 405;
+  - the `reporter_report_creations` table or its migration is missing;
+  - the handler still counts `reports` rows instead of the log.
+- No container was left running.
+
+**Open owner decisions:**
+- (a) Backfill the log from existing `reports.created_at`? The designer recommends yes. The spec is silent, so the tests do not assert it.
+- (b) The race guarantee is asserted strictly only in the held-lock tests. The free race checks that each result matches what is stored.
+- (c) A few edge cases are deliberately left untested.
+
+A fresh `baseline_verifier`, using a mutation check, is running.
+
+### 2.9–2.11 baseline verification (10 Nov)
+
+A fresh `baseline_verifier` gave **PASS**. It also notes that HEAD is now `0a91d50`.
+
+- **Run results:**
+  - edit: 31/31 fail;
+  - delete: 23/24 fail, with the collection `Allow` guard passing;
+  - migration: 6/6 fail;
+  - rate limit: 13/21 fail. 8 of the original 14 still pass, not 7 as first reported.
+  - 2.3–2.5 still pass.
+- **Mutation check:** against a scratch-correct implementation the tests pass 82/82. Every mutant was caught:
+  - TOCTOU, caught only by the held-lock tests, which therefore carry the proof; the free race is a smoke test;
+  - 403 instead of 404;
+  - version checked before lock;
+  - cascade delete;
+  - log deleted along with the report;
+  - counting `reports`;
+  - no advisory lock.
+- **LOW findings:**
+  1. The held-lock assertions error rather than fail.
+  2. The spec's "2 seeded + 5 concurrent → 1 and 4" variant is missing. This gap dates from 2.6.
+  3. The PUT test with an unknown `reporterId` query assumes it is ignored. The contract is silent.
+
+**Owner decision: backfill = yes.** D10 now says the migration backfills one
+log row per existing report. `openspec validate` passes.
+
+`test_designer` is asked to:
+- add a backfill migration test;
+- fix findings 1–3, dropping the query part of finding 3 because the contract is silent.
+
+The amended baseline then gets a short re-verification.
+
+### Stopped by the owner (10 Nov)
+
+The owner said "stop". The 2.9–2.11 amendment `test_designer` was stopped partway through its work.
+
+- **Test files:** the test files may be partly amended. The hashes recorded below are the state at the time of stopping.
+- **Containers:** any leftover `mp4-reporter-test` containers were removed.
+- **Not started:** implementation of 2.9–2.11.
+
+**File state when the designer was stopped:**
+- **Partly amended:** only `edit_report_api_test.py` had changed. Its hash went from `be20f83fa66f` to `74f0e8715ea9`.
+- **Unchanged:** every other file still matches the verified baseline.
+- **Next step:** the partial edit must be finished or reverted, then re-verified, before Green.
+
+### Owner reverts delete; close replaces it (10 Nov)
+
+The owner said "I made a mistake, revert the delete, instead close the report" and confirmed "Apply as drafted".
+
+**Plan changes** (`openspec validate --strict` passes):
+- **Spec.** RPT-10 is now "Reporter closes an unassigned report", via `POST /api/reporter/reports/{id}/close`:
+  - the body is `{version}`;
+  - the response is 200 with status `CLOSED` and the version increased by 1;
+  - a closed report stays readable and listed;
+  - editing or closing a report that is closed or assigned returns 409 `REPORT_LOCKED`;
+  - there is no reopen;
+  - new scenario: "Closing does not free a rate-limit slot".
+
+  RPT-08 again counts stored creation times. The "Deleting a report does not free a slot" scenario is removed.
+- **Design.**
+  - D6 lists the close endpoint.
+  - D10 goes back to counting `reports` rows. The creation log and its backfill are dropped.
+  - D17 now covers edit and close.
+- **Proposal.** Reports are never deleted. Out of scope: deleting and reopening.
+- **Tasks.**
+  - 2.9 (creation log) is removed.
+  - 2.11 becomes close, verified by `close_report_api_test.py`.
+  - 2.8 is reopened: contract revision 3 must be approved.
+- **Contract.** Revision 3 is drafted (sha256 `7f87c4fd4777…`):
+  - DELETE is replaced by `POST …/close`;
+  - the `Allow` headers become `GET, POST`, `GET, PUT` and `POST`;
+  - rate limiting counts stored rows;
+  - revision 2 is marked superseded.
+
+  Revision 3 awaits owner approval.
+
+**Test files:**
+- **Restored to the approved 2.6 versions**, using hash-matched copies from `scratchpad\bv24\mut`:
+  - `create_report_rate_limit_test.py` `ad7d35c7dea7`
+  - `reporter_report_fixtures.py` `8ed1fcc7aafa`
+  - `reporter_api_support.py` `b060ff517b7c`
+- **Removed:** `delete_report_api_test.py` and `report_creation_log_migration_test.py`.
+- **Backup:** every replaced or removed file was first copied to `scratchpad\delete-plan-backup\`.
+- **Still pending:** `edit_report_api_test.py` (`74f0e8715ea9`, partly amended) still has to be re-baselined. It drops the creation-log seeding and takes the earlier verifier's findings.
+
+No implementation code was touched, and nothing was committed.
+
+### Contract revision 3 approved (10 Nov)
+
+The owner said "approve contract". Revision 3 is marked approved and is now read-only, and task 2.8 is ticked.
+
+Next, `test_designer` writes the Red baselines for 2.10 (edit) and 2.11 (close). It amends `edit_report_api_test.py` and adds `close_report_api_test.py`. A verifier PASS counts as approval under the owner's earlier "do 2.9-2.11" instruction (2.9 has since been removed) and the standing delegation.
+
+### 2.10–2.11 Red (10 Nov)
+
+`test_designer` wrote or changed three test files:
+
+| File | Status | sha256 prefix | Before |
+|---|---|---|---|
+| `edit_report_api_test.py` | reworked | `1e0f5e028338` | `74f0e8715ea9` |
+| `close_report_api_test.py` | new | `d5da63213c1f` | — |
+| `reporter_report_fixtures.py` | helpers added | `29b187db7cc5` | `8ed1fcc7aafa` |
+
+The new fixture helpers are `edit`, `close`, `snapshot`, `assign_sql` and `assign_holding_lock`. Existing helpers are unchanged.
+
+**Results:**
+- The 2.3–2.6 files pass unchanged: 81 tests.
+- Edit: 31 of 31 fail on 405.
+- Close: 24 of 26 fail on 404 or 405. The other 2 are 404 guards that pass because the route does not exist yet.
+
+**Conflict.** The approved `reporter_access_api_test.py` expects PUT on a report path to return 405, but contract revision 3 makes PUT valid there. Under the owner's delegation, that amendment is approved: drop PUT from the method list. `test_designer` is applying it.
+
+**Runtime note.** Running all 8 files in one go takes more than 590 s, so run them in groups.
+
+### 2.10–2.11 baseline verification (10 Nov)
+
+A fresh `baseline_verifier` gave **PASS**. HEAD is now `3720af1`, a new commit by the owner.
+
+**Red runs:**
+- edit: 31 of 31 fail on 405;
+- close: 24 of 26 fail on 404 or 405;
+- 2.3–2.6: 81 of 81 pass, including the amended access test.
+
+**Diffs:**
+- The fixtures diff shows additions only.
+- The access-test diff is exactly the 2-line PUT skip, which is both necessary and faithful.
+
+**Mutation testing:** a correct scratch implementation passes 31 of 31 edit tests and 26 of 26 close tests. Every mutant was caught:
+- TOCTOU, caught three times out of three by the held-lock tests;
+- 403 instead of 404;
+- version checked before lock;
+- closing an already-closed report;
+- close changing the title;
+- edit and close rate-limited;
+- editing a closed report;
+- a query parameter on close;
+- both `Allow` mistakes;
+- no version bump;
+- close ignoring the assignee.
+
+**Notes:**
+- The tests assert that the two 409 messages differ. This is mildly beyond the contract; it is kept.
+- `ReporterJson` needs integer support for `version`.
+
+**Approved under the owner's delegation.** The `implementer` starts on 2.10 and 2.11.
+
+### 2.10–2.11 Green (10 Nov)
+
+The `implementer` changed three files:
+
+| File | sha256 | Was |
+|---|---|---|
+| `ReporterJson.java` | `aa6023bce2ca` | `b35d87b47537` |
+| `ReporterReportStore.java` | `b747fad8caa9` | `e105a1428f96` |
+| `ReporterReportsHttpHandler.java` | `ba95a6a655ec` | `7ac17e6aa8dc` |
+
+What it added:
+- **JSON integers.** `ReporterJson` now accepts a strict non-negative JSON integer for `version`, up to the bigint limit.
+- **Edit and close.** Both use one conditional `UPDATE … RETURNING`. When no row matches, a read in the same transaction decides between 404, `REPORT_LOCKED` and `VERSION_CONFLICT`.
+- **Routing and errors.** The handler routes `/close`, sets the `Allow` headers, and adds two fixed 409 messages.
+
+All 138 tests pass across 4 groups. No container was left running.
+
+Open points for the reviewers:
+- `-0` is rejected.
+- A bare `?` on close returns 400.
+- The classification read could, in theory, report `VERSION_CONFLICT` instead of `REPORT_LOCKED` if the report is unassigned at that moment. It never changes the report.
+
+A fresh `candidate_verifier` and a `security_reviewer` are now running in parallel.
+
+### 2.10–2.11 candidate verification (10 Nov)
+
+A fresh `candidate_verifier` gave **PASS**.
+
+- **Tests:** 138 of 138 pass across 4 groups:
+  - edit 31;
+  - close 26;
+  - create, validation and access 50;
+  - list, read and rate limit 31.
+- **Migration test:** passes.
+- **Baseline:** the 13 test files are intact, checked before and after the runs.
+- **Code checks:**
+  - It matches D17: a single conditional write, with a classification read only when no row is updated.
+  - Check order, `Allow` headers and the close query rule are as specified.
+  - Edit and close have no rate limit.
+  - Create behaviour is unchanged.
+  - SQL is fully parameterised.
+  - JSON integers are parsed strictly.
+- **Defects:** none.
+
+The security review is still running.
+
+### 2.10–2.11 security review: PASS. Tasks 2.10 and 2.11 are complete (10 Nov)
+
+`security_reviewer` gave **PASS**. It found no HIGH or MEDIUM issues. One probe made 121 checks, and none were flagged.
+
+**What held:**
+- **IDOR.** Another Reporter's report always gets the byte-identical 404, never a 409. This held for 37 path-confusion variants.
+- **Races.**
+  - 16 parallel edits: exactly one won.
+  - Edit against close: exactly one won.
+  - 16 parallel closes: exactly one won.
+  - An edit or close while an assignment holds the lock gets `REPORT_LOCKED`.
+  - No lost updates.
+  - Version overflow returns the fixed 500.
+- **Bad bodies.** 45 hostile JSON bodies all got 400.
+- **Writable fields.** Only the title, the description and the CLOSED status can be changed.
+- **Responses.** No input is echoed, and every response sends `no-store`.
+
+**LOW findings, recorded for the owner:**
+1. An edit that changes nothing still bumps `version` and `updated_at`. Edits are not rate-limited, so a Reporter can keep an unassigned report at the top of the Maintainer queue. This follows the approved contract and D17. Options:
+   - treat an identical edit as a no-op;
+   - add an edit rate limit;
+   - sort the queue on a triage timestamp.
+2. The classification read can give a stale reason, `REPORT_LOCKED` versus `VERSION_CONFLICT`. This only happens if a report is unassigned again, which is out of scope. Nothing is changed. An optional fix is `FOR SHARE`.
+
+**Not verified:** assignment does not check `version`, so a Reporter could change the text between a Maintainer reading the report and assigning it. This is a question for the Maintainer side.
+
+All of the stated checks passed, so tasks 2.10 and 2.11 are ticked.

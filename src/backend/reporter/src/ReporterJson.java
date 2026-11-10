@@ -10,9 +10,11 @@ import java.util.Map;
 /**
  * Minimal strict JSON (RFC 8259) reading and writing for the Reporter API, JDK only.
  *
- * <p>Reading accepts only what a create body may legally be: a UTF-8 object whose values are all
- * strings. Anything else (other value types, duplicate keys, trailing data, malformed UTF-8 or
- * JSON) is rejected with {@link IllegalArgumentException}, whose message is never sent to clients.
+ * <p>Reading accepts only what a request body may legally be: a UTF-8 object whose values are
+ * strings or non-negative JSON integers that fit a PostgreSQL {@code bigint}. Anything else (other
+ * value types, a sign, fractions, exponents, leading zeros, duplicate keys, trailing data, malformed
+ * UTF-8 or JSON) is rejected with {@link IllegalArgumentException}, whose message is never sent to
+ * clients.
  * {@code \\u} escapes are decoded verbatim, so an escaped unpaired surrogate stays in the result
  * for the caller to reject instead of being replaced.
  */
@@ -20,6 +22,18 @@ final class ReporterJson {
     private ReporterJson() {}
 
     static Map<String, String> parseStringObject(byte[] body) {
+        var result = new LinkedHashMap<String, String>();
+        for (var field : parseObject(body).entrySet()) {
+            if (!(field.getValue() instanceof String value)) {
+                throw new IllegalArgumentException("Value is not a string");
+            }
+            result.put(field.getKey(), value);
+        }
+        return result;
+    }
+
+    /** Values are {@link String} or {@link Long} (0 to {@link Long#MAX_VALUE}). */
+    static Map<String, Object> parseObject(byte[] body) {
         String text;
         try {
             text = StandardCharsets.UTF_8.newDecoder()
@@ -30,7 +44,7 @@ final class ReporterJson {
             throw new IllegalArgumentException("Body is not valid UTF-8", malformed);
         }
         var parser = new Parser(text);
-        Map<String, String> object = parser.stringObject();
+        Map<String, Object> object = parser.object();
         parser.skipWhitespace();
         if (!parser.atEnd()) {
             throw new IllegalArgumentException("Trailing data after JSON value");
@@ -79,10 +93,10 @@ final class ReporterJson {
             }
         }
 
-        Map<String, String> stringObject() {
+        Map<String, Object> object() {
             skipWhitespace();
             expect('{');
-            var result = new LinkedHashMap<String, String>();
+            var result = new LinkedHashMap<String, Object>();
             skipWhitespace();
             if (peek() == '}') {
                 pos++;
@@ -94,7 +108,7 @@ final class ReporterJson {
                 skipWhitespace();
                 expect(':');
                 skipWhitespace();
-                String value = string();
+                Object value = peek() == '"' ? string() : nonNegativeInteger();
                 if (result.putIfAbsent(key, value) != null) {
                     throw new IllegalArgumentException("Duplicate key");
                 }
@@ -137,6 +151,22 @@ final class ReporterJson {
                     }
                     default -> throw new IllegalArgumentException("Invalid escape");
                 }
+            }
+        }
+
+        /** JSON int without a sign, fraction or exponent: {@code 0 | [1-9][0-9]*}, within bigint range. */
+        private Long nonNegativeInteger() {
+            int start = pos;
+            while (pos < text.length() && text.charAt(pos) >= '0' && text.charAt(pos) <= '9') pos++;
+            if (pos == start) throw new IllegalArgumentException("Expected a string or a non-negative integer");
+            if (text.charAt(start) == '0' && pos - start > 1) throw new IllegalArgumentException("Leading zero");
+            if (!atEnd() && (peek() == '.' || peek() == 'e' || peek() == 'E')) {
+                throw new IllegalArgumentException("Not an integer");
+            }
+            try {
+                return Long.parseLong(text, start, pos, 10);
+            } catch (NumberFormatException outOfRange) {
+                throw new IllegalArgumentException("Integer out of range", outOfRange);
             }
         }
 

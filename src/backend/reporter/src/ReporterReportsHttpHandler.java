@@ -10,6 +10,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -18,14 +19,18 @@ import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import mp4.reporter.ReporterReportStore.Page;
 import mp4.reporter.ReporterReportStore.RateLimited;
+import mp4.reporter.ReporterReportStore.Refused;
 import mp4.reporter.ReporterReportStore.Report;
 import mp4.reporter.ReporterReportStore.Summary;
 
-/** HTTP adapter for Reporter report create, list and read; authentication supplies the trusted actor. */
+/** HTTP adapter for Reporter report create, list, read, edit and close; authentication supplies the actor. */
 public final class ReporterReportsHttpHandler {
     private static final String COLLECTION_PATH = "/api/reporter/reports";
     private static final String ITEM_PREFIX = COLLECTION_PATH + "/";
+    private static final String CLOSE_SUFFIX = "/close";
     private static final Set<String> CREATE_FIELDS = Set.of("title", "description");
+    private static final Set<String> EDIT_FIELDS = Set.of("title", "description", "version");
+    private static final Set<String> CLOSE_FIELDS = Set.of("version");
     // Largest legal body is about 121 KB: 20,200 code units written as 6-byte \\u escapes, plus syntax.
     private static final int MAX_BODY_BYTES = 128 * 1024;
     private static final int MAX_TITLE_UNITS = 200;
@@ -44,6 +49,8 @@ public final class ReporterReportsHttpHandler {
         FORBIDDEN(403, "You do not have access to this resource."),
         REPORT_NOT_FOUND(404, "The report was not found."),
         METHOD_NOT_ALLOWED(405, "The method is not allowed."),
+        REPORT_LOCKED(409, "The report can no longer be changed."),
+        VERSION_CONFLICT(409, "The report has changed since it was read. Reload it and try again."),
         RATE_LIMITED(429, "Too many reports were created recently. Try again later."),
         INTERNAL_ERROR(500, "The request could not be completed.");
 
@@ -66,15 +73,18 @@ public final class ReporterReportsHttpHandler {
         String path = exchange.getRequestURI().getRawPath();
         String method = exchange.getRequestMethod();
         boolean collection = COLLECTION_PATH.equals(path);
-        boolean item = path != null && path.startsWith(ITEM_PREFIX)
-                && path.indexOf('/', ITEM_PREFIX.length()) < 0;
-        if (!collection && !item) {
+        String rest = path != null && path.startsWith(ITEM_PREFIX) ? path.substring(ITEM_PREFIX.length()) : null;
+        boolean item = rest != null && rest.indexOf('/') < 0;
+        // {id}/close where the suffix holds the only '/'; the raw {id} is checked after validation.
+        boolean close = rest != null && rest.endsWith(CLOSE_SUFFIX)
+                && rest.indexOf('/') == rest.length() - CLOSE_SUFFIX.length();
+        if (!collection && !item && !close) {
             sendError(exchange, ErrorCode.REPORT_NOT_FOUND);
             return;
         }
-        boolean post = collection && method.equals("POST");
-        if (!post && !method.equals("GET")) {
-            exchange.getResponseHeaders().set("Allow", collection ? "GET, POST" : "GET");
+        String allow = collection ? "GET, POST" : close ? "POST" : "GET, PUT";
+        if (!List.of(allow.split(", ")).contains(method)) {
+            exchange.getResponseHeaders().set("Allow", allow);
             sendError(exchange, ErrorCode.METHOD_NOT_ALLOWED);
             return;
         }
@@ -87,12 +97,15 @@ public final class ReporterReportsHttpHandler {
             return;
         }
         try {
-            if (post) {
-                create(exchange, actorId);
-            } else if (collection) {
-                list(exchange, actorId);
+            if (collection) {
+                if (method.equals("POST")) create(exchange, actorId);
+                else list(exchange, actorId);
+            } else if (close) {
+                close(exchange, actorId, rest.substring(0, rest.length() - CLOSE_SUFFIX.length()));
+            } else if (method.equals("PUT")) {
+                edit(exchange, actorId, rest);
             } else {
-                read(exchange, actorId, path.substring(ITEM_PREFIX.length()));
+                read(exchange, actorId, rest);
             }
         } catch (SQLException | RuntimeException failure) {
             sendError(exchange, ErrorCode.INTERNAL_ERROR);
@@ -142,13 +155,102 @@ public final class ReporterReportsHttpHandler {
         sendJson(exchange, 200, detailJson(report.get()));
     }
 
+    /** RPT-09. Session is checked in handle, then validation, then the report (design D17). */
+    private void edit(HttpExchange exchange, UUID actorId, String rawId) throws IOException, SQLException {
+        ReportEdit request;
+        try {
+            request = parseEdit(readBounded(exchange));
+        } catch (BodyTooLarge | IOException | IllegalArgumentException invalidBody) {
+            sendError(exchange, ErrorCode.VALIDATION_FAILED);
+            return;
+        }
+        UUID reportId = canonicalId(rawId);
+        if (reportId == null) {
+            sendError(exchange, ErrorCode.REPORT_NOT_FOUND);
+            return;
+        }
+        Report report;
+        try {
+            report = store.edit(actorId, reportId, request.version(), request.title(), request.description());
+        } catch (Refused refused) {
+            sendRefusal(exchange, refused);
+            return;
+        }
+        sendJson(exchange, 200, detailJson(report));
+    }
+
+    /** RPT-10. Same order as edit; any query parameter is a validation failure. */
+    private void close(HttpExchange exchange, UUID actorId, String rawId) throws IOException, SQLException {
+        long version;
+        try {
+            if (exchange.getRequestURI().getRawQuery() != null) {
+                throw new IllegalArgumentException("Query parameters are not accepted");
+            }
+            version = parseClose(readBounded(exchange));
+        } catch (BodyTooLarge | IOException | IllegalArgumentException invalidBody) {
+            sendError(exchange, ErrorCode.VALIDATION_FAILED);
+            return;
+        }
+        UUID reportId = canonicalId(rawId);
+        if (reportId == null) {
+            sendError(exchange, ErrorCode.REPORT_NOT_FOUND);
+            return;
+        }
+        Report report;
+        try {
+            report = store.close(actorId, reportId, version);
+        } catch (Refused refused) {
+            sendRefusal(exchange, refused);
+            return;
+        }
+        sendJson(exchange, 200, detailJson(report));
+    }
+
+    /** NOT_FOUND reuses the read 404, so another Reporter's report looks the same as a missing one. */
+    private static void sendRefusal(HttpExchange exchange, Refused refused) throws IOException {
+        sendError(exchange, switch (refused.reason()) {
+            case NOT_FOUND -> ErrorCode.REPORT_NOT_FOUND;
+            case LOCKED -> ErrorCode.REPORT_LOCKED;
+            case VERSION_CONFLICT -> ErrorCode.VERSION_CONFLICT;
+        });
+    }
+
+    /** The UUID for a canonical lowercase ID, otherwise null, which callers treat as not found. */
+    private static UUID canonicalId(String rawId) {
+        return CANONICAL_UUID.matcher(rawId).matches() ? UUID.fromString(rawId) : null;
+    }
+
     private static NewReport parseCreate(byte[] body) {
         Map<String, String> fields = ReporterJson.parseStringObject(body);
         if (!fields.keySet().equals(CREATE_FIELDS)) {
             throw new IllegalArgumentException("Body must contain exactly title and description");
         }
-        String title = fields.get("title");
-        String description = fields.get("description");
+        validateText(fields.get("title"), fields.get("description"));
+        return new NewReport(fields.get("title"), fields.get("description"));
+    }
+
+    private static ReportEdit parseEdit(byte[] body) {
+        Map<String, Object> fields = ReporterJson.parseObject(body);
+        if (!fields.keySet().equals(EDIT_FIELDS)
+                || !(fields.get("title") instanceof String title)
+                || !(fields.get("description") instanceof String description)
+                || !(fields.get("version") instanceof Long version)) {
+            throw new IllegalArgumentException("Body must contain exactly title, description and version");
+        }
+        validateText(title, description);
+        return new ReportEdit(title, description, version);
+    }
+
+    private static long parseClose(byte[] body) {
+        Map<String, Object> fields = ReporterJson.parseObject(body);
+        if (!fields.keySet().equals(CLOSE_FIELDS) || !(fields.get("version") instanceof Long version)) {
+            throw new IllegalArgumentException("Body must contain exactly version");
+        }
+        return version;
+    }
+
+    /** RPT-02 field rules, shared by create and edit. */
+    private static void validateText(String title, String description) {
         if (!isStorableText(title) || isBlank(title) || title.length() > MAX_TITLE_UNITS
                 || title.indexOf('\r') >= 0 || title.indexOf('\n') >= 0) {
             throw new IllegalArgumentException("Invalid title");
@@ -156,7 +258,6 @@ public final class ReporterReportsHttpHandler {
         if (!isStorableText(description) || isBlank(description) || description.length() > MAX_DESCRIPTION_UNITS) {
             throw new IllegalArgumentException("Invalid description");
         }
-        return new NewReport(title, description);
     }
 
     /** False for U+0000 or an unpaired surrogate, which PostgreSQL text cannot hold faithfully. */
@@ -291,4 +392,6 @@ public final class ReporterReportsHttpHandler {
     private static final class BodyTooLarge extends Exception {}
 
     private record NewReport(String title, String description) {}
+
+    private record ReportEdit(String title, String description, long version) {}
 }

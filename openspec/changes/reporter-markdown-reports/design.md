@@ -305,9 +305,9 @@ blockquotes. The blocklist doesn't converge, so parsing moves off the main threa
   - `GET /api/reporter/reports?page&pageSize`
   - `GET /api/reporter/reports/{id}`
   - `PUT /api/reporter/reports/{id}` (RPT-09) returns 200
-  - `DELETE /api/reporter/reports/{id}?version=N` (RPT-10) returns 204
-- 409 `REPORT_LOCKED` means the report is assigned, past `SUBMITTED`, or still
-  referenced. 409 `VERSION_CONFLICT` means the client's version is stale. Both
+  - `POST /api/reporter/reports/{id}/close` (RPT-10) returns 200
+- 409 `REPORT_LOCKED` means the report is assigned or not `SUBMITTED` (including
+  already `CLOSED`). 409 `VERSION_CONFLICT` means the client's version is stale. Both
   apply only to the Reporter's own report; otherwise the RPT-05 404 applies.
 - Another Reporter's report returns **404 `REPORT_NOT_FOUND`**, not 403, so a
   Reporter can't probe whether report IDs exist (RPT-05). A malformed UUID in the
@@ -349,23 +349,14 @@ This needs Developer owner approval.
 ### D10 Rate limit counted from stored rows, locked per Reporter
 Inside the create transaction:
 1. `SELECT pg_advisory_xact_lock(<64-bit hash of reporter_id>)`
-2. `SELECT count(*), min(created_at) FROM reporter_report_creations WHERE
-   reporter_id = ? AND created_at > now() - interval '60 seconds'`
+2. `SELECT count(*), min(created_at) FROM reports WHERE reporter_id = ? AND
+   created_at > now() - interval '60 seconds'`
 3. If the count is 3 or more, roll back and return 429. `Retry-After` is
-   `ceil(min(created_at) + 60s - now())`, at least 1. Otherwise insert the report
-   and a `reporter_report_creations` row with the same `created_at`, and commit.
+   `ceil(min(created_at) + 60s - now())`, at least 1. Otherwise insert and commit.
 
-**Revised 10 Nov (owner decision: hard delete, RPT-10).** Counting `reports` rows
-let create, delete, create bypass the limit, so the count now comes from the
-append-only `reporter_report_creations (reporter_id, created_at)` table, indexed
-on `(reporter_id, created_at)`. Deleting a report never deletes its creation
-row. The table holds no report content. It lives in the Reporter-owned migration
-`src/backend/reporter/migrations/001_report_creation_log.sql`, is additive and
-touches no shared table. Pruning rows older than the window is out of scope.
-**Backfill (owner decision 10 Nov).** The migration inserts one log row per
-existing report, with that report's `reporter_id` and `created_at`, so reports
-created shortly before deployment still count toward the window. It is
-idempotent only on a fresh table and runs once with the other migrations.
+Reports are never deleted (RPT-10 closes instead, owner decision 10 Nov), so
+stored rows remain a complete record of creates and closing never frees a slot.
+A creation-log table considered for hard delete was dropped with it.
 
 Why this approach:
 - The lock serialises one Reporter's creates (the RPT-08 concurrency scenario)
@@ -378,9 +369,8 @@ Why this approach:
 Alternatives considered:
 - An in-memory token bucket per Reporter. Rejected because it resets on restart
   and breaks with more than one instance.
-- A separate rate-limit table. First rejected because it duplicated
-  `created_at`; adopted on 10 Nov once hard delete made `reports` rows an
-  unreliable record of creates.
+- A separate rate-limit table. Rejected because it duplicates what `created_at`
+  already records.
 - Checking the limit before validation. Rejected so that an over-limit Reporter
   still gets the more useful 400 for a malformed request. The contract fixes the
   order: session → validation → rate limit.
@@ -390,28 +380,30 @@ fixture database with `created_at = now() - interval '61 seconds'` (and 59 s for
 the still-limited case). This avoids a 60-second sleep and needs no production
 clock hook. The concurrency scenario uses real parallel HTTP requests.
 
-### D17 Edit and delete while unassigned (owner decision 10 Nov)
+### D17 Edit and close while unassigned (owner decisions 10 Nov)
 - **Atomic condition.** Edit is one `UPDATE reports SET title = ?, description = ?,
   version = version + 1, updated_at = now() WHERE id = ? AND reporter_id = ? AND
   assignee_id IS NULL AND status = 'SUBMITTED' AND version = ? RETURNING ...`.
-  Delete is the matching `DELETE ... WHERE` with the same conditions. Neither
-  reads then writes, so a concurrent assignment either commits first (the
+  Close is the same `UPDATE` setting `status = 'CLOSED'` instead of the text.
+  Neither reads then writes, so a concurrent assignment either commits first (the
   conditional write then matches 0 rows) or waits on the row lock.
 - **Classifying 0 rows.** When the write matches nothing, the same transaction
   reads the row by `id` and `reporter_id`: no row is 404, an assignee or another
-  status is `REPORT_LOCKED`, otherwise `VERSION_CONFLICT`. The 404 body is the
-  RPT-05 body, so another Reporter's report still looks missing.
-- **Referenced reports.** A foreign-key violation on delete (for example an
-  `investigation_checklists` row) rolls back and returns `REPORT_LOCKED`. No
-  cascade is added.
-- **Version on the wire.** Edit carries `version` in the JSON body; delete
-  carries it as the only query parameter, because DELETE bodies are poorly
-  supported. Both use the version returned by RPT-05.
+  status (including `CLOSED`) is `REPORT_LOCKED`, otherwise `VERSION_CONFLICT`.
+  The 404 body is the RPT-05 body, so another Reporter's report still looks
+  missing.
+- **Close, not delete.** The owner first chose hard delete, then reverted it
+  (10 Nov). Rows are never removed, so foreign keys such as
+  `investigation_checklists` and the D10 rate-limit count are unaffected.
+- **Version on the wire.** Edit carries `version` in its JSON body with the two
+  fields; close carries `{version}` alone. Both use the version returned by
+  RPT-05.
 - **Assumption.** Assignment by the Maintainer side sets `assignee_id` or changes
   `status` on the same row. It need not bump `version` for D17 to be safe,
   because the lock condition is part of the write.
-- Edits and deletes are not rate limited; RPT-08 covers creates only.
-- Tasks 2.8 to 2.11.
+- Edits and closes are not rate limited; RPT-08 covers creates only. Reopening a
+  closed report is out of scope.
+- Tasks 2.8, 2.10 and 2.11.
 
 ## Risks / Trade-offs
 

@@ -90,7 +90,7 @@ Error responses SHALL use the shared envelope `{ code, message, requestId }` wit
 
 ### Requirement: RPT-08 Report creation rate limit
 
-A Reporter SHALL be able to create at most 3 reports in any rolling 60-second window, counted from a record of their successful creates that deleting a report does not change. A further valid create SHALL return 429 `RATE_LIMITED` with a `Retry-After` header in whole seconds, and store nothing. The check and insert SHALL be atomic per Reporter. Rejected requests SHALL NOT count.
+A Reporter SHALL be able to create at most 3 reports in any rolling 60-second window, counted from their stored creation times. A further valid create SHALL return 429 `RATE_LIMITED` with a `Retry-After` header in whole seconds, and store nothing. The check and insert SHALL be atomic per Reporter. Rejected requests SHALL NOT count.
 
 #### Scenario: Fourth report within a minute
 - **GIVEN** Reporter R1 created 3 reports in the last 60 seconds
@@ -112,11 +112,6 @@ A Reporter SHALL be able to create at most 3 reports in any rolling 60-second wi
 - **WHEN** R2 posts a valid report, and separately R1 posts an invalid report
 - **THEN** R2 gets 201, and R1 gets 400 `VALIDATION_FAILED` rather than 429
 - **AND** neither the invalid request nor any 429 adds to R1's window
-
-#### Scenario: Deleting a report does not free a slot
-- **GIVEN** R1 created 3 reports in the last 60 seconds and then deleted one of them
-- **WHEN** R1 posts a valid report
-- **THEN** the response is 429 `RATE_LIMITED`
 
 ### Requirement: RPT-09 Reporter edits an unassigned report
 
@@ -152,24 +147,33 @@ A Reporter SHALL be able to replace the `title` and `description` of their own u
 - **WHEN** R1 edits an unassigned report
 - **THEN** the edit succeeds and does not change the create count
 
-### Requirement: RPT-10 Reporter deletes an unassigned report
+### Requirement: RPT-10 Reporter closes an unassigned report
 
-The system SHALL let a Reporter permanently delete a report they filed while it has no assignee and status `SUBMITTED`, given the `version` they last read as the single `version` query parameter. The delete SHALL be one atomic step under the same conditions as RPT-09 and SHALL return 204 with no body. After deletion the report SHALL behave as nonexistent for every Reporter endpoint. A report still referenced by other records SHALL NOT be deleted.
+A Reporter SHALL be able to close their own unassigned `SUBMITTED` report by sending exactly the `version` they last read. The close SHALL be one atomic step that succeeds only if ownership, no assignee, `SUBMITTED` and the version all hold, and SHALL set status `CLOSED`, increase the version by 1 and change `updatedAt`. A closed report SHALL stay readable and listed. Reopening is not supported.
 
-#### Scenario: Delete an unassigned report
-- **WHEN** R1 deletes unassigned report A with its current version
-- **THEN** the response is 204
-- **AND** reading, editing or deleting A then returns 404 `REPORT_NOT_FOUND`, and A is absent from R1's list
+#### Scenario: Close an unassigned report
+- **GIVEN** R1 filed report A, which is unassigned with version 0
+- **WHEN** R1 closes A with version 0
+- **THEN** the response is 200 with status `CLOSED`, version 1, a later `updatedAt` and the title and description unchanged
+- **AND** A still reads with 200 and appears in R1's list with status `CLOSED`
 
-#### Scenario: Delete is refused when locked, stale or not owned
-- **WHEN** the report is assigned or not `SUBMITTED`, or is referenced by another record such as a checklist
-- **THEN** the response is 409 `REPORT_LOCKED` and the report remains
-- **AND** a stale version returns 409 `VERSION_CONFLICT`, and another Reporter's or a nonexistent report returns the RPT-05 404
+#### Scenario: Closed, assigned or progressed report is locked
+- **GIVEN** report A is already `CLOSED`, has an assignee, or has another status than `SUBMITTED`
+- **WHEN** R1 closes or edits A with the current version
+- **THEN** the response is 409 `REPORT_LOCKED` and nothing changes
 
-#### Scenario: Invalid delete parameters
-- **WHEN** `version` is missing, non-integer, negative or repeated, or another query parameter is supplied
-- **THEN** the response is 400 `VALIDATION_FAILED` and the report remains
+#### Scenario: Stale version, another Reporter, invalid body
+- **WHEN** R1 closes A with a version other than the stored one
+- **THEN** the response is 409 `VERSION_CONFLICT` and nothing changes
+- **AND** another Reporter's or a nonexistent report returns the RPT-05 404
+- **AND** a body that is not an object with exactly an integer `version` of 0 or more returns 400 `VALIDATION_FAILED`
 
-#### Scenario: Delete races an assignment
-- **WHEN** R1's delete and a Maintainer's assignment of the same unassigned report run concurrently
-- **THEN** either the delete returns 204 and the assignment finds no report, or the delete returns 409 and the report remains assigned
+#### Scenario: Close races an assignment
+- **WHEN** R1's close and a Maintainer's assignment of the same unassigned report run concurrently
+- **THEN** either the close returns 200 before the assignment applies, or the close returns 409 and the report stays assigned and `SUBMITTED`
+- **AND** a report is never closed by the Reporter after it is assigned
+
+#### Scenario: Closing does not free a rate-limit slot
+- **GIVEN** R1 created 3 reports in the last 60 seconds and closed one of them
+- **WHEN** R1 posts a valid report
+- **THEN** the response is 429 `RATE_LIMITED`

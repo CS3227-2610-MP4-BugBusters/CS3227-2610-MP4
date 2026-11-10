@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executors;
 import org.postgresql.ds.PGSimpleDataSource;
 
 /** Test-only loopback HTTP harness with a synthetic session. Never parses request bodies. */
@@ -62,6 +63,8 @@ public final class ReporterApiHarness {
                 exchange.close();
             }
         });
+        // Multi-threaded so parallel requests really overlap (concurrency tests must not pass by serialisation).
+        server.setExecutor(Executors.newFixedThreadPool(16));
         server.start();
         System.out.println("http://127.0.0.1:" + server.getAddress().getPort());
         System.out.flush();
