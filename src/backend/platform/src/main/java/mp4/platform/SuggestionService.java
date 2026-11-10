@@ -132,7 +132,7 @@ final class SuggestionService {
         try {
             pending = providerWorker.submit(() -> {
                 try {
-                    return provider.suggest(source.title, source.description, source.checklist);
+                    return provider.suggest(actor.id(), source.title, source.description, source.checklist);
                 } finally {
                     inFlight.release();
                 }
@@ -173,6 +173,14 @@ final class SuggestionService {
                     case BUSY -> {
                         recordTelemetry("busy", providerStarted, null);
                         error(response, 429, "AI_BUSY", "Suggestion capacity is currently full");
+                    }
+                    case RATE_LIMITED -> {
+                        recordTelemetry("rate_limited", providerStarted, null);
+                        error(response, 429, "AI_RATE_LIMITED", "Suggestion generation is rate limited");
+                    }
+                    case INPUT_TOO_LARGE -> {
+                        recordTelemetry("input_too_large", providerStarted, null);
+                        error(response, 400, "INPUT_TOO_LARGE", "Report context exceeds the suggestion input limit");
                     }
                     case UNAVAILABLE -> {
                         recordTelemetry("unavailable", providerStarted, null);

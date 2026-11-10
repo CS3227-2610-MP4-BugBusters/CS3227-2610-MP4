@@ -44,9 +44,10 @@ origin; forwarded headers are ignored.
 ### Local Developer AI configuration
 
 From the repository root, copy `.env.example` to `.env` and set
-`SOCLAAS_BASE_URL` and `SOCLAAS_API_KEY` in that local file. The model defaults
-to `qwen3.5:9b`; set `SOCLAAS_MODEL` to a team-approved model if needed. The
-example contains no credentials, and `.env` is ignored by Git. This file uses
+`SOC_LLM_ENABLED=true`, `SOC_LLM_MODEL`, `SOC_LLM_RPM`, `SOC_LLM_TPM` and
+`SOC_LLM_API_KEY_DEVELOPER` in that local file. Use the team-approved shared
+gateway model and budget values. The example contains no credentials, and
+`.env` is ignored by Git. This file uses
 shell assignment syntax: quote values containing shell-special characters and
 only source a file you trust. Avoid putting credentials in terminal commands or
 sharing the file.
@@ -65,8 +66,9 @@ cd src/backend/auth
 The existing database and rate-limit environment variables listed above are
 also required to start the backend. Configure the SoC values as environment
 secrets separately in each deployed environment; do not commit real values.
-The Maintainer summary and Developer suggestions still require their respective
-gateway and integration work; setting a key alone does not complete those tasks.
+Developer suggestions use the shared role gateway, its PostgreSQL admission
+limits, and the configured Developer key. A key alone does not establish live
+provider availability or quota.
 
 Browser flow: call `GET /api/auth/csrf`, send its `X-CSRF-TOKEN` on the
 URL-encoded `POST /api/auth/login`, then fetch a fresh CSRF token after login.

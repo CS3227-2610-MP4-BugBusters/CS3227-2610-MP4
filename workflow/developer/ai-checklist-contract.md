@@ -51,35 +51,21 @@ loading either full value into application memory. Perform byte-length checks
 and return only bounded values while preserving the same report lock,
 authorization and version snapshot. Oversized input must not reach the provider.
 
-The temporary server-side SoC adapter uses `SOCLAAS_BASE_URL`,
-`SOCLAAS_API_KEY` and an application-selected model; credentials are never
-sent to the browser or logged. Use a finite deadline (15 seconds), bounded
-response (64 KiB, counted during streaming) and 384 output tokens. Bound the
-incoming JSON body before parsing and disable provider redirects so credentials
-cannot be forwarded to another origin. The deadline
-covers connection, headers and response streaming. Enforce a per-instance
-in-flight limit of one request and retain the permit until the underlying
-provider operation actually stops, including after timeout/cancellation.
-On deadline or interruption the adapter requests cancellation of the HTTP
-exchange and response-body subscription; capacity is not made available to
-a replacement operation until the owned transport has reached its terminal
-cleanup boundary.
-Do not claim it enforces a cross-instance quota. The shared gateway owner must
-confirm model, quota, shared limits and production integration.
+The Developer provider uses the shared SoC role gateway, configured with
+`SOC_LLM_ENABLED`, `SOC_LLM_MODEL`, `SOC_LLM_RPM`, `SOC_LLM_TPM` and
+`SOC_LLM_API_KEY_DEVELOPER`. It passes the authenticated Developer UUID and
+`DEVELOPER_ASSIST` task from trusted backend code. Credentials are never sent to
+the browser or logged; legacy `SOCLAAS_*` settings do not activate a provider.
+Use a finite 15-second feature deadline and 384 output tokens. The shared
+gateway owns transport, per-key admission and quota enforcement. Preflight the
+serialized report/checklist context against the gateway's 24,576-byte limit and
+return `INPUT_TOO_LARGE` before admission when it exceeds that bound. Do not
+claim provider quota or production availability without measured evidence.
 
-For this local adapter, send one OpenAI-compatible `POST` to the configured
-base URL plus `/chat/completions`, with a bearer token and JSON containing
-`model`, fixed system and user `messages`, `temperature: 0`,
-`max_tokens: 384`, and `reasoning_effort: "none"`. The provisional default
-model is `qwen3.5:9b`, selected from a bounded synthetic comparison; allow
-server-side `SOCLAAS_MODEL` to select
-another team-approved model. Parse only `choices[0].message.content` and
-optional integer `usage.prompt_tokens` / `usage.completion_tokens`. A local
-test seam may inject the client, base URI, key, model and deadline. A working
-probe is not evidence of provider quotas or production availability.
-The fixed system instruction is the reviewed candidate in
-`workflow/evaluation/developer/ai-prompt-candidate-v2.txt`; the application
-must use the same content as that recorded experiment.
+The fixed Developer system instruction is the reviewed candidate in
+`workflow/evaluation/developer/ai-prompt-candidate-v4.txt`; preserve its
+untrusted-input boundary and behavior while using the shared gateway's required
+JSON-object response envelope.
 
 Use safe structured errors `{code,message,requestId}` and no-store. Denied
 access returns 403 for an authenticated but unauthorized actor; missing or

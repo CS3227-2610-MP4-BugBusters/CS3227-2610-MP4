@@ -20,6 +20,8 @@
 - [ ] 4.1 Freeze the evaluation rubric and fixtures, then record bounded live SoC usefulness and adversarial outcomes, actual available token usage and timeouts without secrets or real user content.
 - [ ] 4.2 Reconcile the provider adapter with the Reporter-owned shared gateway, confirm actual quota and shared limits, and verify environment-specific secrets and deployment before release.
 
+Progress note (10 Nov): the Developer provider now routes through the shared `DEVELOPER` role service and `DEVELOPER_ASSIST` task, with trusted actor identity, serialized-input bounds, safe gateway failure mapping, output credential-reflection rejection, and no legacy `SOCLAAS_*` activation. Focused adapter/configuration tests pass. Task 4.2 remains open for confirmed live quota and shared-budget values, environment-specific secret verification, and deployed integration evidence; no live quota is claimed here.
+
 ## 5. Saved checklist context
 
 - [x] 5.1 Send bounded saved checklist steps to the provider with the report; explicitly treat both as untrusted and instruct the model to avoid duplicates.

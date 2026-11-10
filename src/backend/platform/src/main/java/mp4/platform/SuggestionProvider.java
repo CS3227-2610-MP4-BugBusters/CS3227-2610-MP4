@@ -1,8 +1,9 @@
 package mp4.platform;
 
 import java.util.List;
+import java.util.UUID;
 
-/** Provider boundary for bounded, untrusted report context. No provider is configured yet. */
+/** Provider boundary for bounded, untrusted report context. */
 public interface SuggestionProvider {
     ProviderResponse suggest(String boundedTitle, String boundedDescription);
 
@@ -11,10 +12,16 @@ public interface SuggestionProvider {
         return suggest(boundedTitle, boundedDescription);
     }
 
+    /** Trusted server-side actor identity for shared role-gateway calls. */
+    default ProviderResponse suggest(UUID actorId, String boundedTitle, String boundedDescription,
+            List<String> savedChecklist) {
+        return suggest(boundedTitle, boundedDescription, savedChecklist);
+    }
+
     /** Configured model identifier for sanitized telemetry, when available. */
     default String modelName() { return null; }
 
-    enum FailureKind { TIMEOUT, INVALID, UNAVAILABLE, BUSY }
+    enum FailureKind { TIMEOUT, INVALID, UNAVAILABLE, BUSY, RATE_LIMITED, INPUT_TOO_LARGE }
 
     /** Safe provider failure category for API mapping; messages must not contain provider data. */
     final class Failure extends IllegalStateException {

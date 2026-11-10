@@ -23,4 +23,4 @@ None.
 
 ## Impact
 
-Developer checklist UI, authenticated API, current report/account data, server-side SoC access and evaluation evidence. The Reporter-owned shared AI gateway is not present in this checkout; the provider boundary must be reconciled with that team's gateway before deployment. Response assessment and automatic checklist publication are out of scope.
+Developer checklist UI, authenticated API, current report/account data, server-side SoC access and evaluation evidence. Developer suggestions use the Reporter-owned shared role gateway and its admission controls; actual quota, environment secrets and deployment still require release verification. Response assessment and automatic checklist publication are out of scope.
