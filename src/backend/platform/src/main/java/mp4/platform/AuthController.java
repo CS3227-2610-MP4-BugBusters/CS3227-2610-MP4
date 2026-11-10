@@ -17,6 +17,7 @@ import mp4.developer.ChecklistDraftStore;
 import mp4.developer.ChecklistShareHttpHandler;
 import mp4.developer.ChecklistSharedHttpHandler;
 import mp4.developer.JdbcChecklistShareService;
+import mp4.reporter.ReporterReportsHttpHandler;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationServiceException;
@@ -50,6 +51,7 @@ final class AuthController {
     private final ChecklistDraftHttpHandler checklistDraft;
     private final ChecklistShareHttpHandler checklistShare;
     private final ChecklistSharedHttpHandler sharedChecklist;
+    private final ReporterReportsHttpHandler reporterReports;
     private final String publicOrigin;
 
     AuthController(AuthenticationManager authenticationManager, SessionAuthenticationStrategy sessionStrategy,
@@ -62,6 +64,7 @@ final class AuthController {
         var actorDataSource = new ActorTransactionDataSource(dataSource);
         this.assignedReports = new AssignedReportListHttpHandler(new AssignedReportStore(actorDataSource));
         this.checklistDraft = new ChecklistDraftHttpHandler(new ChecklistDraftStore(actorDataSource));
+        this.reporterReports = new ReporterReportsHttpHandler(actorDataSource);
         this.checklistShare = new ChecklistShareHttpHandler(new JdbcChecklistShareService(actorDataSource,
                 (connection, request, version, invalidated) ->
                         mp4.maintainer.storage.SharedReportHistory.checklistPublished(connection, request.reportId(),
@@ -172,6 +175,16 @@ final class AuthController {
                 SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         var actor = new ChecklistDraftStore.Actor(user.id(), ChecklistDraftStore.Role.DEVELOPER, true);
         roleRequest(request, response, output -> assignedReports.handle(new ServletHttpExchange(request, output), actor));
+    }
+
+    // The handler parses the exact request path; identity comes only from the session principal.
+    @RequestMapping({"/api/reporter/reports", "/api/reporter/reports/**"})
+    void reporterReports(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        AuthProvider.CurrentUser user = (AuthProvider.CurrentUser)
+                SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        // AuthSessionFreshnessFilter has already refused inactive accounts; transactions recheck it.
+        roleRequest(request, response, output ->
+                reporterReports.handle(new ServletHttpExchange(request, output), user.id(), user.role(), true));
     }
 
     @RequestMapping("/api/reports/{reportId}/checklist/share")

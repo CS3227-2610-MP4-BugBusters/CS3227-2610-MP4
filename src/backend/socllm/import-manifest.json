@@ -1,0 +1,112 @@
+{
+  "source_repository": "D:\\cs3227\\CS3227-2610-MP3",
+  "source_revision": "d77fadf24fe4442a72c9ad6e2642bf3d9d7d5dc9",
+  "status": "historical-provenance-only; original imported source and test files were removed during the MP4-native port",
+  "files": [
+    {
+      "source": "src/backend/src/main/java/unichope/platform/ai/AdmittedAiGateway.java",
+      "destination": "src/main/java/unichope/platform/ai/AdmittedAiGateway.java",
+      "sha256": "d3341f0925058c299190daf363b7cd8d1b399fc3b983a7269c8893d7caa85cfb"
+    },
+    {
+      "source": "src/backend/src/main/java/unichope/platform/ai/AiAdmissionService.java",
+      "destination": "src/main/java/unichope/platform/ai/AiAdmissionService.java",
+      "sha256": "b8a5d762007563f8a9129b1717068e0ef1a7d920922dcb9f1b15c56cb82be7ea"
+    },
+    {
+      "source": "src/backend/src/main/java/unichope/platform/ai/AiGateway.java",
+      "destination": "src/main/java/unichope/platform/ai/AiGateway.java",
+      "sha256": "482b36b23ea8388a1a89aea8dcabe4467809681ae6130b7edc68a72a9cd65088"
+    },
+    {
+      "source": "src/backend/src/main/java/unichope/platform/ai/AiProviderBudget.java",
+      "destination": "src/main/java/unichope/platform/ai/AiProviderBudget.java",
+      "sha256": "3eb3c84c6762d340649da26d960a5989d5d90d96f2c64ab614d1430db679c435"
+    },
+    {
+      "source": "src/backend/src/main/java/unichope/platform/ai/AiProviderKey.java",
+      "destination": "src/main/java/unichope/platform/ai/AiProviderKey.java",
+      "sha256": "3d6886ca98a9ae43df6c53968086c3ac0430d4a9ddc15e22ae54910c8e23e47a"
+    },
+    {
+      "source": "src/backend/src/main/java/unichope/platform/ai/AiProviderRouter.java",
+      "destination": "src/main/java/unichope/platform/ai/AiProviderRouter.java",
+      "sha256": "f8c2242460da63d6f9d1e08fcde619b2c2daf0926ddc0dd73e21177c020f9ef6"
+    },
+    {
+      "source": "src/backend/src/main/java/unichope/platform/ai/AiTaskPolicy.java",
+      "destination": "src/main/java/unichope/platform/ai/AiTaskPolicy.java",
+      "sha256": "9aaf05abdbffc2a7d6e0c90f2afb0ee9578dd31ddad2d4d32ed6c62940c44b21"
+    },
+    {
+      "source": "src/backend/src/main/java/unichope/platform/ai/FakeProvider.java",
+      "destination": "src/main/java/unichope/platform/ai/FakeProvider.java",
+      "sha256": "cac6d4eb1fce95111de7a27485c3b0adb0a81dce6eeb162925047dfc4a183fe3"
+    },
+    {
+      "source": "src/backend/src/main/java/unichope/platform/ai/SoCLaaSChatCompletionsProvider.java",
+      "destination": "src/main/java/unichope/platform/ai/SoCLaaSChatCompletionsProvider.java",
+      "sha256": "e8b5f98790d037a722046e462f2ab9fa21f5fb1f66b853ba629fd8622283d561"
+    },
+    {
+      "source": "src/backend/src/main/java/unichope/platform/ai/postgres/PostgresAiAdmissionService.java",
+      "destination": "src/main/java/unichope/platform/ai/postgres/PostgresAiAdmissionService.java",
+      "sha256": "8a72539b6412299aa9b0ee3e4b32d9b9e134fd1eccd8f659c63c0a23e566a8c9"
+    },
+    {
+      "source": "src/backend/src/test/java/unichope/platform/ai/AdmittedAiGatewayTest.java",
+      "destination": "src/test/java/unichope/platform/ai/AdmittedAiGatewayTest.java",
+      "sha256": "3e98f2fc11deed22fd40d6d59c01c1980cb459aeccb85bf17faffdd202741abc"
+    },
+    {
+      "source": "src/backend/src/test/java/unichope/platform/ai/AiGatewayTest.java",
+      "destination": "src/test/java/unichope/platform/ai/AiGatewayTest.java",
+      "sha256": "58ba64a11c4f0db875174312f2b33996736c1d464a1367625e157b99efe60758"
+    },
+    {
+      "source": "src/backend/src/test/java/unichope/platform/ai/SoCLaaSChatCompletionsProviderTest.java",
+      "destination": "src/test/java/unichope/platform/ai/SoCLaaSChatCompletionsProviderTest.java",
+      "sha256": "ca8b840b4c16e6f844e973eb4e3bc47d7cef2dee7746cc669cfdba937a54985e"
+    },
+    {
+      "source": "src/backend/src/test/java/unichope/platform/ai/postgres/PostgresAiAdmissionPgTest.java",
+      "destination": "src/test/java/unichope/platform/ai/postgres/PostgresAiAdmissionPgTest.java",
+      "sha256": "eff91e2d5295853c510dd50e19ccaed9ab8d167868bb4a11a717c4d3330b004c"
+    },
+    {
+      "source": "src/backend/src/main/java/unichope/platform/web/ApiFailure.java",
+      "destination": "src/main/java/unichope/platform/web/ApiFailure.java",
+      "sha256": "aa5328e9d888fbc5acc0cbd8580db3bf00715d06858cc17ede25a8c27bc8bf45"
+    },
+    {
+      "source": "src/backend/src/main/java/unichope/platform/runtime/AiConfiguration.java",
+      "destination": "reference/AiConfiguration.java",
+      "sha256": "9933a0257ef5ce8132421b48e7454874242e15c62bb97a707b1d1153cc8e591b"
+    },
+    {
+      "source": "src/backend/src/main/resources/db/migration/V5__ai_admission.sql",
+      "destination": "reference/db/migration/V5__ai_admission.sql",
+      "sha256": "bd489c5d5f3600ae361907ac973dc3727f46e6f0d8fedd92b0ffd0687f07760f"
+    },
+    {
+      "source": "src/backend/src/main/resources/db/migration/V6__track_successful_ai_drafts_for_actor_quota.sql",
+      "destination": "reference/db/migration/V6__track_successful_ai_drafts_for_actor_quota.sql",
+      "sha256": "6759bdc7fa2cbe1783574af418877b2a21b7157dc10bc58cdb697f5df2340cf5"
+    },
+    {
+      "source": "src/backend/src/main/resources/db/ai-review/V1__create_ai_admission.sql",
+      "destination": "src/test/resources/db/ai-review/V1__create_ai_admission.sql",
+      "sha256": "72ce08b9ff5d5207af31ae977f30a98ccd68636f31a00f20c75ff165a19884e3"
+    },
+    {
+      "source": "workflow/tutor/SOCLAAS-PROVIDER-SPEC.md",
+      "destination": "reference/SOCLAAS-PROVIDER-SPEC.md",
+      "sha256": "bd6b7517f78543b9d6a9d1eb9a4737c5aa5d73a19fb8936aa5e83a74b35f7625"
+    },
+    {
+      "source": "workflow/tutor/SOCLAAS-PROVIDER-TEST-MATRIX.md",
+      "destination": "reference/SOCLAAS-PROVIDER-TEST-MATRIX.md",
+      "sha256": "af1101aa5ae588db47b63bf1e1dec3d6cacf430cd27ce332ea61ccb7d5709282"
+    }
+  ]
+}

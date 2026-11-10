@@ -13,6 +13,7 @@ import mp4.maintainer.summary.SummaryContracts.*;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
@@ -20,6 +21,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Configuration(proxyBeanMethods = false)
+@Import({SocLlmConfiguration.class, SocLlmRoleConfiguration.class})
 class MaintainerSummaryConfiguration {
     @Bean QueueSummaryService maintainerQueueSummary(DataSource database, JdbcIndexedSessionRepository sessions,
             Clock clock, ObjectProvider<SummaryGateway> gateways, ObjectProvider<BudgetAndAdmission> budgets) {
