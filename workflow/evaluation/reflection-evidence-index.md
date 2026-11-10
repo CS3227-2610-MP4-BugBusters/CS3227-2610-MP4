@@ -20,3 +20,12 @@ Use the [Developer AI evidence plan](developer-ai-evidence-plan.md) once the rea
 3. **Context and resources:** Show context supplied and model/effort choices. Explicitly label unavailable token/cost measurements and report the exploratory comparison's limitations.
 4. **App-side evidence:** Show actual input selection, safety/limit tests and usage only after they are implemented and measured.
 5. **Reflection:** Explain when coordination helped, what caused retries or extra work, and the next improvement. Avoid unsupported claims about savings or full production readiness.
+
+## Maintainer additions
+
+Recorded the [controlled coordination/reuse comparisons](../../logs/experiments/2026-11-09-maintainer-comparisons.md),
+[development-agent security cases](../../logs/security/2026-11-09-development-agent-cases.md)
+and [workflow failure/scope/repair cases](../../logs/agent-runs/2026-11-09-workflow-cases.md).
+Kept the frozen protocols/runnable fixtures under evaluation/agents and
+evaluation/reflections. These add controlled evidence; live provider context quality,
+shared durable budgets, human scores and deployed checks remain pending.

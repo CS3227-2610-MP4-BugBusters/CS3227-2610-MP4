@@ -59,6 +59,13 @@ SHALL be identifiable and verification SHALL distinguish deterministic and live 
 - **THEN** authorized login/read and wrong-role denial succeed as specified in each environment
 - **AND** sanitized evidence identifies distinct environments and the revision without secret values
 
+#### Scenario: Legacy shared schema defaults
+
+- **WHEN** startup inspects shared tables without registered migration history
+- **THEN** required report/checklist defaults match the canonical migrations before baselining
+- **AND** absent or incompatible defaults cause startup to reject the schema without shared history, additive migration writes or changes to existing rows
+- **AND** canonical defaults preserve first-Save behavior and an empty last-shared checklist before publication
+
 ### Requirement: MNT-READ-EVIDENCE Shared investigation evidence
 
 The Maintainer detail SHALL retain authorized shared investigation notes/history

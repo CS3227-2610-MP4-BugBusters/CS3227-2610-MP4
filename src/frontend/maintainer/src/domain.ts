@@ -55,13 +55,32 @@ export type Filters = {
   limit?: number;
 };
 export type Page = { items: Summary[]; total: number };
+export type SummaryFilters = Pick<Filters, "status" | "priority" | "assigneeId">;
+export type SummaryFinding = { text: string; reportIds: string[] };
+export type SummaryResult = {
+  capturedAt: string;
+  filters: SummaryFilters;
+  included: { id: string; version: number; truncatedFields: string[] }[];
+  excluded: { id: string; reason: string }[];
+  findings: {
+    overview: SummaryFinding[];
+    blockers: SummaryFinding[];
+    missingInformation: SummaryFinding[];
+  };
+  requiresReview: true;
+  providerMode: "none" | "deterministic" | "soc";
+  promptVersion: "MNT-SUMMARY-1";
+};
 export type FailureCode =
   | "session"
   | "denied"
   | "missing"
   | "contract"
   | "network"
-  | "cancelled";
+  | "cancelled"
+  | "conflict"
+  | "invalidState"
+  | "validation";
 export class QueryError extends Error {
   constructor(public code: FailureCode) {
     super(messages[code]);
@@ -74,12 +93,22 @@ export const messages: Record<FailureCode, string> = {
   contract: "The service returned an unsupported response.",
   network: "The service is unavailable. Please retry.",
   cancelled: "Request cancelled.",
+  conflict: "This report changed. Refresh it and reconcile your changes.",
+  invalidState: "This action is no longer available for the report state.",
+  validation: "Please check the entered values and try again.",
 };
 export interface Queries {
   getCurrentUser(signal: AbortSignal): Promise<User>;
   listReports(filters: Filters, signal: AbortSignal): Promise<Page>;
   listDevelopers(signal: AbortSignal): Promise<Person[]>;
   getReport(id: string, signal: AbortSignal): Promise<Detail>;
+  summarizeQueue?(request: { filters: SummaryFilters; regenerate: boolean }, signal?: AbortSignal): Promise<SummaryResult>;
+  updatePriority?(input: { reportId: string; expectedVersion: number; priority: (typeof priorities)[number] }, signal?: AbortSignal): Promise<void>;
+  assignReport?(input: { reportId: string; expectedVersion: number; developerId: string; reason?: string }, signal?: AbortSignal): Promise<void>;
+  returnResolution?(input: { reportId: string; expectedVersion: number; proposalId: string; proposalVersion: number; reason: string }, signal?: AbortSignal): Promise<void>;
+  closeReport?(input: { reportId: string; expectedVersion: number; proposalId: string; proposalVersion: number; reviewed: true }, signal?: AbortSignal): Promise<void>;
+  reopenReport?(input: { reportId: string; expectedVersion: number; reason: string }, signal?: AbortSignal): Promise<void>;
+  addComment?(input: { reportId: string; expectedVersion: number; text: string }, signal?: AbortSignal): Promise<void>;
 }
 export const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

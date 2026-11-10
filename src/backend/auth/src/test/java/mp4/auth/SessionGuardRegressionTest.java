@@ -138,7 +138,7 @@ class SessionGuardRegressionTest {
     @Test void missingMaintainerApiIsSafe404AndKeepsSessionValid() throws Exception {
         var account = SessionAuthenticationTest.account("MAINTAINER");
         var browser = login(account);
-        var missing = browser.get("/api/maintainer/reports");
+        var missing = browser.get("/api/maintainer/not-a-real-route");
         SessionAuthenticationTest.error(missing, 404, "NOT_FOUND");
         SessionAuthenticationTest.identity(browser.get("/api/auth/me"), account);
     }

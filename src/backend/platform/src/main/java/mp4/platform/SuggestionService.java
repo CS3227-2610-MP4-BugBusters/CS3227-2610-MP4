@@ -106,7 +106,8 @@ final class SuggestionService {
             error(response, 403, "FORBIDDEN", "Access denied");
             return;
         }
-        if (utf8Length(source.title) > TITLE_LIMIT || utf8Length(source.description) > DESCRIPTION_LIMIT
+        if (source.oversized || utf8Length(source.title) > TITLE_LIMIT
+                || utf8Length(source.description) > DESCRIPTION_LIMIT
                 || !validUnicode(source.title) || !validUnicode(source.description)) {
             error(response, 400, "INPUT_TOO_LARGE", "Report context exceeds the suggestion input limit");
             return;
@@ -240,16 +241,25 @@ final class SuggestionService {
                 }
                 Snapshot result;
                 try (PreparedStatement report = connection.prepareStatement("""
-                        SELECT title, description, assignee_id, version FROM public.reports WHERE id = ? FOR UPDATE
+                        SELECT CASE WHEN octet_length(convert_to(title, 'UTF8')) <= ? THEN title END AS title,
+                               CASE WHEN octet_length(convert_to(description, 'UTF8')) <= ? THEN description END AS description,
+                               octet_length(convert_to(title, 'UTF8')) AS title_bytes,
+                               octet_length(convert_to(description, 'UTF8')) AS description_bytes,
+                               assignee_id, version
+                        FROM public.reports WHERE id = ? FOR UPDATE
                         """)) {
-                    report.setObject(1, reportId);
+                    report.setInt(1, TITLE_LIMIT);
+                    report.setInt(2, DESCRIPTION_LIMIT);
+                    report.setObject(3, reportId);
                     try (ResultSet row = report.executeQuery()) {
                         if (!row.next() || !actor.id().equals(row.getObject("assignee_id", UUID.class))) {
                             connection.commit();
                             return null;
                         }
+                        boolean oversized = row.getInt("title_bytes") > TITLE_LIMIT
+                                || row.getInt("description_bytes") > DESCRIPTION_LIMIT;
                         result = new Snapshot(reportId, row.getString("title"), row.getString("description"),
-                                row.getLong("version"));
+                                row.getLong("version"), oversized);
                     }
                 }
                 connection.commit();
@@ -370,7 +380,7 @@ final class SuggestionService {
         AuthHttp.error(response, status, code, message);
     }
 
-    private record Snapshot(UUID id, String title, String description, long version) { }
+    private record Snapshot(UUID id, String title, String description, long version, boolean oversized) { }
     private record SuggestionResult(List<String> steps, long sourceVersion) { }
     private static final class SQLExceptionFailure extends RuntimeException {
         SQLExceptionFailure(Throwable cause) { super(cause); }

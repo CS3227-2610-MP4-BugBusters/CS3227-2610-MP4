@@ -1,0 +1,13 @@
+allprojects {
+    afterEvaluate { project ->
+        if (!project.plugins.hasPlugin('java')) return
+        project.sourceSets.test.java.srcDir(new File(project.rootDir, '../../../workflow/evaluation/reflections/java'))
+        project.tasks.register('summaryReuseExperiment', JavaExec) {
+            group = 'verification'
+            description = 'Runs the frozen controlled-provider result reuse comparison without a database or live SoC.'
+            dependsOn project.tasks.named('testClasses')
+            classpath = project.sourceSets.test.runtimeClasspath
+            mainClass = 'mp4.maintainer.summary.ReuseExperiment'
+        }
+    }
+}

@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "source": "Team plan sections 9, 10 and 12; complete-maintainer-role tasks 5.3-5.5",
+  "coordination": {
+    "tasks": {
+      "title": 120,
+      "reason": 200
+    },
+    "conditions": [
+      "single",
+      "implementation-plus-independent-review"
+    ],
+    "starting_state": "isolated copies, same task/spec/tests within each pair; no condition receives another solution",
+    "implementation_model": "gpt-6-luna",
+    "implementation_effort": "high",
+    "verifier_model": "gpt-6-luna",
+    "verifier_effort": "low",
+    "limits": {
+      "minutes_per_agent": 3,
+      "repair_cycles": 2,
+      "concurrent_writers": 2
+    },
+    "metrics": [
+      "acceptance result",
+      "scope violations",
+      "defects found",
+      "repair rounds",
+      "coordinator wall seconds including handoff/queue time"
+    ],
+    "unavailable_metrics": [
+      "actual tokens/cost unless exposed by tooling"
+    ],
+    "rubric": "all frozen contract assertions pass; only validation.py changes; no suppressed checks",
+    "limitations": "small synthetic tasks; reviewer model/effort is part of workflow configuration; no broad efficiency conclusion"
+  },
+  "reuse": {
+    "provider": "deterministic in-memory fixture, not live SoC",
+    "conditions": [
+      "10 unchanged requests with reuse",
+      "10 unchanged requests with explicit regeneration"
+    ],
+    "repetitions": 1,
+    "checks": [
+      "provider call count",
+      "source-version invalidation",
+      "assignment invalidation",
+      "membership invalidation",
+      "model invalidation",
+      "authorization denial without additional calls"
+    ],
+    "metrics": [
+      "actual provider calls",
+      "local elapsed nanoseconds"
+    ],
+    "limitations": "local fake latency is not network latency or provider prompt caching"
+  },
+  "live_context": {
+    "maintainer_examples": 2,
+    "conditions": [
+      "full permitted history",
+      "selected fields and bounded updates"
+    ],
+    "runs_per_condition_per_example": 3,
+    "provider_model": null,
+    "confirmed_quota": null,
+    "status": "blocked until shared gateway/model/quota are confirmed; freeze model/settings before execution",
+    "human_rubric": {
+      "grounding": "0 incorrect/absent, 1 partial, 2 correct/sufficient",
+      "completeness": "0 absent, 1 partial, 2 sufficient",
+      "usefulness": "0 unusable, 1 partial, 2 useful"
+    },
+    "availability_failures": "report separately, never pass on timeout"
+  }
+}

@@ -1,6 +1,9 @@
 # Maintainer requirement-linked test matrix
 
-Status: migrated planned oracles on 8 November 2026; full-role cases remain unexecuted. Existing read-only frontend evidence is recorded separately below. Use [capability deltas](proposal.md#capabilities) and [design](design.md) as the proposed oracle; resolve open shared contracts before treating affected expectations as approved.
+Status: requirement matrix retained; implementation and verification have progressed
+through PR #10. Refer to the execution record below for actual results and pending
+live, cross-role, workflow-evaluation and human-review checks. Expected outcomes
+remain separate from execution evidence.
 
 Use synthetic fixed-role accounts, reports across lifecycle states, at least two Developers and Reporters, and a counting/controllable provider fake. Keep expected outcomes separate from execution results. Use real PostgreSQL for persistence, atomicity and races; do not infer database correctness from mock services. Capture each run's input/spec/prompt versions, candidate revision, command/exit, case verdict and evidence path.
 
@@ -39,7 +42,19 @@ Coordinate shared DEV-SEC-01 through DEV-SEC-04 and DEV-WF-01 through DEV-WF-04 
 
 ## Execution record
 
-This matrix remains the full-role design oracle. Completed only the isolated read-only frontend increment, traced through QR-01 to QR-08 in [the implemented baseline](../../specs/maintainer-report-browser/spec.md). See [execution evidence](../../../logs/maintainer/2026-11-07-read-only-increment.md) for 30 deterministic tests, independent review and browser smoke results. This does not mark backend MT cases, mutations, live SoC, database checks, production deployment or human acceptance complete.
+Retained this matrix as the full-role oracle. Recorded the original read-only
+increment separately in [its historical evidence](../../../logs/maintainer/2026-11-07-read-only-increment.md).
+Implemented authenticated role mutations, PostgreSQL adapters and the queue-summary
+endpoint in PR #10. Verified 119 backend tests, 109 Maintainer frontend tests and
+all ten CI jobs on `c8e66d2`; see [integration checkpoint](../../../logs/2026-11-09-maintainer-integration-checkpoint.md).
+
+Used controlled providers for summary privacy, validation, staleness, cache and
+revocation checks. These do not establish live SoC grounding or durable cross-replica
+budget behavior. Full Reporter-to-Developer-to-Maintainer release checks, live AI
+trials, Render deployments, complete evaluation telemetry and owner acceptance remain
+pending. Recorded controlled agent cases and comparisons under logs/security,
+logs/agent-runs and logs/experiments. Subsequent workflow checks are recorded separately rather than rewriting
+these historical results.
 
 ## Source-audit follow-up
 

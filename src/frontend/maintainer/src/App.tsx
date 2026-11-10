@@ -9,17 +9,31 @@ import {
   type Page,
   type Person,
   type Queries,
+  type SummaryFilters,
+  type SummaryResult,
 } from "./domain";
 import type { AuthActions } from "./auth-client";
 import { createRoleWorkspace } from "../../shared/RoleWorkspace";
+import { parseSummaryResult } from "./summary";
 type Load<T> = {
   state: "loading" | "ready" | "error";
   data?: T;
   error?: QueryError;
 };
 const loading = <T,>(): Load<T> => ({ state: "loading" });
-const failure = (e: unknown) =>
-  e instanceof QueryError ? e : new QueryError("network");
+const failure = (e: unknown) => {
+  if (e instanceof QueryError) return e;
+  if (e && typeof e === "object") {
+    const error = e as { status?: unknown; code?: unknown };
+    if (error.status === 401) return new QueryError("session");
+    if (error.status === 403) return new QueryError("denied");
+    if (error.status === 409) return new QueryError(error.code === "INVALID_STATE" ? "invalidState" : "conflict");
+    if (error.status === 400 || error.status === 422) return new QueryError("validation");
+  }
+  return new QueryError("network");
+};
+type ActionName = "updatePriority" | "assignReport" | "returnResolution" | "closeReport" | "reopenReport" | "addComment";
+type ActionInput = Record<string, unknown>;
 export function App({
   queries,
   synthetic = false,
@@ -43,27 +57,50 @@ export function App({
     [devs, setDevs] = useState<Load<Person[]>>(loading),
     [selected, setSelected] = useState<string>(),
     [detail, setDetail] = useState<Load<Detail>>(loading),
+    [queueSummary, setQueueSummary] = useState<Load<SummaryResult>>({ state: "loading" }),
+    [summaryPending, setSummaryPending] = useState(false),
     [listRetry, setListRetry] = useState(0),
     [devRetry, setDevRetry] = useState(0),
-    [detailRetry, setDetailRetry] = useState(0);
+    [detailRetry, setDetailRetry] = useState(0),
+    [actionPending, setActionPending] = useState(false),
+    [actionError, setActionError] = useState<QueryError>();
   const epoch = useRef(0),
+    selectedRef = useRef(selected),
     authActionGeneration = useRef(0),
     activeAuthController = useRef<AbortController | undefined>(undefined),
     listEpoch = useRef(0),
     detailEpoch = useRef(0),
     devEpoch = useRef(0),
+    actionController = useRef<AbortController | undefined>(undefined),
+    actionLock = useRef(false),
+    summaryEpoch = useRef(0),
+    summaryController = useRef<AbortController | undefined>(undefined),
     controllers = useRef(new Set<AbortController>());
+  selectedRef.current = selected;
   const control = () => {
     const c = new AbortController();
     controllers.current.add(c);
     return c;
   };
+  const invalidateSummary = () => {
+    summaryEpoch.current++;
+    summaryController.current?.abort();
+    summaryController.current = undefined;
+    setSummaryPending(false);
+    setQueueSummary({ state: "loading" });
+  };
   const clear = () => {
+    invalidateSummary();
     authActionGeneration.current++;
     activeAuthController.current?.abort();
     activeAuthController.current = undefined;
     setAuthBusy(undefined);
     controllers.current.forEach((c) => c.abort());
+    actionController.current?.abort();
+    actionController.current = undefined;
+    actionLock.current = false;
+    setActionPending(false);
+    setActionError(undefined);
     controllers.current.clear();
     listEpoch.current++;
     detailEpoch.current++;
@@ -72,6 +109,12 @@ export function App({
     setDevs(loading());
     setSelected(undefined);
     setDetail(loading());
+  };
+  const cancelSelectedAction = () => {
+    actionController.current?.abort();
+    actionController.current = undefined;
+    actionLock.current = false;
+    setActionPending(false);
   };
   const deny = (e: QueryError, g: number) => {
     if (g !== epoch.current) return;
@@ -175,14 +218,14 @@ export function App({
     const g = epoch.current,
       n = ++detailEpoch.current,
       c = control();
-    setDetail(loading());
+    setDetail((previous) => previous.data ? { ...previous, state: "loading" } : loading());
     queries
       .getReport(selected, c.signal)
       .finally(() => controllers.current.delete(c))
       .then(
         (data) => {
           if (g === epoch.current && n === detailEpoch.current)
-            setDetail({ state: "ready", data });
+            setDetail({ state: "ready", data: structuredClone(data) });
         },
         (e) => {
           const error = failure(e);
@@ -192,7 +235,7 @@ export function App({
             return;
           }
           if (n !== detailEpoch.current) return;
-          setDetail({ state: "error", error });
+          setDetail((previous) => ({ state: "error", error, ...(previous.data ? { data: previous.data } : {}) }));
         },
       );
     return () => {
@@ -201,6 +244,13 @@ export function App({
     };
   }, [queries, auth, session, selected, detailRetry]);
   const change = (next: Filters) => {
+    const canonical = (value: Filters) => JSON.stringify({
+      ...(value.status ? { status: value.status } : {}),
+      ...(value.priority ? { priority: value.priority } : {}),
+      ...(value.assigneeId ? { assigneeId: value.assigneeId } : {}),
+    });
+    if (canonical(next) !== canonical(filters)) invalidateSummary();
+    cancelSelectedAction();
     listEpoch.current++;
     detailEpoch.current++;
     setList(loading());
@@ -208,11 +258,80 @@ export function App({
     setDetail(loading());
     setFilters(next);
   };
+  const runSummary = async (regenerate = false) => {
+    if (!queries.summarizeQueue || summaryPending || actionPending || actionLock.current || auth !== "ready" || session !== epoch.current || filters.status === "Closed") return;
+    const requestFilters: SummaryFilters = {
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.priority ? { priority: filters.priority } : {}),
+      ...(filters.assigneeId ? { assigneeId: filters.assigneeId } : {}),
+    };
+    const request = { filters: requestFilters, regenerate };
+    const requestEpoch = epoch.current, requestSummaryEpoch = ++summaryEpoch.current;
+    const controller = control();
+    summaryController.current = controller;
+    setSummaryPending(true);
+    setQueueSummary({ state: "loading" });
+    const current = () => requestEpoch === epoch.current && requestSummaryEpoch === summaryEpoch.current && !controller.signal.aborted;
+    try {
+      const raw = await queries.summarizeQueue(request, controller.signal);
+      const parsed = parseSummaryResult(raw);
+      if (JSON.stringify(parsed.filters) !== JSON.stringify(requestFilters)) throw new QueryError("contract");
+      if (current()) setQueueSummary({ state: "ready", data: parsed });
+    } catch (cause) {
+      const error = failure(cause);
+      // A denial applies to the current session even if the user changed filters while it was pending.
+      if (requestEpoch === epoch.current && (error.code === "session" || error.code === "denied")) deny(error, requestEpoch);
+      else if (current() && error.code !== "cancelled") setQueueSummary({ state: "error", error });
+    } finally {
+      controllers.current.delete(controller);
+      if (summaryController.current === controller) {
+        summaryController.current = undefined;
+        setSummaryPending(false);
+      }
+    }
+  };
   const select = (id: string) => {
     if (selected === id) return;
+    cancelSelectedAction();
     detailEpoch.current++;
     setDetail(loading());
     setSelected(id);
+    setActionError(undefined);
+  };
+  const runAction = async (kind: ActionName, input: ActionInput): Promise<boolean> => {
+    if (actionLock.current || !selected || auth !== "ready" || session !== epoch.current) return false;
+    const action = queries[kind];
+    if (!action) { setActionError(new QueryError("network")); return false; }
+    const expectedSelection = selected, expectedEpoch = epoch.current;
+    const c = control();
+    actionController.current = c;
+    actionLock.current = true;
+    invalidateSummary();
+    setActionPending(true);
+    setActionError(undefined);
+    const current = () => expectedEpoch === epoch.current && expectedSelection === selectedRef.current && !c.signal.aborted;
+    try {
+      await (action as (v: ActionInput, signal?: AbortSignal) => Promise<void>)(input, c.signal);
+      if (!current()) return false;
+      setListRetry((v) => v + 1);
+      setDetailRetry((v) => v + 1);
+      return true;
+    } catch (e) {
+      const error = failure(e);
+      if (expectedEpoch === epoch.current && (error.code === "session" || error.code === "denied")) deny(error, expectedEpoch);
+      else if (current() && error.code !== "cancelled") setActionError(error);
+      return false;
+    } finally {
+      controllers.current.delete(c);
+      // An aborted action can still commit server-side. Clear summaries created after its start
+      // when its response arrives, provided the same authorized session is still active.
+      if (expectedEpoch === epoch.current) invalidateSummary();
+      if (actionController.current === c) {
+        actionController.current = undefined;
+        actionLock.current = false;
+        setActionPending(false);
+      }
+    }
   };
   const reload = () => {
     epoch.current++;
@@ -428,6 +547,32 @@ export function App({
               />
             )}
           </section>
+          {queries.summarizeQueue && <section className="summary-panel" aria-label="Queue summary">
+            <h2>Queue summary</h2>
+            <p>Advisory summary of the full matching open queue. Review the source reports before acting.</p>
+            <button type="button" disabled={summaryPending || actionPending || filters.status === "Closed"} onClick={() => void runSummary(false)}>Generate summary</button>
+            {summaryPending && <p role="status">Generating a reviewable summary…</p>}
+            {queueSummary.state === "error" && <div role="alert"><p>{messages[queueSummary.error!.code]}</p><button type="button" disabled={filters.status === "Closed"} onClick={() => void runSummary(false)}>Retry summary</button></div>}
+            {queueSummary.state === "ready" && <>
+              <p><strong>Review required.</strong> Captured {queueSummary.data!.capturedAt}. Provider mode: {queueSummary.data!.providerMode}.</p>
+              <button type="button" disabled={summaryPending || actionPending || filters.status === "Closed"} onClick={() => void runSummary(true)}>Regenerate summary</button>
+              {(["overview", "blockers", "missingInformation"] as const).map((group) => <section key={group}>
+                <h3>{group === "missingInformation" ? "Missing information" : group[0].toUpperCase() + group.slice(1)}</h3>
+                {queueSummary.data!.findings[group].length ? <ul>{queueSummary.data!.findings[group].map((finding, index) => <li key={`${group}-${index}`}><p className="text">{finding.text}</p><small>Sources: {finding.reportIds.map((id, i) => <span key={id}>{i > 0 ? ", " : ""}<a href={`#report-${id}`} onClick={() => select(id)}>{id}</a></span>)}</small></li>)}</ul> : <p>None reported.</p>}
+              </section>)}
+              <details>
+                <summary>Included reports ({queueSummary.data!.included.length})</summary>
+                {queueSummary.data!.included.length ? <ul>{queueSummary.data!.included.map((item) => <li key={item.id}>
+                  <a href={`#report-${item.id}`} onClick={() => select(item.id)}>{item.id}</a>
+                  {item.truncatedFields.length > 0 && <span> · {item.truncatedFields.join(", ")} truncated</span>}
+                </li>)}</ul> : <p>No reports were included.</p>}
+              </details>
+              <details>
+                <summary>Excluded reports ({queueSummary.data!.excluded.length})</summary>
+                {queueSummary.data!.excluded.length ? <ul>{queueSummary.data!.excluded.map((item) => <li key={item.id}><a href={`#report-${item.id}`} onClick={() => select(item.id)}>{item.id}</a> · {item.reason}</li>)}</ul> : <p>No reports were excluded.</p>}
+              </details>
+            </>}
+          </section>}
           <div className="workspace">
             <section aria-label="Reports" className="queue">
               {list.state === "loading" ? (
@@ -497,15 +642,15 @@ export function App({
             <section aria-label="Report details" className="detail">
               {!selected ? (
                 <p>Select a report to inspect its evidence.</p>
-              ) : detail.state === "loading" ? (
+              ) : detail.state === "loading" && !detail.data ? (
                 <p role="status">Loading report details…</p>
-              ) : detail.state === "error" ? (
+              ) : detail.state === "error" && !detail.data ? (
                 <ErrorView
                   error={detail.error!}
                   retry={() => setDetailRetry((v) => v + 1)}
                 />
               ) : (
-                <Report detail={detail.data!} />
+                <>{detail.state === "loading" && <p role="status">Refreshing report details…</p>}{detail.state === "error" && <ErrorView error={detail.error!} retry={() => setDetailRetry((v) => v + 1)} />}<Report key={detail.data!.id} detail={detail.data!} developers={devs.data ?? []} queries={queries} pending={actionPending} error={actionError} runAction={runAction} clearError={() => setActionError(undefined)} refreshReport={() => setDetailRetry((v) => v + 1)} /></>
               )}
             </section>
           </div>
@@ -534,7 +679,39 @@ function ErrorView({ error, retry }: { error: QueryError; retry: () => void }) {
     </div>
   );
 }
-function Report({ detail: r }: { detail: Detail }) {
+function ActionControls({ r, developers, queries, pending, error, runAction, clearError, refreshReport }: { r: Detail; developers: Person[]; queries: Queries; pending: boolean; error?: QueryError; runAction: (kind: ActionName, input: ActionInput) => Promise<boolean>; clearError: () => void; refreshReport: () => void }) {
+  const [priority, setPriority] = useState(r.priority), [developerId, setDeveloperId] = useState(r.assignee?.id ?? ""),
+    [assignmentReason, setAssignmentReason] = useState(""), [returnReason, setReturnReason] = useState(""),
+    [reopenReason, setReopenReason] = useState(""), [comment, setComment] = useState(""), [ack, setAck] = useState("");
+  const proposalKey = r.currentProposal ? [r.id, r.version, r.currentProposal.id, r.currentProposal.version].join(":") : "";
+  const acknowledged = !!proposalKey && ack === proposalKey;
+  const reasonValid = (s: string) => { const t = s.trim(); return [...t].length >= 1 && [...t].length <= 1000 && !/[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f-\u009f]/.test(t); };
+  const commentValid = (s: string) => { const t = s.trim(); return [...t].length >= 1 && [...t].length <= 4000 && !/[\u0000-\u0008\u000b\u000c\u000d-\u001f\u007f-\u009f]/.test(t); };
+  const submit = async (kind: ActionName, input: ActionInput, reset: () => void) => { clearError(); if (await runAction(kind, input)) reset(); };
+  const assignmentEligible = r.status === "Submitted" || r.status === "Assigned" || r.status === "In progress";
+  const isReassignment = r.status === "Assigned" || r.status === "In progress";
+  return <>
+    <section aria-label="Maintainer actions" className="action-panel">
+      <h3>Priority and assignment</h3>
+      <label>Report priority<select aria-label="Report priority" value={priority} disabled={pending} onChange={(e) => setPriority(e.target.value as typeof r.priority)}>{priorities.map((p) => <option key={p}>{p}</option>)}</select></label>
+      <button disabled={pending || !queries.updatePriority} onClick={() => void submit("updatePriority", { reportId: r.id, expectedVersion: r.version, priority }, () => setPriority(priority))}>Save priority</button>
+      {assignmentEligible && <><label>Assign to<select aria-label="Assign to" value={developerId} disabled={pending} onChange={(e) => setDeveloperId(e.target.value)}><option value="">Choose an active Developer</option>{developers.map((d) => <option key={d.id} value={d.id}>{d.displayName}</option>)}</select></label>
+      {isReassignment && <label>Reason<input aria-label="Reason" value={assignmentReason} disabled={pending} onChange={(e) => setAssignmentReason(e.target.value)} /></label>}
+      <button disabled={pending || !developerId || developerId === r.assignee?.id || !queries.assignReport || (isReassignment && !reasonValid(assignmentReason))} onClick={() => void submit("assignReport", { reportId: r.id, expectedVersion: r.version, developerId, ...(isReassignment ? { reason: assignmentReason.trim() } : {}) }, () => setAssignmentReason(""))}>{isReassignment ? "Reassign" : "Assign"}</button></>}
+    </section>
+    {r.status === "Resolution proposed" && r.currentProposal && <section aria-label="Resolution review" className="action-panel">
+      <h3>Review resolution</h3>
+      <label><input type="checkbox" checked={acknowledged} disabled={pending} onChange={(e) => setAck(e.target.checked ? proposalKey : "")} /> I reviewed this proposal</label>
+      <button disabled={pending || !acknowledged || !queries.closeReport} onClick={() => void submit("closeReport", { reportId: r.id, expectedVersion: r.version, proposalId: r.currentProposal!.id, proposalVersion: r.currentProposal!.version, reviewed: true }, () => setAck(""))}>Close</button>
+      <label>Return reason<input aria-label="Return reason" value={returnReason} disabled={pending} onChange={(e) => setReturnReason(e.target.value)} /></label>
+      <button disabled={pending || !reasonValid(returnReason) || !queries.returnResolution} onClick={() => void submit("returnResolution", { reportId: r.id, expectedVersion: r.version, proposalId: r.currentProposal!.id, proposalVersion: r.currentProposal!.version, reason: returnReason.trim() }, () => setReturnReason(""))}>Return resolution</button>
+    </section>}
+    {r.status === "Closed" && <section aria-label="Reopen report" className="action-panel"><h3>Reopen report</h3><label>Reopen reason<input aria-label="Reopen reason" value={reopenReason} disabled={pending} onChange={(e) => setReopenReason(e.target.value)} /></label><button disabled={pending || !reasonValid(reopenReason) || !queries.reopenReport} onClick={() => void submit("reopenReport", { reportId: r.id, expectedVersion: r.version, reason: reopenReason.trim() }, () => setReopenReason(""))}>Reopen</button></section>}
+    <section aria-label="Discussion" className="action-panel"><h3>Add discussion comment</h3><label>Add comment<textarea aria-label="Add comment" value={comment} disabled={pending} onChange={(e) => setComment(e.target.value)} /></label><button disabled={pending || !commentValid(comment) || !queries.addComment} onClick={() => void submit("addComment", { reportId: r.id, expectedVersion: r.version, text: comment.trim() }, () => setComment(""))}>Add comment</button>{error && <div role="alert"><p>{messages[error.code]}</p>{(error.code === "conflict" || error.code === "invalidState") && <button type="button" onClick={refreshReport}>Refresh report</button>}</div>}</section>
+  </>;
+}
+
+function Report({ detail: r, developers, queries, pending, error, runAction, clearError, refreshReport }: { detail: Detail; developers: Person[]; queries: Queries; pending: boolean; error?: QueryError; runAction: (kind: ActionName, input: ActionInput) => Promise<boolean>; clearError: () => void; refreshReport: () => void }) {
   return (
     <article>
       <h2>{r.title}</h2>
@@ -553,6 +730,7 @@ function Report({ detail: r }: { detail: Detail }) {
         <dt>Updated</dt>
         <dd>{r.updatedAt}</dd>
       </dl>
+      {(queries.updatePriority || queries.assignReport || queries.returnResolution || queries.closeReport || queries.reopenReport || queries.addComment) && <ActionControls r={r} developers={developers} queries={queries} pending={pending} error={error} runAction={runAction} clearError={clearError} refreshReport={refreshReport} />}
       {(
         [
           "description",

@@ -41,7 +41,13 @@ class SessionAuthenticationTest {
         final String base;
         Server() { this(true); }
         Server(boolean local) {
-            context = new SpringApplicationBuilder(AuthApplication.class, TestClockConfiguration.class)
+            this(local, new Class<?>[0]);
+        }
+        Server(boolean local, Class<?>... additionalConfiguration) {
+            var sources = new ArrayList<Class<?>>();
+            sources.add(AuthApplication.class); sources.add(TestClockConfiguration.class);
+            sources.addAll(Arrays.asList(additionalConfiguration));
+            context = new SpringApplicationBuilder(sources.toArray(Class<?>[]::new))
                 .properties(Map.of("server.address", "127.0.0.1", "server.port", "0",
                     "spring.main.banner-mode", "off", "logging.level.root", "ERROR",
                     "mp4.auth.local", Boolean.toString(local), "mp4.auth.jdbc-url", db.url(),

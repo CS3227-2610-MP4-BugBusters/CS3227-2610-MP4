@@ -46,6 +46,11 @@ the preview if it differs; isolate pending requests by report and session.
 
 ## Provider and limits
 
+The database snapshot must reject an oversized title or description before
+loading either full value into application memory. Perform byte-length checks
+and return only bounded values while preserving the same report lock,
+authorization and version snapshot. Oversized input must not reach the provider.
+
 The temporary server-side SoC adapter uses `SOCLAAS_BASE_URL`,
 `SOCLAAS_API_KEY` and an application-selected model; credentials are never
 sent to the browser or logged. Use a finite deadline (15 seconds), bounded

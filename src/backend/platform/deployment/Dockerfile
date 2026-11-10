@@ -18,6 +18,7 @@ FROM eclipse-temurin:17-jdk-jammy AS package
 WORKDIR /workspace/src/backend/auth
 COPY src/backend/auth/ ./
 COPY src/backend/platform/ ../platform/
+COPY src/backend/maintainer/ ../maintainer/
 COPY src/backend/developer/src/ ../developer/src/
 COPY src/backend/developer/migrations/ ../developer/migrations/
 COPY src/backend/shared/migrations/ ../shared/migrations/
