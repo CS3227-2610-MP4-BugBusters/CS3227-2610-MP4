@@ -90,7 +90,7 @@ Error responses SHALL use the shared envelope `{ code, message, requestId }` wit
 
 ### Requirement: RPT-08 Report creation rate limit
 
-A Reporter SHALL be able to create at most 3 reports in any rolling 60-second window, counted from their stored creation times. A further valid create SHALL return 429 `RATE_LIMITED` with a `Retry-After` header in whole seconds, and store nothing. The check and insert SHALL be atomic per Reporter. Rejected requests SHALL NOT count.
+A Reporter SHALL be able to create at most 3 reports in any rolling 60-second window, counted from a record of their successful creates that deleting a report does not change. A further valid create SHALL return 429 `RATE_LIMITED` with a `Retry-After` header in whole seconds, and store nothing. The check and insert SHALL be atomic per Reporter. Rejected requests SHALL NOT count.
 
 #### Scenario: Fourth report within a minute
 - **GIVEN** Reporter R1 created 3 reports in the last 60 seconds
@@ -112,3 +112,64 @@ A Reporter SHALL be able to create at most 3 reports in any rolling 60-second wi
 - **WHEN** R2 posts a valid report, and separately R1 posts an invalid report
 - **THEN** R2 gets 201, and R1 gets 400 `VALIDATION_FAILED` rather than 429
 - **AND** neither the invalid request nor any 429 adds to R1's window
+
+#### Scenario: Deleting a report does not free a slot
+- **GIVEN** R1 created 3 reports in the last 60 seconds and then deleted one of them
+- **WHEN** R1 posts a valid report
+- **THEN** the response is 429 `RATE_LIMITED`
+
+### Requirement: RPT-09 Reporter edits an unassigned report
+
+A Reporter SHALL be able to replace the `title` and `description` of their own unassigned `SUBMITTED` report, sending exactly those fields and the `version` they last read, validated per RPT-02 and stored per RPT-03. The update SHALL be atomic and succeed only if ownership, no assignee, `SUBMITTED` and the version all hold, then increase the version by 1 and change `updatedAt`. Checks SHALL run: session, validation, existence, lock, version.
+
+#### Scenario: Edit an unassigned report
+- **GIVEN** R1 filed report A, which is unassigned with version 0
+- **WHEN** R1 sends a valid title and description with version 0
+- **THEN** the response is 200 with the new title and description stored exactly, version 1 and a later `updatedAt`
+
+#### Scenario: Stale version
+- **WHEN** R1 sends an edit with a version other than the stored one
+- **THEN** the response is 409 `VERSION_CONFLICT` and nothing changes
+
+#### Scenario: Assigned or progressed report is locked
+- **GIVEN** report A has an assignee or a status other than `SUBMITTED`
+- **WHEN** R1 sends an otherwise valid edit with the current version
+- **THEN** the response is 409 `REPORT_LOCKED` and nothing changes
+
+#### Scenario: Edit races an assignment
+- **GIVEN** R1's unassigned report A
+- **WHEN** R1's edit and a Maintainer's assignment of A run concurrently
+- **THEN** either the edit returns 200 before the assignment applies, or the edit returns 409 and A keeps the assignment and its original text
+- **AND** a report is never edited after it is assigned
+
+#### Scenario: Another Reporter's report or invalid body
+- **WHEN** R2 edits R1's report, or any Reporter edits a nonexistent ID
+- **THEN** the response is 404 `REPORT_NOT_FOUND` matching the RPT-05 404, and nothing changes
+- **AND** a body with a missing, non-integer or negative `version`, an invalid field per RPT-02, or any other key returns 400 `VALIDATION_FAILED`
+
+#### Scenario: Edits are not rate limited
+- **GIVEN** R1 is at the RPT-08 create limit
+- **WHEN** R1 edits an unassigned report
+- **THEN** the edit succeeds and does not change the create count
+
+### Requirement: RPT-10 Reporter deletes an unassigned report
+
+The system SHALL let a Reporter permanently delete a report they filed while it has no assignee and status `SUBMITTED`, given the `version` they last read as the single `version` query parameter. The delete SHALL be one atomic step under the same conditions as RPT-09 and SHALL return 204 with no body. After deletion the report SHALL behave as nonexistent for every Reporter endpoint. A report still referenced by other records SHALL NOT be deleted.
+
+#### Scenario: Delete an unassigned report
+- **WHEN** R1 deletes unassigned report A with its current version
+- **THEN** the response is 204
+- **AND** reading, editing or deleting A then returns 404 `REPORT_NOT_FOUND`, and A is absent from R1's list
+
+#### Scenario: Delete is refused when locked, stale or not owned
+- **WHEN** the report is assigned or not `SUBMITTED`, or is referenced by another record such as a checklist
+- **THEN** the response is 409 `REPORT_LOCKED` and the report remains
+- **AND** a stale version returns 409 `VERSION_CONFLICT`, and another Reporter's or a nonexistent report returns the RPT-05 404
+
+#### Scenario: Invalid delete parameters
+- **WHEN** `version` is missing, non-integer, negative or repeated, or another query parameter is supplied
+- **THEN** the response is 400 `VALIDATION_FAILED` and the report remains
+
+#### Scenario: Delete races an assignment
+- **WHEN** R1's delete and a Maintainer's assignment of the same unassigned report run concurrently
+- **THEN** either the delete returns 204 and the assignment finds no report, or the delete returns 409 and the report remains assigned
