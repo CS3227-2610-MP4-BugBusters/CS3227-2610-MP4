@@ -6,7 +6,7 @@ type DraftResponse = {
   reportVersion: number;
 };
 
-type Suggestions = { steps: string[]; sourceVersion: number };
+type Suggestions = { steps: string[]; sourceVersion: number; draftRevision: number };
 type CsrfResponse = { token: string; headerName: "X-CSRF-TOKEN" };
 
 const jsonHeaders = { Accept: "application/json" };
@@ -39,7 +39,7 @@ function ChecklistForReport({
   startedVersion?: { previous: number; current: number };
   onReportVersionChange?: (previous: number, current: number) => void;
 }) {
-  const [editor, setEditor] = useState("");
+  const [steps, setSteps] = useState<string[]>([""]);
   const [savedSteps, setSavedSteps] = useState<string[]>([]);
   const [draftRevision, setDraftRevision] = useState(0);
   const [reportVersion, setReportVersion] = useState(0);
@@ -49,6 +49,7 @@ function ChecklistForReport({
   const [generating, setGenerating] = useState(false);
   const [applying, setApplying] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestions | null>(null);
+  const [selectedSuggestions, setSelectedSuggestions] = useState<number[]>([]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const startedVersionRef = useRef(startedVersion);
@@ -84,7 +85,7 @@ function ChecklistForReport({
         const value: unknown = await response.json();
         if (controller.signal.aborted) return;
         if (!isDraftResponse(value)) throw new Error("Unable to load the checklist.");
-        setEditor(value.steps.join("\n"));
+        setSteps(value.steps.length > 0 ? value.steps : [""]);
         setSavedSteps(value.steps);
         setDraftRevision(value.draftRevision);
         const transition = startedVersionRef.current;
@@ -153,7 +154,7 @@ function ChecklistForReport({
     setError("");
     setMessage("");
     try {
-      const steps = editor.split("\n").map((step) => step.trim()).filter(Boolean);
+      const saved = steps.map((step) => step.trim()).filter(Boolean);
       const token = await csrf(controller.signal);
       if (controller.signal.aborted || !token) return;
       const response = await fetch(
@@ -167,7 +168,7 @@ function ChecklistForReport({
             "Content-Type": "application/json",
             [token.headerName]: token.token,
           },
-          body: JSON.stringify({ steps, expectedDraftRevision: draftRevision }),
+          body: JSON.stringify({ steps: saved, expectedDraftRevision: draftRevision }),
           signal: controller.signal,
         },
       );
@@ -180,7 +181,7 @@ function ChecklistForReport({
         throw new Error("Unable to save. Your text is still here; reload the checklist and try again.");
       }
       setDraftRevision(value.draftRevision);
-      setSavedSteps(steps);
+      setSavedSteps(saved);
       setMessage("Private draft saved.");
     } catch (cause) {
       if (!controller.signal.aborted) {
@@ -278,6 +279,7 @@ function ChecklistForReport({
         throw new Error("Unable to generate suggestions. Please try again.");
       }
       setSuggestions(value);
+      setSelectedSuggestions([]);
     } catch {
       if (!controller.signal.aborted) {
         setSuggestions(null);
@@ -288,9 +290,11 @@ function ChecklistForReport({
     }
   }
 
-  async function applySuggestions() {
+  async function applySuggestions(mode: "add" | "replace") {
     if (!suggestions) return;
     const candidate = suggestions;
+    const selected = candidate.steps.filter((_step, index) => selectedSuggestions.includes(index));
+    if (selected.length === 0) return;
     const controller = new AbortController();
     applyController.current = controller;
     setApplying(true);
@@ -315,15 +319,19 @@ function ChecklistForReport({
       if (!isDraftResponse(value)) {
         throw new Error("Unable to verify these suggestions. Generate them again.");
       }
-      if (value.reportVersion !== candidate.sourceVersion) {
+      if (value.reportVersion !== candidate.sourceVersion || value.draftRevision !== candidate.draftRevision) {
         setSuggestions(null);
-        setError("These suggestions are out of date. Generate them again before applying.");
+        setError("The report or saved checklist changed. Generate suggestions again before applying.");
         return;
       }
-      const existingText = editor.trim();
-      setEditor(`${editor}${existingText ? "\n" : ""}${candidate.steps.join("\n")}`);
+      const currentSteps = steps.map((step) => step.trim()).filter(Boolean);
+      const nextSteps = mode === "replace" ? selected : [...currentSteps, ...selected];
+      setSteps(nextSteps.length > 0 ? nextSteps : [""]);
       setSuggestions(null);
-      setMessage("Suggestions added to the draft. Save to keep them.");
+      setSelectedSuggestions([]);
+      setMessage(mode === "replace"
+        ? "Checklist replaced with selected suggestions. Save to keep the draft."
+        : "Selected suggestions added to the draft. Save to keep them.");
     } catch {
       if (!controller.signal.aborted) {
         setSuggestions(null);
@@ -335,22 +343,42 @@ function ChecklistForReport({
   }
 
   return (
-    <section aria-label="Investigation checklist">
+    <section className="developer-checklist" aria-label="Investigation checklist">
       <h2>Investigation checklist</h2>
+      <p className="developer-checklist__intro">Plan the checks you need to investigate this report.</p>
       {loading ? (
         <p role="status">Loading checklist…</p>
       ) : loaded ? (
         <>
-          <label htmlFor="investigation-steps">Investigation steps (one per line)</label>
-          <textarea
-            id="investigation-steps"
-            rows={6}
-            value={editor}
-            disabled={pending || applying}
-            onChange={(event) => setEditor(event.target.value)}
-          />
-          <p>Save stores the private draft. Share publishes the last saved steps.</p>
-          <button type="button" onClick={() => void save()} disabled={pending || applying || generating}>Save</button>
+          <fieldset className="developer-checklist__steps" disabled={pending || applying}>
+            <legend>Investigation steps</legend>
+            {steps.map((step, index) => (
+              <div className="developer-checklist-step" key={index}>
+                <div className="developer-checklist-step__content">
+                <label htmlFor={`investigation-step-${index}`}>Step {index + 1}</label>
+                <input
+                  id={`investigation-step-${index}`}
+                  type="text"
+                  value={step}
+                  onChange={(event) => setSteps((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))}
+                />
+                </div>
+                <button
+                  type="button"
+                  aria-label={`Remove step ${index + 1}`}
+                  onClick={() => setSteps((current) => current.length === 1
+                    ? [""]
+                    : current.filter((_item, itemIndex) => itemIndex !== index))}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            <button className="developer-checklist__add" type="button" onClick={() => setSteps((current) => [...current, ""])}>Add step</button>
+          </fieldset>
+          <p className="developer-checklist__hint">Save stores the private draft. Share publishes the last saved steps.</p>
+          <div className="developer-checklist__actions">
+          <button className="developer-checklist__primary" type="button" onClick={() => void save()} disabled={pending || applying || generating}>Save</button>
           <button type="button" onClick={() => void share()} disabled={pending || applying || generating}>Share</button>
           <button
             type="button"
@@ -359,20 +387,42 @@ function ChecklistForReport({
           >
             {generating ? "Generating suggestions…" : "Generate suggestions"}
           </button>
+          </div>
           {suggestions && (
-            <section aria-label="AI suggestions">
+            <section className="developer-checklist__suggestions" aria-label="AI suggestions">
               <h3>AI-generated suggestions</h3>
-              <p>Review these suggestions before applying them to your draft.</p>
-              <ol>
-                {suggestions.steps.map((step, index) => <li key={index}>{step}</li>)}
-              </ol>
+              <p>Suggestions use the report and last saved checklist. Unsaved edits and private notes are not sent. Review before applying.</p>
+              <fieldset className="developer-checklist__choices" disabled={pending || applying || generating}>
+                <legend>Select suggestions</legend>
+                {suggestions.steps.map((step, index) => (
+                  <label className="developer-checklist__choice" key={index}>
+                    <input
+                      type="checkbox"
+                      checked={selectedSuggestions.includes(index)}
+                      onChange={(event) => setSelectedSuggestions((current) => event.target.checked
+                        ? [...current, index]
+                        : current.filter((item) => item !== index))}
+                    />
+                    <span>{step}</span>
+                  </label>
+                ))}
+              </fieldset>
+              <div className="developer-checklist__actions">
               <button
                 type="button"
-                onClick={() => void applySuggestions()}
-                disabled={pending || applying || generating}
+                onClick={() => void applySuggestions("add")}
+                disabled={pending || applying || generating || selectedSuggestions.length === 0}
               >
-                {applying ? "Checking report version…" : "Apply suggestions"}
+                {applying ? "Checking report version…" : "Add selected"}
               </button>
+              <button
+                type="button"
+                onClick={() => void applySuggestions("replace")}
+                disabled={pending || applying || generating || selectedSuggestions.length === 0}
+              >
+                Replace checklist
+              </button>
+              </div>
             </section>
           )}
           {message && <p role="status">{message}</p>}
@@ -409,7 +459,8 @@ function isSuggestions(value: unknown): value is Suggestions {
     value.steps.length >= 1 &&
     value.steps.length <= 8 &&
     value.steps.every(isSuggestionStep) &&
-    isRevision(value.sourceVersion)
+    isRevision(value.sourceVersion) &&
+    isRevision(value.draftRevision)
   );
 }
 

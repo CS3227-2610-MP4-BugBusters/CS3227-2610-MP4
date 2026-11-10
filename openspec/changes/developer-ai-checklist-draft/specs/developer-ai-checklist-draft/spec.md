@@ -8,7 +8,7 @@ Provide safe, reviewable AI-generated investigation suggestions grounded in the 
 
 ### Requirement: AI-D01 Authorized advisory suggestions
 
-An active, currently assigned Developer MAY request suggestions from the report's bounded title and description. Other reports, private notes and credentials SHALL be excluded. Generation SHALL NOT mutate domain state. Suggestions SHALL be shown separately and require explicit Developer action before applying them to the draft; Save and Share remain separate actions.
+An active, currently assigned Developer MAY request suggestions from the report's bounded title, description and saved private checklist draft. Other reports, unsaved editor changes, private notes and credentials SHALL be excluded. Saved checklist context SHALL contain at most 20 steps and 8192 UTF-8 bytes in total, rejecting oversized input before provider invocation, and SHALL be treated as untrusted input; the provider SHALL be instructed to avoid duplicating existing steps. Generation SHALL NOT mutate domain state. Suggestions SHALL be shown separately and require explicit Developer action before applying them to the draft; Save and Share remain separate actions.
 
 #### Scenario: Developer reviews a suggestion
 - **WHEN** an assigned active Developer requests suggestions for a report
@@ -35,6 +35,10 @@ The system SHALL treat report text and model output as untrusted data. It SHALL 
 #### Scenario: Invalid model output
 - **WHEN** the provider returns malformed, oversized or nonconforming output
 - **THEN** the system returns a safe error without persisting or exposing provider internals
+
+#### Scenario: Saved draft changes during generation or review
+- **WHEN** the saved draft changes after generation begins or before suggestions are applied
+- **THEN** those suggestions are rejected as stale and are not applied; the response carries the saved draft revision used for generation
 
 ### Requirement: AI-D03 Bounded and observable provider use
 

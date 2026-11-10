@@ -19,3 +19,9 @@
 
 - [ ] 4.1 Freeze the evaluation rubric and fixtures, then record bounded live SoC usefulness and adversarial outcomes, actual available token usage and timeouts without secrets or real user content.
 - [ ] 4.2 Reconcile the provider adapter with the Reporter-owned shared gateway, confirm actual quota and shared limits, and verify environment-specific secrets and deployment before release.
+
+## 5. Saved checklist context
+
+- [x] 5.1 Send bounded saved checklist steps to the provider with the report; explicitly treat both as untrusted and instruct the model to avoid duplicates.
+- [x] 5.2 Reject suggestions when the report or saved draft changes during generation or before applying; preserve private notes, unsaved edits and separate Save/Share actions.
+- [ ] 5.3 Verify authorization, input bounds, stale-draft races, prompt injection and frontend behavior, and record limits of live provider testing.

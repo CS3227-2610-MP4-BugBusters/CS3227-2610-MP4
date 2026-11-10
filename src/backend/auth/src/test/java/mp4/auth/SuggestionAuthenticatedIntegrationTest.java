@@ -21,6 +21,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import mp4.platform.AuthApplication;
 import mp4.platform.SuggestionProvider;
 import org.junit.jupiter.api.AfterAll;
@@ -106,6 +108,7 @@ class SuggestionAuthenticatedIntegrationTest {
         final AtomicInteger calls = new AtomicInteger();
         final AtomicReference<String> title = new AtomicReference<>();
         final AtomicReference<String> description = new AtomicReference<>();
+        final AtomicReference<List<String>> checklist = new AtomicReference<>();
         final AtomicReference<ProviderResponse> next = new AtomicReference<>(
             new ProviderResponse("[\"Compare the first trace\"]", null));
         volatile boolean failModelName;
@@ -113,7 +116,7 @@ class SuggestionAuthenticatedIntegrationTest {
         volatile CountDownLatch release;
 
         void reset() {
-            calls.set(0); title.set(null); description.set(null);
+            calls.set(0); title.set(null); description.set(null); checklist.set(null);
             next.set(new ProviderResponse("[\"Compare the first trace\"]", null));
             failModelName = false;
             entered = null; release = null;
@@ -123,8 +126,16 @@ class SuggestionAuthenticatedIntegrationTest {
             return null;
         }
         void block() { entered = new CountDownLatch(1); release = new CountDownLatch(1); }
+        public ProviderResponse suggest(String boundedTitle, String boundedDescription, List<String> savedChecklist) {
+            calls.incrementAndGet(); title.set(boundedTitle); description.set(boundedDescription);
+            checklist.set(savedChecklist == null ? null : List.copyOf(savedChecklist));
+            return complete();
+        }
         @Override public ProviderResponse suggest(String boundedTitle, String boundedDescription) {
             calls.incrementAndGet(); title.set(boundedTitle); description.set(boundedDescription);
+            return complete();
+        }
+        private ProviderResponse complete() {
             CountDownLatch started = entered, finish = release;
             if (started != null && finish != null) {
                 started.countDown();
@@ -161,15 +172,105 @@ class SuggestionAuthenticatedIntegrationTest {
         SessionAuthenticationTest.status(200, response, "assigned Developer suggestions");
         assertTrue(response.headers().firstValue("Cache-Control").orElse("").contains("no-store"));
         var json = SessionAuthenticationTest.json(response);
-        assertEquals(java.util.Set.of("steps", "sourceVersion"), json.keySet());
+        assertEquals(java.util.Set.of("steps", "sourceVersion", "draftRevision"), json.keySet());
         assertEquals(java.util.List.of("Compare the first trace"), json.get("steps"));
         assertInstanceOf(Number.class, json.get("sourceVersion"));
         assertEquals(before.version(), ((Number) json.get("sourceVersion")).longValue());
         assertEquals(1, PROVIDER.calls.get());
         assertEquals("Synthetic report title", PROVIDER.title.get());
         assertEquals("Synthetic report description", PROVIDER.description.get());
-        assertFalse(PROVIDER.description.get().contains("private draft canary"));
+        assertEquals(List.of("private draft canary"), PROVIDER.checklist.get());
+        assertEquals(4, ((Number) json.get("draftRevision")).longValue());
         assertSnapshotEquals(before, snapshot(report));
+    }
+
+    @Test void savedChecklistIsPassedToProviderAndDraftRevisionIsReturned() throws Exception {
+        PROVIDER.reset();
+        var developer = account("DEVELOPER"); var reporter = account("REPORTER");
+        UUID report = UUID.randomUUID(); fixture(report, reporter.id(), developer.id());
+        replaceDraft(report, new String[] {"Check the browser console", "Inspect the login request"}, 5);
+        try (var c = connection(); var insert = c.prepareStatement(
+                "INSERT INTO developer_private_notes(report_id,text) VALUES(?,?)")) {
+            insert.setObject(1, report); insert.setString(2, "private-note-must-not-be-sent"); insert.executeUpdate();
+        }
+        Browser browser = authenticated(developer);
+
+        var response = suggestions(browser, report, "{}", browser.csrf());
+
+        SessionAuthenticationTest.status(200, response, "suggestions include saved checklist context");
+        var json = SessionAuthenticationTest.json(response);
+        assertEquals(List.of("Check the browser console", "Inspect the login request"), PROVIDER.checklist.get());
+        assertEquals(5, ((Number) json.get("draftRevision")).longValue());
+        assertFalse(String.join(" ", PROVIDER.checklist.get()).contains("private-note-must-not-be-sent"));
+    }
+
+    @Test void changingSavedChecklistDuringGenerationDiscardsSuggestions() throws Exception {
+        PROVIDER.reset();
+        var developer = account("DEVELOPER"); var reporter = account("REPORTER");
+        UUID report = UUID.randomUUID(); fixture(report, reporter.id(), developer.id());
+        PROVIDER.block();
+        Browser browser = authenticated(developer);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            var pending = CompletableFuture.supplyAsync(() -> {
+                try { return suggestions(browser, report, "{}", browser.csrf()); }
+                catch (Exception failure) { throw new RuntimeException(failure); }
+            }, executor);
+            assertTrue(PROVIDER.entered.await(5, TimeUnit.SECONDS), "provider should receive the saved checklist");
+            replaceDraft(report, new String[] {"New saved investigation step"}, 5);
+            PROVIDER.release.countDown();
+            var response = pending.get(10, TimeUnit.SECONDS);
+            SessionAuthenticationTest.error(response, 409, "STALE_SOURCE");
+            assertFalse(response.body().contains("Compare the first trace"));
+        } finally {
+            if (PROVIDER.release != null) PROVIDER.release.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test void oversizedSavedChecklistIsRejectedBeforeProviderInvocation() throws Exception {
+        PROVIDER.reset();
+        var developer = account("DEVELOPER"); var reporter = account("REPORTER");
+        UUID report = UUID.randomUUID(); fixture(report, reporter.id(), developer.id());
+        replaceDraft(report, new String[] {"x".repeat(8193)}, 5);
+        Browser browser = authenticated(developer);
+
+        var response = suggestions(browser, report, "{}", browser.csrf());
+
+        SessionAuthenticationTest.error(response, 400, "INPUT_TOO_LARGE");
+        assertEquals(0, PROVIDER.calls.get(), "oversized saved checklist must not reach the provider");
+    }
+
+    @Test void finalSuggestionSnapshotWaitsForConcurrentChecklistWriter() throws Exception {
+        PROVIDER.reset();
+        var developer = account("DEVELOPER"); var reporter = account("REPORTER");
+        UUID report = UUID.randomUUID(); fixture(report, reporter.id(), developer.id());
+        PROVIDER.block();
+        Browser browser = authenticated(developer);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        ReportRowLock writer = null;
+        CompletableFuture<HttpResponse<String>> pending = null;
+        try {
+            pending = CompletableFuture.supplyAsync(() -> {
+                try { return suggestions(browser, report, "{}", browser.csrf()); }
+                catch (Exception failure) { throw new RuntimeException(failure); }
+            }, executor);
+            assertTrue(PROVIDER.entered.await(5, TimeUnit.SECONDS), "provider should block after source capture");
+
+            writer = lockAndUpdateChecklist(report);
+            PROVIDER.release.countDown();
+
+            awaitSuggestionSnapshotBlockedBy(writer.backendPid);
+            writer.commit();
+            var response = pending.get(10, TimeUnit.SECONDS);
+            SessionAuthenticationTest.error(response, 409, "STALE_SOURCE");
+            assertFalse(response.body().contains("Compare the first trace"));
+        } finally {
+            if (PROVIDER.release != null) PROVIDER.release.countDown();
+            if (writer != null) writer.close();
+            if (pending != null && !pending.isDone()) pending.cancel(true);
+            executor.shutdownNow();
+        }
     }
 
     @Test void generatedLineBreaksAreRejectedWithoutLeakingOrMutating() throws Exception {
@@ -501,6 +602,88 @@ class SuggestionAuthenticatedIntegrationTest {
                 "INSERT INTO investigation_checklists(report_id,draft_steps,draft_revision,shared_steps) VALUES(?,?::text[],4,?::text[])")) {
             insert.setObject(1, report); insert.setString(2, "{\"private draft canary\"}");
             insert.setString(3, "{\"published canary\"}"); insert.executeUpdate();
+        }
+    }
+
+    private static void replaceDraft(UUID report, String[] steps, long revision) throws Exception {
+        try (var c = connection(); var update = c.prepareStatement(
+                "UPDATE investigation_checklists SET draft_steps=?::text[],draft_revision=? WHERE report_id=?")) {
+            update.setString(1, "{" + String.join(",", java.util.Arrays.stream(steps)
+                    .map(value -> "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+                    .toList()) + "}");
+            update.setLong(2, revision); update.setObject(3, report); assertEquals(1, update.executeUpdate());
+        }
+    }
+
+    private static ReportRowLock lockAndUpdateChecklist(UUID report) throws Exception {
+        var connection = connection();
+        connection.setAutoCommit(false);
+        try {
+            int backendPid;
+            try (var pid = connection.prepareStatement("SELECT pg_backend_pid()")) {
+                try (var row = pid.executeQuery()) { assertTrue(row.next()); backendPid = row.getInt(1); }
+            }
+            try (var lock = connection.prepareStatement("SELECT id FROM reports WHERE id=? FOR UPDATE")) {
+                lock.setObject(1, report);
+                try (var rows = lock.executeQuery()) { assertTrue(rows.next()); }
+            }
+            try (var update = connection.prepareStatement("""
+                    UPDATE investigation_checklists
+                    SET draft_steps=ARRAY['Concurrent saved step'], draft_revision=draft_revision+1
+                    WHERE report_id=?
+                    """)) {
+                update.setObject(1, report);
+                assertEquals(1, update.executeUpdate());
+            }
+            return new ReportRowLock(connection, backendPid);
+        } catch (Exception failure) {
+            connection.rollback();
+            connection.close();
+            throw failure;
+        }
+    }
+
+    private static void awaitSuggestionSnapshotBlockedBy(int blockerPid) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            try (var c = connection(); var query = c.prepareStatement("""
+                    SELECT EXISTS (
+                        SELECT 1 FROM pg_stat_activity activity
+                        WHERE activity.datname = current_database()
+                          AND activity.wait_event_type = 'Lock'
+                          AND activity.query ILIKE '%FROM public.reports%'
+                          AND ? = ANY(pg_blocking_pids(activity.pid))
+                    )
+                    """)) {
+                query.setInt(1, blockerPid);
+                try (var rows = query.executeQuery()) {
+                    assertTrue(rows.next());
+                    if (rows.getBoolean(1)) return;
+                }
+            }
+            Thread.sleep(20);
+        }
+        fail("final suggestion snapshot did not wait on the concurrent report-row writer");
+    }
+
+    private static final class ReportRowLock implements AutoCloseable {
+        private final java.sql.Connection connection;
+        private final int backendPid;
+        private boolean finished;
+
+        ReportRowLock(java.sql.Connection connection, int backendPid) {
+            this.connection = connection;
+            this.backendPid = backendPid;
+        }
+
+        void commit() throws Exception {
+            connection.commit();
+            finished = true;
+        }
+
+        @Override public void close() throws Exception {
+            if (!finished) connection.rollback();
+            connection.close();
         }
     }
 

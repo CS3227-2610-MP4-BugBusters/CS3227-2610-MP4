@@ -76,7 +76,7 @@ describe("Developer workspace when the account becomes inactive during Save", ()
     expect(screen.getByRole("navigation", { name: "Developer navigation" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /Export crash investigation/ }));
-    const editor = await screen.findByLabelText(/investigation steps/i) as HTMLTextAreaElement;
+    const editor = await screen.findByRole("textbox", { name: "Step 1" }) as HTMLInputElement;
     await waitFor(() => expect(editor.value).toBe(privateStep));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -92,7 +92,7 @@ describe("Developer workspace when the account becomes inactive during Save", ()
 
     expect.soft(screen.queryByText(reports[0].title)).toBeNull();
     expect.soft(screen.queryByText(reports[1].title)).toBeNull();
-    expect.soft(screen.queryByLabelText(/investigation steps/i)).toBeNull();
+    expect.soft(screen.queryByRole("textbox", { name: "Step 1" })).toBeNull();
     expect.soft(screen.queryByDisplayValue(privateStep)).toBeNull();
     expect.soft(screen.queryByText("Developer One")).toBeNull();
     expect.soft(screen.queryByRole("navigation", { name: "Developer navigation" })).toBeNull();

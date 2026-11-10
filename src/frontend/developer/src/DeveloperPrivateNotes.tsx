@@ -115,7 +115,7 @@ export function DeveloperPrivateNotes({
     return false;
   }
 
-  return <section aria-label="Private investigation notes">
+  return <section className="developer-private-notes" aria-label="Private investigation notes">
     <h3>Private investigation notes</h3>
     {loading ? <p role="status">Loading private notes…</p> : <>
       <label htmlFor="private-notes">Notes (visible only to the assigned Developer)</label>

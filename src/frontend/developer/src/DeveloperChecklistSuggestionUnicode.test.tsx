@@ -27,7 +27,7 @@ beforeEach(() => {
       return jsonResponse({ steps: ["Saved step"], draftRevision: 2, reportVersion: 7 });
     }
     if (path === suggestionPath && init?.method === "POST") {
-      return jsonResponse({ steps: [suggestionStep], sourceVersion: 7 });
+      return jsonResponse({ steps: [suggestionStep], sourceVersion: 7, draftRevision: 2 });
     }
     throw new Error(`Unexpected request: ${init?.method ?? "GET"} ${path}`);
   });
@@ -42,13 +42,13 @@ afterEach(() => {
 async function generateFor(step: string) {
   suggestionStep = step;
   render(<DeveloperChecklist reportId={reportId} />);
-  const editor = await screen.findByLabelText(/investigation steps/i);
+  const editor = await screen.findByRole("textbox", { name: "Step 1" });
   fireEvent.change(editor, { target: { value: "Unsaved editor text" } });
   fireEvent.click(screen.getByRole("button", { name: "Generate suggestions" }));
   await waitFor(() => {
     expect((screen.getByRole("button", { name: "Generate suggestions" }) as HTMLButtonElement).disabled).toBe(false);
   });
-  return editor as HTMLTextAreaElement;
+  return editor as HTMLInputElement;
 }
 
 describe("AI suggestion Unicode validation", () => {
@@ -58,7 +58,7 @@ describe("AI suggestion Unicode validation", () => {
     expect.soft(screen.queryByRole("region", { name: "AI suggestions" })).toBeNull();
     expect.soft(screen.queryByRole("alert")).not.toBeNull();
     expect.soft(editor.value).toBe("Unsaved editor text");
-    expect.soft(screen.queryByRole("button", { name: "Apply suggestions" })).toBeNull();
+    expect.soft(screen.queryByRole("button", { name: "Add selected" })).toBeNull();
     expect.soft(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
   });
 
@@ -67,10 +67,14 @@ describe("AI suggestion Unicode validation", () => {
     const editor = await generateFor(validStep);
 
     expect(await screen.findByText(validStep)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Apply suggestions" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: validStep }));
+    fireEvent.click(screen.getByRole("button", { name: "Add selected" }));
 
     await waitFor(() => {
-      expect(editor.value).toBe(`Unsaved editor text\n${validStep}`);
+      expect((screen.getByRole("textbox", { name: "Step 1" }) as HTMLInputElement).value)
+        .toBe("Unsaved editor text");
+      expect((screen.getByRole("textbox", { name: "Step 2" }) as HTMLInputElement).value)
+        .toBe(validStep);
     });
     expect(fetchMock.mock.calls.some(([path, init]) =>
       String(path) === draftPath && (!init?.method || init.method === "GET"),

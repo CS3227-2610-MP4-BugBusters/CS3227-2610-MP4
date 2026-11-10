@@ -1,8 +1,15 @@
 package mp4.platform;
 
+import java.util.List;
+
 /** Provider boundary for bounded, untrusted report context. No provider is configured yet. */
 public interface SuggestionProvider {
     ProviderResponse suggest(String boundedTitle, String boundedDescription);
+
+    /** Supplies the saved private checklist as bounded, untrusted context. */
+    default ProviderResponse suggest(String boundedTitle, String boundedDescription, List<String> savedChecklist) {
+        return suggest(boundedTitle, boundedDescription);
+    }
 
     /** Configured model identifier for sanitized telemetry, when available. */
     default String modelName() { return null; }

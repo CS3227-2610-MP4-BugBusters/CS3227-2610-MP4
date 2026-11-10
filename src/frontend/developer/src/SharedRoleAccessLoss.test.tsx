@@ -54,7 +54,7 @@ function responseFor(input: RequestInfo | URL, init?: RequestInit): Response {
 async function openSelectedReport() {
   render(<DeveloperApp />);
   fireEvent.click(await screen.findByRole("button", { name: /Protected export investigation/ }));
-  const editor = await screen.findByLabelText(/investigation steps/i) as HTMLTextAreaElement;
+  const editor = await screen.findByRole("textbox", { name: "Step 1" }) as HTMLInputElement;
   await waitFor(() => expect(editor.value).toBe(privateStep));
   return editor;
 }
@@ -79,7 +79,7 @@ describe("Developer workspace access loss during checklist actions", () => {
 
     expect(await screen.findByText("Private draft saved.")).toBeTruthy();
     expect(screen.getAllByText(report.title)).toHaveLength(2);
-    expect((screen.getByLabelText(/investigation steps/i) as HTMLTextAreaElement).value).toBe(privateStep);
+    expect((screen.getByRole("textbox", { name: "Step 1" }) as HTMLInputElement).value).toBe(privateStep);
   });
 
   it("preserves an unsaved draft after a CSRF_INVALID 403", async () => {
@@ -95,7 +95,7 @@ describe("Developer workspace access loss during checklist actions", () => {
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toMatch(/unable|retry|reload|verify/i);
     expect(screen.getAllByText(report.title)).toHaveLength(2);
-    expect((screen.getByLabelText(/investigation steps/i) as HTMLTextAreaElement).value).toBe(unsavedDraft);
+    expect((screen.getByRole("textbox", { name: "Step 1" }) as HTMLInputElement).value).toBe(unsavedDraft);
     const saveCall = fetchMock.mock.calls.find(
       ([path, init]) => String(path) === draftPath && init?.method === "PUT",
     );
@@ -114,7 +114,7 @@ describe("Developer workspace access loss during checklist actions", () => {
 
     await waitFor(() => {
       expect(screen.queryAllByText(report.title)).toHaveLength(0);
-      expect(screen.queryByLabelText(/investigation steps/i)).toBeNull();
+      expect(screen.queryByRole("textbox", { name: "Step 1" })).toBeNull();
     });
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(screen.getByRole("alert").textContent).toMatch(/access|session|sign in/i);

@@ -41,7 +41,7 @@ function defaultResponse(path: string, init?: RequestInit): Response {
     return jsonResponse({ reportVersion: 8, changed: true });
   }
   if (/\/checklist\/suggestions$/.test(path) && init?.method === "POST") {
-    return jsonResponse({ steps: ["Inspect the export path"], sourceVersion: 7 });
+    return jsonResponse({ steps: ["Inspect the export path"], sourceVersion: 7, draftRevision: 2 });
   }
   throw new Error(`Unexpected request: ${init?.method ?? "GET"} ${path}`);
 }
@@ -69,20 +69,21 @@ describe("Developer AI suggestion review flow", () => {
     const untrustedStep = "<img src=x onerror=alert(1)> Inspect export handling";
     fetchMock.mockImplementation(async (input, init) => {
       if (String(input) === suggestionPath("report-a") && init?.method === "POST") {
-        return jsonResponse({ steps: [untrustedStep], sourceVersion: 7 });
+        return jsonResponse({ steps: [untrustedStep], sourceVersion: 7, draftRevision: 2 });
       }
       return defaultResponse(String(input), init);
     });
 
     render(<DeveloperChecklist reportId="report-a" />);
-    const editor = await screen.findByLabelText(/investigation steps/i);
+    const editor = await screen.findByRole("textbox", { name: "Step 1" });
     fireEvent.change(editor, { target: { value: "Keep my unsaved note" } });
     fireEvent.click(screen.getByRole("button", { name: /generate suggestions/i }));
 
     const preview = await screen.findByRole("region", { name: /suggestions/i });
     expect(within(preview).getByText(untrustedStep)).toBeTruthy();
+    expect(screen.getByText(/last saved checklist/i)).toBeTruthy();
     expect(preview.querySelector("img")).toBeNull();
-    expect((editor as HTMLTextAreaElement).value).toBe("Keep my unsaved note");
+    expect((editor as HTMLInputElement).value).toBe("Keep my unsaved note");
 
     const post = requestInit(suggestionPath("report-a"), "POST");
     expect(post?.body).toBe("{}");
@@ -99,15 +100,17 @@ describe("Developer AI suggestion review flow", () => {
     expect(screen.getByRole("button", { name: "Share" })).toBeTruthy();
   });
 
-  it("applies only after a fresh matching report-version check and does not persist the draft", async () => {
+  it("applies only after fresh matching report and saved-checklist revision checks and does not persist the draft", async () => {
     render(<DeveloperChecklist reportId="report-a" />);
-    const editor = await screen.findByLabelText(/investigation steps/i);
+    const editor = await screen.findByRole("textbox", { name: "Step 1" });
     fireEvent.click(screen.getByRole("button", { name: /generate suggestions/i }));
     const preview = await screen.findByRole("region", { name: /suggestions/i });
-    fireEvent.click(within(preview).getByRole("button", { name: /apply/i }));
+    fireEvent.click(within(preview).getByRole("checkbox", { name: "Inspect the export path" }));
+    fireEvent.click(within(preview).getByRole("button", { name: /add selected/i }));
 
     await waitFor(() => {
-      expect((editor as HTMLTextAreaElement).value).toBe("Inspect the export path");
+      expect((screen.getByRole("textbox", { name: "Step 1" }) as HTMLInputElement).value)
+        .toBe("Inspect the export path");
     });
     expect(fetchMock.mock.calls.some(([path, init]) =>
       String(path) === draftPath("report-a") && (!init?.method || init.method === "GET"),
@@ -128,17 +131,43 @@ describe("Developer AI suggestion review flow", () => {
     });
 
     render(<DeveloperChecklist reportId="report-a" />);
-    const editor = await screen.findByLabelText(/investigation steps/i);
+    const editor = await screen.findByRole("textbox", { name: "Step 1" });
     fireEvent.change(editor, { target: { value: "Unsaved user wording" } });
     fireEvent.click(screen.getByRole("button", { name: /generate suggestions/i }));
     const preview = await screen.findByRole("region", { name: /suggestions/i });
-    fireEvent.click(within(preview).getByRole("button", { name: /apply/i }));
+    fireEvent.click(within(preview).getByRole("checkbox", { name: "Inspect the export path" }));
+    fireEvent.click(within(preview).getByRole("button", { name: /add selected/i }));
 
     expect(await screen.findByRole("alert")).toBeTruthy();
-    expect((editor as HTMLTextAreaElement).value).toBe("Unsaved user wording");
+    expect((editor as HTMLInputElement).value).toBe("Unsaved user wording");
     expect(screen.queryByText("Inspect the export path")).toBeNull();
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
     expect(fetchMock.mock.calls.some(([path]) => /\/checklist\/share$/.test(String(path)))).toBe(false);
+  });
+
+  it("rejects suggestions when the saved checklist revision changes during generation", async () => {
+    let draftReads = 0;
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === draftPath("report-a") && (!init?.method || init.method === "GET")) {
+        draftReads += 1;
+        return draft([draftReads === 1 ? "Saved before generation" : "Saved after generation"],
+          draftReads === 1 ? 2 : 3, 7);
+      }
+      return defaultResponse(path, init);
+    });
+
+    render(<DeveloperChecklist reportId="report-a" />);
+    const editor = await screen.findByRole("textbox", { name: "Step 1" });
+    fireEvent.change(editor, { target: { value: "Unsaved wording stays local" } });
+    fireEvent.click(screen.getByRole("button", { name: /generate suggestions/i }));
+    const preview = await screen.findByRole("region", { name: /suggestions/i });
+    fireEvent.click(within(preview).getByRole("checkbox", { name: "Inspect the export path" }));
+    fireEvent.click(within(preview).getByRole("button", { name: /add selected/i }));
+
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect((editor as HTMLInputElement).value).toBe("Unsaved wording stays local");
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
   });
 
   it("keeps the current report intact when a pending suggestion for the previous report completes late", async () => {
@@ -156,20 +185,20 @@ describe("Developer AI suggestion review flow", () => {
     });
 
     const view = render(<DeveloperChecklist reportId="report-a" />);
-    const editorA = await screen.findByLabelText(/investigation steps/i);
+    const editorA = await screen.findByRole("textbox", { name: "Step 1" });
     fireEvent.change(editorA, { target: { value: "Unsaved A text" } });
     fireEvent.click(screen.getByRole("button", { name: /generate suggestions/i }));
     await waitFor(() => expect(requestInit(suggestionPath("report-a"), "POST")).toBeTruthy());
 
     view.rerender(<DeveloperChecklist reportId="report-b" />);
-    const editorB = await screen.findByLabelText(/investigation steps/i);
-    expect((editorB as HTMLTextAreaElement).value).toBe("Report B saved step");
+    const editorB = await screen.findByRole("textbox", { name: "Step 1" });
+    expect((editorB as HTMLInputElement).value).toBe("Report B saved step");
     await act(async () => {
-      resultA.resolve(jsonResponse({ steps: ["Late report A suggestion"], sourceVersion: 10 }));
+      resultA.resolve(jsonResponse({ steps: ["Late report A suggestion"], sourceVersion: 10, draftRevision: 4 }));
       await resultA.promise;
     });
 
-    expect((editorB as HTMLTextAreaElement).value).toBe("Report B saved step");
+    expect((editorB as HTMLInputElement).value).toBe("Report B saved step");
     expect(screen.queryByText("Late report A suggestion")).toBeNull();
     expect(screen.queryByText("Unsaved A text")).toBeNull();
   });
@@ -183,12 +212,12 @@ describe("Developer AI suggestion review flow", () => {
     });
 
     render(<DeveloperChecklist reportId="report-a" />);
-    const editor = await screen.findByLabelText(/investigation steps/i);
+    const editor = await screen.findByRole("textbox", { name: "Step 1" });
     fireEvent.change(editor, { target: { value: "Unsaved investigation note" } });
     fireEvent.click(screen.getByRole("button", { name: /generate suggestions/i }));
 
     expect(await screen.findByRole("alert")).toBeTruthy();
-    expect((editor as HTMLTextAreaElement).value).toBe("Unsaved investigation note");
+    expect((editor as HTMLInputElement).value).toBe("Unsaved investigation note");
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
   });
 });

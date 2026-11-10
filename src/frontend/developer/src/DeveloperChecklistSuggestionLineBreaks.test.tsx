@@ -27,7 +27,7 @@ beforeEach(() => {
       return jsonResponse({ steps: ["Saved step"], draftRevision: 2, reportVersion: 7 });
     }
     if (path === suggestionPath && init?.method === "POST") {
-      return jsonResponse({ steps: [suggestionStep], sourceVersion: 7 });
+      return jsonResponse({ steps: [suggestionStep], sourceVersion: 7, draftRevision: 2 });
     }
     throw new Error(`Unexpected request: ${init?.method ?? "GET"} ${path}`);
   });
@@ -47,7 +47,7 @@ describe("AI suggestion line boundaries", () => {
   ])("rejects a suggestion containing %s without preview, Apply, or draft mutation", async (_kind, step) => {
     suggestionStep = step;
     render(<DeveloperChecklist reportId={reportId} />);
-    const editor = await screen.findByLabelText(/investigation steps/i) as HTMLTextAreaElement;
+    const editor = await screen.findByRole("textbox", { name: "Step 1" }) as HTMLInputElement;
     fireEvent.change(editor, { target: { value: "Unsaved editor text" } });
     fireEvent.click(screen.getByRole("button", { name: "Generate suggestions" }));
 
@@ -56,7 +56,7 @@ describe("AI suggestion line boundaries", () => {
     });
     expect(screen.queryByRole("region", { name: "AI suggestions" })).toBeNull();
     expect(screen.getByRole("alert")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Apply suggestions" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add selected" })).toBeNull();
     expect(editor.value).toBe("Unsaved editor text");
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
     expect(fetchMock.mock.calls.some(([path]) => String(path).endsWith("/checklist/share"))).toBe(false);

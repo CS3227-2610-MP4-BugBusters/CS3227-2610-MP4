@@ -50,6 +50,8 @@ final class SuggestionService {
     private static final Duration PROVIDER_DEADLINE = Duration.ofSeconds(15);
     private static final int TITLE_LIMIT = 512;
     private static final int DESCRIPTION_LIMIT = 8192;
+    private static final int CHECKLIST_STEP_LIMIT = 20;
+    private static final int CHECKLIST_BYTES_LIMIT = 8192;
 
     private final DataSource dataSource;
     private final Clock clock;
@@ -108,7 +110,9 @@ final class SuggestionService {
         }
         if (source.oversized || utf8Length(source.title) > TITLE_LIMIT
                 || utf8Length(source.description) > DESCRIPTION_LIMIT
-                || !validUnicode(source.title) || !validUnicode(source.description)) {
+                || source.checklistOversized || !validUnicode(source.title)
+                || !validUnicode(source.description)
+                || source.checklist.stream().anyMatch(step -> !validUnicode(step))) {
             error(response, 400, "INPUT_TOO_LARGE", "Report context exceeds the suggestion input limit");
             return;
         }
@@ -128,7 +132,7 @@ final class SuggestionService {
         try {
             pending = providerWorker.submit(() -> {
                 try {
-                    return provider.suggest(source.title, source.description);
+                    return provider.suggest(source.title, source.description, source.checklist);
                 } finally {
                     inFlight.release();
                 }
@@ -219,7 +223,7 @@ final class SuggestionService {
         recordTelemetry("success", providerStarted, generated == null ? null : generated.usage());
         response.setStatus(200);
         response.setContentType("application/json; charset=utf-8");
-        json.writeValue(response.getOutputStream(), new SuggestionResult(steps, source.version));
+        json.writeValue(response.getOutputStream(), new SuggestionResult(steps, source.version, source.draftRevision));
     }
 
     private Snapshot snapshot(UUID reportId, AuthProvider.CurrentUser actor) {
@@ -239,7 +243,7 @@ final class SuggestionService {
                         }
                     }
                 }
-                Snapshot result;
+                Snapshot reportSnapshot;
                 try (PreparedStatement report = connection.prepareStatement("""
                         SELECT CASE WHEN octet_length(convert_to(title, 'UTF8')) <= ? THEN title END AS title,
                                CASE WHEN octet_length(convert_to(description, 'UTF8')) <= ? THEN description END AS description,
@@ -258,10 +262,51 @@ final class SuggestionService {
                         }
                         boolean oversized = row.getInt("title_bytes") > TITLE_LIMIT
                                 || row.getInt("description_bytes") > DESCRIPTION_LIMIT;
-                        result = new Snapshot(reportId, row.getString("title"), row.getString("description"),
-                                row.getLong("version"), oversized);
+                        reportSnapshot = new Snapshot(reportId, row.getString("title"), row.getString("description"),
+                                row.getLong("version"), List.of(), 0, oversized, false);
                     }
                 }
+                // Read the draft in a separate READ COMMITTED statement after locking the report.
+                // Save also locks the report, so this sees the latest committed draft without
+                // transferring an unbounded text[] into the application.
+                try (PreparedStatement checklist = connection.prepareStatement("""
+                        SELECT COALESCE(c.draft_revision, 0) AS draft_revision,
+                               CASE WHEN c.report_id IS NULL THEN FALSE
+                                    WHEN cardinality(c.draft_steps) > ? THEN TRUE
+                                    WHEN array_position(c.draft_steps, NULL) IS NOT NULL THEN TRUE
+                                    WHEN (SELECT COALESCE(sum(octet_length(convert_to(step.value, 'UTF8'))), 0)
+                                          FROM unnest(c.draft_steps) AS step(value)) > ? THEN TRUE
+                                    ELSE FALSE END AS oversized,
+                               CASE WHEN c.report_id IS NULL THEN ARRAY[]::text[]
+                                    WHEN cardinality(c.draft_steps) > ? THEN ARRAY[]::text[]
+                                    WHEN array_position(c.draft_steps, NULL) IS NOT NULL THEN ARRAY[]::text[]
+                                    WHEN (SELECT COALESCE(sum(octet_length(convert_to(step.value, 'UTF8'))), 0)
+                                          FROM unnest(c.draft_steps) AS step(value)) > ? THEN ARRAY[]::text[]
+                                    ELSE c.draft_steps END AS draft_steps
+                        FROM (SELECT ?::uuid AS report_id) requested
+                        LEFT JOIN public.investigation_checklists c ON c.report_id = requested.report_id
+                        """)) {
+                    checklist.setInt(1, CHECKLIST_STEP_LIMIT);
+                    checklist.setInt(2, CHECKLIST_BYTES_LIMIT);
+                    checklist.setInt(3, CHECKLIST_STEP_LIMIT);
+                    checklist.setInt(4, CHECKLIST_BYTES_LIMIT);
+                    checklist.setObject(5, reportId);
+                    try (ResultSet row = checklist.executeQuery()) {
+                        row.next();
+                        java.sql.Array draftArray = row.getArray("draft_steps");
+                        List<String> draft;
+                        try {
+                            draft = List.of((String[]) draftArray.getArray());
+                        } finally {
+                            draftArray.free();
+                        }
+                        reportSnapshot = new Snapshot(reportSnapshot.id, reportSnapshot.title,
+                                reportSnapshot.description, reportSnapshot.version, draft,
+                                row.getLong("draft_revision"), reportSnapshot.oversized,
+                                row.getBoolean("oversized"));
+                    }
+                }
+                Snapshot result = reportSnapshot;
                 connection.commit();
                 return result;
             } catch (SQLException | RuntimeException failure) {
@@ -343,21 +388,29 @@ final class SuggestionService {
         if (raw == null || raw.getBytes(StandardCharsets.UTF_8).length > 64 * 1024 || !validUnicode(raw)) {
             throw new IllegalArgumentException("invalid output");
         }
-        try {
-            JsonNode parsed = json.readTree(raw);
-            if (parsed == null || !parsed.isArray() || parsed.isEmpty() || parsed.size() > 8) {
-                throw new IllegalArgumentException("invalid output");
-            }
-            List<String> steps = new ArrayList<>(parsed.size());
-            for (JsonNode step : parsed) {
-                if (!step.isTextual()) throw new IllegalArgumentException("invalid output");
-                String text = step.textValue();
-                if (text.isBlank() || text.indexOf('\0') >= 0 || text.indexOf('\r') >= 0
-                        || text.indexOf('\n') >= 0 || !validUnicode(text) || utf8Length(text) > 300) {
+        List<String> steps = new ArrayList<>();
+        try (var parser = json.getFactory().createParser(raw)) {
+            com.fasterxml.jackson.core.JsonToken token;
+            while ((token = parser.nextToken()) != null) {
+                if (token != com.fasterxml.jackson.core.JsonToken.START_ARRAY) {
                     throw new IllegalArgumentException("invalid output");
                 }
-                steps.add(text);
+                int arraySize = 0;
+                while ((token = parser.nextToken()) != com.fasterxml.jackson.core.JsonToken.END_ARRAY) {
+                    if (token != com.fasterxml.jackson.core.JsonToken.VALUE_STRING || steps.size() >= 8) {
+                        throw new IllegalArgumentException("invalid output");
+                    }
+                    String text = parser.getText();
+                    if (text.isBlank() || text.indexOf('\0') >= 0 || text.indexOf('\r') >= 0
+                            || text.indexOf('\n') >= 0 || !validUnicode(text) || utf8Length(text) > 300) {
+                        throw new IllegalArgumentException("invalid output");
+                    }
+                    steps.add(text);
+                    arraySize++;
+                }
+                if (arraySize == 0) throw new IllegalArgumentException("invalid output");
             }
+            if (steps.isEmpty()) throw new IllegalArgumentException("invalid output");
             return List.copyOf(steps);
         } catch (IOException malformed) {
             throw new IllegalArgumentException("invalid output");
@@ -380,8 +433,9 @@ final class SuggestionService {
         AuthHttp.error(response, status, code, message);
     }
 
-    private record Snapshot(UUID id, String title, String description, long version, boolean oversized) { }
-    private record SuggestionResult(List<String> steps, long sourceVersion) { }
+    private record Snapshot(UUID id, String title, String description, long version, List<String> checklist,
+            long draftRevision, boolean oversized, boolean checklistOversized) { }
+    private record SuggestionResult(List<String> steps, long sourceVersion, long draftRevision) { }
     private static final class SQLExceptionFailure extends RuntimeException {
         SQLExceptionFailure(Throwable cause) { super(cause); }
     }

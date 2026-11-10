@@ -91,6 +91,12 @@ textarea {
   line-height: 1.5;
 }
 
+.developer-checklist-step input[type="text"] {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+}
+
 button + button {
   margin-left: .5rem;
 }
@@ -207,4 +213,125 @@ button + button {
   .developer-report-list__status {
     justify-self: start;
   }
+}
+
+.developer-checklist > h2,
+.developer-checklist__suggestions > h3 { margin: 0; }
+
+.developer-checklist__intro,
+.developer-checklist__hint,
+.developer-checklist__suggestions > p {
+  color: #52666b;
+  font-size: .9rem;
+  margin: .4rem 0 1rem;
+}
+
+.developer-checklist__steps,
+.developer-checklist__choices {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.developer-checklist__steps legend,
+.developer-checklist__choices legend {
+  margin-bottom: .65rem;
+  color: #31545a;
+  font-size: .86rem;
+  font-weight: 700;
+}
+
+.developer-checklist-step {
+  display: flex;
+  align-items: end;
+  gap: .65rem;
+  margin-bottom: .75rem;
+}
+
+.developer-checklist-step__content { flex: 1; min-width: 0; }
+.developer-checklist-step label { margin-bottom: .25rem; color: #52666b; font-size: .8rem; font-weight: 650; }
+.developer-checklist__add { color: #086e71; border-style: dashed; }
+.developer-checklist__hint { margin: 1rem 0 .65rem; }
+.developer-checklist__actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.developer-checklist__actions button + button { margin-left: 0; }
+button.developer-checklist__primary:not(:disabled) { border-color: #087c80; color: #fff; background: #087c80; }
+button.developer-checklist__primary:hover:not(:disabled) { border-color: #075d60; background: #075d60; }
+.developer-checklist__suggestions { padding: 1rem; border-color: #b9dcd9; background: #f4fbfa; }
+.developer-checklist__choice {
+  display: flex;
+  align-items: flex-start;
+  gap: .7rem;
+  margin-bottom: .5rem;
+  padding: .75rem;
+  border: 1px solid #d6e7e5;
+  border-radius: .5rem;
+  background: #fff;
+  cursor: pointer;
+}
+.developer-checklist__choice:has(input:checked) { border-color: #52a7a0; background: #eaf7f5; }
+.developer-checklist__choice input { flex: none; width: 1rem; height: 1rem; margin: .25rem 0 0; accent-color: #087c80; }
+@media (max-width: 480px) {
+  .developer-checklist-step { flex-wrap: wrap; }
+  .developer-checklist-step__content { flex-basis: 100%; }
+}
+
+.developer-report-detail > h2 {
+  margin: 0;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.developer-report-detail__description {
+  color: #52666b;
+  margin: .65rem 0 .85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.developer-report-detail__status {
+  display: inline-block;
+  margin: 0 0 1rem;
+  padding: .3rem .7rem;
+  border: 1px solid #c6d9d8;
+  border-radius: 999px;
+  color: #315a5d;
+  background: #f2f8f7;
+  font-size: .85rem;
+  font-weight: 650;
+}
+
+.developer-resolution {
+  padding: 1rem;
+  border: 1px solid #dce6e8;
+  border-radius: .5rem;
+  background: #f9fbfb;
+}
+
+.developer-resolution label,
+.developer-private-notes label {
+  margin-bottom: .45rem;
+  color: #31545a;
+  font-size: .9rem;
+  font-weight: 650;
+}
+
+.developer-resolution textarea,
+.developer-private-notes textarea {
+  min-height: 6rem;
+  background: #fff;
+}
+
+.developer-resolution button,
+.developer-private-notes button {
+  margin-top: .7rem;
+}
+
+.developer-private-notes {
+  border-color: #dce6e8;
+  background: #f9fbfb;
+}
+
+.developer-private-notes h3 {
+  margin: 0 0 .8rem;
 }

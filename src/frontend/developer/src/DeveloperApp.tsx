@@ -527,16 +527,16 @@ export function DeveloperApp() {
             )}
           </section>
           {selectedReportId && (
-            <section aria-label="Selected report">
+            <section className="developer-report-detail" aria-label="Selected report">
               <h2>{detail?.id === selectedReportId ? detail.title : selectedReportTitle}</h2>
               {detailState === "loading" && <p role="status">Loading report details…</p>}
               {detailState === "error" && <p role="alert">Unable to load report details.</p>}
               {detailState === "ready" && detail?.id === selectedReportId && (
                 <>
-                  <p>{detail.description}</p>
-                  <p>Status: {formatStatus(detail.status)}</p>
+                  <p className="developer-report-detail__description">{detail.description}</p>
+                  <p className="developer-report-detail__status">Status: {formatStatus(detail.status)}</p>
                   {(detail.status === "IN_PROGRESS" || resolution.length > 0) && detail.version !== undefined && (
-                    <form onSubmit={(event) => void submitResolution(event)}>
+                    <form className="developer-resolution" onSubmit={(event) => void submitResolution(event)}>
                       <label htmlFor="resolution">Resolution</label>
                       <textarea id="resolution" value={resolution} maxLength={10000} disabled={submittingResolution}
                         onChange={(event) => setResolution(event.target.value)} />
