@@ -1,8 +1,12 @@
 # Reporter reports backend contract
 
-Status: **Draft for Reporter feature-owner approval**, 9 November 2026. Source
-requirements: `openspec/changes/reporter-markdown-reports/specs/reporter-reports/spec.md`
-(RPT-01..07) and design D6–D8. Once approved, this file is read-only for every
+Status: revision 1 (RPT-01..08) **approved** 9 November 2026 (sha256 2153c287).
+Revision 2 (edit and hard delete, sha256 9d0ad9b0) was approved and then
+superseded on 10 November 2026, when the owner replaced delete with close.
+Revision 3 (RPT-09 edit, RPT-10 close) **approved** by the Reporter feature
+owner, 10 November 2026 (task 2.8). Source requirements:
+`openspec/changes/reporter-markdown-reports/specs/reporter-reports/spec.md`
+(RPT-01..10) and design D6–D8, D10 and D17. Once approved, this file is read-only for every
 agent. Changes go back to the feature owner and reset any approved Red baseline
 that depends on them.
 
@@ -23,7 +27,7 @@ Identity or role in the body, query or headers never selects the actor.
 
 A report has exactly two Reporter-authored fields:
 
-| JSON field | Column | Create | Rules |
+| JSON field | Column | Create and edit | Rules |
 | --- | --- | --- | --- |
 | `title` | `title` | required | Non-blank. At most 200 UTF-16 code units. No `\r` or `\n`. Plain text. |
 | `description` | `description` | required | Non-blank. At most 20,000 code units. Markdown source. |
@@ -58,8 +62,9 @@ The server sets `id` (random UUID), `reporter_id` (the actor), status
 #### Rate limit: 3 reports per minute per Reporter
 
 - A Reporter can create at most **3 reports in any rolling 60-second window**.
-- The window is counted from that Reporter's stored `created_at` values. Only
-  successful creates count; requests rejected for any reason don't.
+- The window is counted from that Reporter's stored `created_at` values. Reports
+  are never deleted, so closing a report never frees a slot. Only successful
+  creates count; requests rejected for any reason don't.
 - A 4th create inside the window returns **429 `RATE_LIMITED`** and stores
   nothing. The response sends `Retry-After` with the whole seconds (rounded up,
   minimum 1) until the oldest create in the window is 60 seconds old.
@@ -69,7 +74,7 @@ The server sets `id` (random UUID), `reporter_id` (the actor), status
   another.
 - Order of checks: session, then validation, then rate limit. An invalid request
   gets 400 even when the Reporter is over the limit.
-- List and read requests are not rate-limited by this rule.
+- List, read, edit and close requests are not rate-limited by this rule.
 
 ### `GET /api/reporter/reports`
 
@@ -98,7 +103,53 @@ whose `reporter_id` equals the actor.
 Reporter, or `{id}` isn't a canonical UUID. These three cases must be
 byte-identical apart from `requestId`.
 
-Other methods on these paths return 405 `METHOD_NOT_ALLOWED`.
+### `PUT /api/reporter/reports/{id}` (edit, RPT-09)
+
+The body is a JSON object with exactly `title`, `description` and `version`.
+`title` and `description` follow the field rules above. `version` is a JSON
+integer of 0 or more, the value the Reporter last read. A missing, non-integer
+or negative `version`, an invalid field, any other key, or a body that is not a
+JSON object returns 400 `VALIDATION_FAILED`.
+
+The update is one atomic write that succeeds only when the report belongs to
+the actor, has no assignee, has status `SUBMITTED` and has the given version.
+It then sets both fields exactly as submitted, increments `version` by 1 and
+sets `updatedAt` to the current time.
+
+**200** with the updated detail, same shape as the 201 response.
+
+### `POST /api/reporter/reports/{id}/close` (close, RPT-10)
+
+The body is a JSON object with exactly `version`, a JSON integer of 0 or more.
+A missing, non-integer or negative `version`, any other key, or a body that is
+not a JSON object returns 400 `VALIDATION_FAILED`. Query parameters are not
+accepted: any query parameter returns 400 `VALIDATION_FAILED`.
+
+The close is one atomic write under the same conditions as edit. It sets status
+`CLOSED`, increments `version` by 1, sets `updatedAt` to the current time and
+leaves `title` and `description` unchanged.
+
+**200** with the updated detail, same shape as the 201 response. The report stays
+readable and listed. Reopening is not supported.
+
+### Edit and close outcomes
+
+Checks run in this order: session, validation, then the report.
+
+| Condition | Response |
+| --- | --- |
+| No such report, another Reporter's report, or `{id}` not a canonical UUID | 404 `REPORT_NOT_FOUND`, byte-identical to the read 404 apart from `requestId` |
+| The actor's report has an assignee, or a status other than `SUBMITTED` (including `CLOSED`) | 409 `REPORT_LOCKED` |
+| The actor's unlocked report has a different version | 409 `VERSION_CONFLICT` |
+| Otherwise | 200 |
+
+Nothing changes on any non-success response. If an assignment and an edit or
+close race, exactly one takes effect: either the edit or close succeeds first, or
+it returns 409 and the report stays assigned and unchanged.
+
+Other methods on these paths return 405 `METHOD_NOT_ALLOWED`. The `Allow`
+header is `GET, POST` on the collection, `GET, PUT` on a report and `POST` on its
+`/close` path.
 
 ## Errors and headers
 
@@ -107,8 +158,8 @@ Other methods on these paths return 405 `METHOD_NOT_ALLOWED`.
 ```
 
 - Codes: `VALIDATION_FAILED` 400, `UNAUTHENTICATED` 401, `FORBIDDEN` 403,
-  `REPORT_NOT_FOUND` 404, `METHOD_NOT_ALLOWED` 405, `RATE_LIMITED` 429,
-  `INTERNAL_ERROR` 500.
+  `REPORT_NOT_FOUND` 404, `METHOD_NOT_ALLOWED` 405, `REPORT_LOCKED` 409,
+  `VERSION_CONFLICT` 409, `RATE_LIMITED` 429, `INTERNAL_ERROR` 500.
 - Messages are fixed per code. The body never echoes submitted text and never
   includes report content, SQL or a stack trace.
 - Error responses don't say which field failed. This keeps the envelope identical
@@ -119,6 +170,7 @@ Other methods on these paths return 405 `METHOD_NOT_ALLOWED`.
 
 ## Not covered
 
-Editing, lifecycle transitions, assignee details, discussion, checklist responses,
+Editing or closing after assignment, deleting reports, reopening, other
+lifecycle transitions, assignee details, discussion, checklist responses,
 and AI, including the AI suggestions for reproduction steps, expected and actual
 behavior, and environment.

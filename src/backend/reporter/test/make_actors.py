@@ -10,7 +10,7 @@ for name, role, active in fixed:
     print("MP4_TEST_ID_%s=%s\nMP4_TEST_TOKEN_%s=%s" % (name, i, name, t))
     entries.append("%s=%s:%s:%s" % (t, i, role, "true" if active else "false"))
 pool = []
-for _ in range(60):
+for _ in range(120):
     i, t = uuid.uuid4(), secrets.token_hex(16)
     entries.append("%s=%s:REPORTER:true" % (t, i))
     pool.append("%s:%s" % (t, i))

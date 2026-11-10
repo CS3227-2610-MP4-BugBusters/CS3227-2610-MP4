@@ -16,14 +16,22 @@ ORIGIN = urllib.parse.urlparse(os.environ["MP4_TEST_ORIGIN"])
 ISO = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$")
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 _POOL = [p.split(":") for p in os.environ["MP4_TEST_POOL"].split(",")]
-_next = [0]
+_handed_out = set()
 
 
 def fresh_reporter():
-    """Returns (token, uuid) of a Reporter that has not created anything yet."""
-    pair = _POOL[_next[0]]
-    _next[0] += 1
-    return pair[0], pair[1]
+    """Returns (token, uuid) of a pool Reporter with no stored reports.
+
+    Test files run as separate processes against one database and one pool, so
+    the check is made against the database, not an in-memory cursor. Entries
+    already used (stored reports) or handed out in this process are skipped."""
+    for token, uuid in _POOL:
+        if uuid in _handed_out:
+            continue
+        if int(psql("SELECT count(*) FROM reports WHERE reporter_id='%s'" % uuid)) == 0:
+            _handed_out.add(uuid)
+            return token, uuid
+    raise RuntimeError("Reporter pool exhausted: all %d pool Reporters already have reports" % len(_POOL))
 
 
 def request(method, path, body=None, token=None, raw=None, headers=None):
