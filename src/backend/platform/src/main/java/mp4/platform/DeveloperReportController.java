@@ -26,6 +26,96 @@ final class DeveloperReportController {
         this.actorDataSource = new ActorTransactionDataSource(dataSource);
     }
 
+    @GetMapping("/api/developer/notifications")
+    Object notifications(HttpServletResponse response) throws IOException {
+        AuthHttp.noStore(response);
+        AuthProvider.CurrentUser user = currentUser();
+        try (var connection = actorDataSource.getConnection()) {
+            connection.setTransactionIsolation(java.sql.Connection.TRANSACTION_READ_COMMITTED);
+            connection.setAutoCommit(false);
+            try (var query = connection.prepareStatement("""
+                    SELECT n.id, n.event_type, n.created_at, n.read_at,
+                           CASE WHEN r.assignee_id = n.recipient_id THEN n.report_id ELSE NULL END AS visible_report_id
+                    FROM public.developer_notifications n
+                    JOIN public.reports r ON r.id = n.report_id
+                    WHERE n.recipient_id = ?
+                    ORDER BY n.created_at DESC, n.id DESC
+                    LIMIT 50
+                    """)) {
+                query.setObject(1, user.id());
+                java.util.List<Map<String, Object>> items = new java.util.ArrayList<>();
+                try (var rows = query.executeQuery()) {
+                    while (rows.next()) {
+                        Map<String, Object> item = new java.util.LinkedHashMap<>();
+                        item.put("id", rows.getObject("id").toString());
+                        item.put("type", rows.getString("event_type"));
+                        item.put("createdAt", rows.getTimestamp("created_at").toInstant().toString());
+                        item.put("read", rows.getTimestamp("read_at") != null);
+                        var visibleReport = rows.getObject("visible_report_id", UUID.class);
+                        item.put("reportId", visibleReport == null ? null : visibleReport.toString());
+                        items.add(item);
+                    }
+                }
+                connection.commit();
+                return Map.of("items", items);
+            } catch (java.sql.SQLException | RuntimeException failure) {
+                connection.rollback();
+                throw failure;
+            }
+        } catch (ActorTransactionDataSource.Revoked revoked) {
+            AuthHttp.error(response, 401, "UNAUTHENTICATED", "Authentication required");
+            return null;
+        } catch (java.sql.SQLException unavailable) {
+            AuthHttp.error(response, 503, "STORAGE_UNAVAILABLE", "Notifications are temporarily unavailable");
+            return null;
+        }
+    }
+
+    @PostMapping("/api/developer/notifications/{notificationId}/read")
+    void markNotificationRead(@PathVariable("notificationId") String notificationId,
+            HttpServletRequest request, HttpServletResponse response) throws IOException {
+        AuthHttp.noStore(response);
+        if (request.getQueryString() != null || request.getInputStream().readNBytes(1).length != 0) {
+            AuthHttp.error(response, 400, "INVALID_REQUEST", "Invalid notification request");
+            return;
+        }
+        final UUID id;
+        try { id = UUID.fromString(notificationId); }
+        catch (IllegalArgumentException invalid) {
+            AuthHttp.error(response, 404, "NOT_FOUND", "Notification not found");
+            return;
+        }
+        AuthProvider.CurrentUser user = currentUser();
+        try (var connection = actorDataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            try (var update = connection.prepareStatement("""
+                    UPDATE public.developer_notifications SET read_at = COALESCE(read_at, now())
+                    WHERE id = ? AND recipient_id = ?
+                    """)) {
+                update.setObject(1, id); update.setObject(2, user.id());
+                if (update.executeUpdate() != 1) {
+                    connection.rollback();
+                    AuthHttp.error(response, 404, "NOT_FOUND", "Notification not found");
+                    return;
+                }
+                connection.commit();
+                response.setStatus(204);
+            } catch (java.sql.SQLException | RuntimeException failure) {
+                connection.rollback();
+                throw failure;
+            }
+        } catch (ActorTransactionDataSource.Revoked revoked) {
+            AuthHttp.error(response, 401, "UNAUTHENTICATED", "Authentication required");
+        } catch (java.sql.SQLException unavailable) {
+            AuthHttp.error(response, 503, "STORAGE_UNAVAILABLE", "Notifications are temporarily unavailable");
+        }
+    }
+
+    private static AuthProvider.CurrentUser currentUser() {
+        return (AuthProvider.CurrentUser) org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication().getPrincipal();
+    }
+
     @GetMapping("/api/developer/reports/{reportId}")
     Object detail(@PathVariable("reportId") String reportId, HttpServletResponse response) throws IOException {
         AuthHttp.noStore(response);

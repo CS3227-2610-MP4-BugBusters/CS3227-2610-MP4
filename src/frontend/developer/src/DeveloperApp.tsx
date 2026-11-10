@@ -1,6 +1,7 @@
 import { createElement, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { DeveloperChecklist } from "./DeveloperChecklist";
 import { DeveloperPrivateNotes } from "./DeveloperPrivateNotes";
+import { DeveloperNotifications } from "./DeveloperNotifications";
 import { createRoleWorkspace } from "../../shared/RoleWorkspace";
 
 type User = {
@@ -439,6 +440,15 @@ export function DeveloperApp() {
       {sessionState === "active" && user && (
         <>
           {error && listState !== "error" && <p role="alert">{error}</p>}
+          <DeveloperNotifications
+            onSessionExpired={() => handleChecklistAccessLoss("session", "")}
+            onOpenReport={(reportId) => {
+              const report = reports.find((item) => item.id === reportId);
+              setError("");
+              setSelectedReportId(reportId);
+              setSelectedReportTitle(report?.title ?? "Assigned report");
+            }}
+          />
           <section aria-label="Assigned reports">
             <h2>Assigned reports</h2>
             <div className="developer-report-controls">

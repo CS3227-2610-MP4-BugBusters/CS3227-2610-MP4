@@ -87,6 +87,7 @@ beforeEach(() => {
       listRequests.push(url);
       return listHandler(url);
     }
+    if (url.pathname === "/api/developer/notifications") return jsonResponse({ items: [] });
     throw new Error(`Unexpected request: ${url.pathname}`);
   });
   vi.stubGlobal("fetch", fetchMock);

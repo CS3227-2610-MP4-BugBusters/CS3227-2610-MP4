@@ -422,3 +422,22 @@ button.developer-checklist__primary:hover:not(:disabled) { border-color: #075d60
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.developer-notifications > h2 { margin: 0 0 .8rem; }
+.developer-notifications__list { display: grid; gap: .55rem; margin: 0; padding: 0; list-style: none; }
+.developer-notifications__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .55rem .8rem;
+  padding: .7rem .8rem;
+  border: 1px solid #dce7e7;
+  border-radius: .5rem;
+  background: #fbfdfd;
+}
+.developer-notifications__item time { color: #63777a; font-size: .82rem; }
+.developer-notifications__label { flex: 1 1 12rem; font-weight: 650; }
+.developer-notifications__report { color: #086e71; }
+.developer-notifications__read { color: #63777a; font-size: .82rem; }
+.developer-notifications__item.is-unread { border-left: 3px solid #087c80; background: #f4fbfa; }
+.developer-notifications__item button { min-height: 2.2rem; padding: .35rem .65rem; }

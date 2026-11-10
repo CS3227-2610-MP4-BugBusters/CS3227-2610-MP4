@@ -31,6 +31,7 @@ function responseFor(input: RequestInfo | URL, init?: RequestInit): Response {
   if (path === "/api/developer/reports") {
     return json({ items: [report], page: 1, pageSize: 20, totalItems: 1 });
   }
+  if (path === "/api/developer/notifications") return json({ items: [] });
   if (path === "/api/auth/csrf") {
     return json({ token: "csrf-test-token", headerName: "X-CSRF-TOKEN" });
   }

@@ -122,8 +122,9 @@ class DeveloperPrivateNotesLifecycleRaceIntegrationTest {
         var response = browser.get("/api/developer/reports/" + f.report());
         SessionAuthenticationTest.status(200, response, "assigned Developer report detail");
         var detail = SessionAuthenticationTest.json(response);
-        assertEquals(java.util.Set.of("id", "title", "description", "status", "version", "assigneeId"),
+        assertEquals(java.util.Set.of("id", "title", "description", "status", "version", "assigneeId", "returnReason"),
                 detail.keySet());
+        assertNull(detail.get("returnReason"));
         assertFalse(response.body().contains("report-detail-private-canary"));
         assertFalse(response.body().contains("notesRevision"));
     }

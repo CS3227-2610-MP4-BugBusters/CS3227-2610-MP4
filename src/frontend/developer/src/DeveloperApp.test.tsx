@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { DeveloperApp } from "./DeveloperApp";
+import { DeveloperNotifications } from "./DeveloperNotifications";
 
 vi.mock("./DeveloperChecklist", () => ({
   DeveloperChecklist: ({ reportId, onReportVersionChange }: { reportId: string; onReportVersionChange?: (previous: number, current: number) => void }) => (
@@ -24,6 +25,7 @@ let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
 let authenticated: boolean;
 let listResponse: Response;
 let detailResponse: Response;
+let notificationsResponse: Response;
 let activeDeveloper = "developer.one";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -67,6 +69,10 @@ function responseFor(path: string, init?: RequestInit): Response {
     authenticated = false;
     return new Response(null, { status: 204 });
   }
+  if (path === "/api/developer/notifications" && init?.method !== "POST") return notificationsResponse.clone();
+  if (/^\/api\/developer\/notifications\/[^/]+\/read$/.test(path) && init?.method === "POST") {
+    return new Response(null, { status: 204 });
+  }
   if (path === `${reportsPath}/${assignedReport.id}`) return detailResponse.clone();
   if (path.startsWith(reportsPath) && init?.method !== "POST") {
     if (new URL(path, "http://localhost").searchParams.get("page") === "2") {
@@ -86,6 +92,7 @@ beforeEach(() => {
   activeDeveloper = "developer.one";
   listResponse = jsonResponse({ items: [assignedReport], page: 1, pageSize: 20, totalItems: 1 });
   detailResponse = jsonResponse({ ...assignedReport, description: "Export fails after submission." });
+  notificationsResponse = jsonResponse({ items: [] });
   fetchMock = vi.fn<typeof fetch>(async (input, init) => responseFor(String(input), init));
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -96,6 +103,127 @@ afterEach(() => {
 });
 
 describe("DeveloperApp authenticated report journey", () => {
+  it("shows generic notification labels and only links reports still assigned to the Developer", async () => {
+    authenticated = true;
+    notificationsResponse = jsonResponse({ items: [
+      { id: "00000000-0000-4000-8000-000000000201", type: "ASSIGNED", createdAt: "2026-11-10T08:00:00Z", read: false, reportId: assignedReport.id },
+      { id: "00000000-0000-4000-8000-000000000202", type: "UNASSIGNED", createdAt: "2026-11-10T08:01:00Z", read: false, reportId: null },
+      { id: "00000000-0000-4000-8000-000000000203", type: "RESOLUTION_RETURNED", createdAt: "2026-11-10T08:02:00Z", read: true, reportId: assignedReport.id },
+      { id: "00000000-0000-4000-8000-000000000204", type: "REOPENED", createdAt: "2026-11-10T08:03:00Z", read: false, reportId: null },
+    ] });
+    render(<DeveloperApp />);
+    const region = await screen.findByRole("region", { name: "Notifications" });
+    await within(region).findByText("New report assigned");
+    expect(region.textContent).toMatch(/assigned/i);
+    expect(region.textContent).toMatch(/assignment removed|unassigned/i);
+    expect(region.textContent).toMatch(/resolution returned/i);
+    expect(region.textContent).toMatch(/report reopened|reopened/i);
+    const reportButtons = within(region).getAllByRole("button", { name: "Open report" });
+    expect(reportButtons).toHaveLength(2);
+    expect(region.textContent).not.toContain("00000000-0000-4000-8000-000000000202");
+    expect(region.textContent).not.toContain("00000000-0000-4000-8000-000000000204");
+    expect(region.textContent).not.toContain("Sensitive report");
+  });
+
+  it("shows notification loading, empty, and error states", async () => {
+    authenticated = true;
+    let resolveNotifications!: (response: Response) => void;
+    const pending = new Promise<Response>((resolve) => { resolveNotifications = resolve; });
+    fetchMock.mockImplementation(async (input, init) => {
+      if (String(input) === "/api/developer/notifications") return pending;
+      return responseFor(String(input), init);
+    });
+    const { unmount } = render(<DeveloperApp />);
+    expect(await screen.findByRole("status", { name: /loading notifications/i })).toBeTruthy();
+    resolveNotifications(jsonResponse({ items: [] }));
+    expect(await screen.findByText(/no notifications/i)).toBeTruthy();
+    unmount();
+
+    fetchMock.mockImplementation(async (input, init) => {
+      if (String(input) === "/api/developer/notifications") return jsonResponse({ code: "STORAGE_UNAVAILABLE" }, 503);
+      return responseFor(String(input), init);
+    });
+    render(<DeveloperApp />);
+    const errorRegion = await screen.findByRole("region", { name: "Notifications" });
+    expect(await within(errorRegion).findByRole("alert", { name: "Notification error" })).toBeTruthy();
+  });
+
+  it("posts an owned notification read acknowledgement with CSRF", async () => {
+    authenticated = true;
+    const notificationId = "00000000-0000-4000-8000-000000000205";
+    notificationsResponse = jsonResponse({ items: [
+      { id: notificationId, type: "ASSIGNED", createdAt: "2026-11-10T08:00:00Z", read: false, reportId: assignedReport.id },
+    ] });
+    render(<DeveloperApp />);
+    const region = await screen.findByRole("region", { name: "Notifications" });
+    fireEvent.click(await within(region).findByRole("button", { name: /mark read/i }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([path, init]) =>
+      String(path) === `/api/developer/notifications/${notificationId}/read` && init?.method === "POST"
+      && headerValue(init.headers, "X-CSRF-TOKEN") === csrfToken)).toBe(true));
+  });
+
+  it("does not continue a notification read after the dashboard unmounts", async () => {
+    authenticated = true;
+    const notificationId = "00000000-0000-4000-8000-000000000206";
+    notificationsResponse = jsonResponse({ items: [
+      { id: notificationId, type: "ASSIGNED", createdAt: "2026-11-10T08:00:00Z", read: false, reportId: assignedReport.id },
+    ] });
+    let resolveCsrf!: (response: Response) => void;
+    const pendingCsrf = new Promise<Response>((resolve) => { resolveCsrf = resolve; });
+    fetchMock.mockImplementation(async (input, init) => {
+      if (String(input) === csrfPath) return pendingCsrf;
+      return responseFor(String(input), init);
+    });
+    const { unmount } = render(<DeveloperApp />);
+    const region = await screen.findByRole("region", { name: "Notifications" });
+    fireEvent.click(await within(region).findByRole("button", { name: /mark read/i }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([path]) => String(path) === csrfPath)).toBe(true));
+    const sessionChecksBeforeUnmount = fetchMock.mock.calls.filter(([path]) => String(path) === currentUserPath).length;
+    unmount();
+    await act(async () => resolveCsrf(jsonResponse({ code: "UNAUTHENTICATED" }, 401)));
+    expect(fetchMock.mock.calls.some(([path]) => String(path).endsWith(`/notifications/${notificationId}/read`))).toBe(false);
+    expect(fetchMock.mock.calls.filter(([path]) => String(path) === currentUserPath)).toHaveLength(sessionChecksBeforeUnmount);
+  });
+
+  it("does not handle late notification CSRF responses after unmount", async () => {
+    const notificationId = "00000000-0000-4000-8000-000000000207";
+    notificationsResponse = jsonResponse({ items: [
+      { id: notificationId, type: "ASSIGNED", createdAt: "2026-11-10T08:00:00Z", read: false, reportId: assignedReport.id },
+    ] });
+    const expired = vi.fn();
+    let resolveCsrf!: (response: Response) => void;
+    const pendingCsrf = new Promise<Response>((resolve) => { resolveCsrf = resolve; });
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === "/api/developer/notifications") return notificationsResponse.clone();
+      if (path === csrfPath) return pendingCsrf;
+      if (path === `/api/developer/notifications/${notificationId}/read` && init?.method === "POST") return new Response(null, { status: 204 });
+      throw new Error(`Unexpected request: ${init?.method ?? "GET"} ${path}`);
+    });
+    const { unmount } = render(<DeveloperNotifications onSessionExpired={expired} onOpenReport={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: /mark read/i }));
+    unmount();
+    await act(async () => resolveCsrf(jsonResponse({ code: "UNAUTHENTICATED" }, 401)));
+    expect(expired).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.some(([path]) => String(path) === `/api/developer/notifications/${notificationId}/read`)).toBe(false);
+
+    let resolveSuccessfulCsrf!: (response: Response) => void;
+    const pendingSuccessfulCsrf = new Promise<Response>((resolve) => { resolveSuccessfulCsrf = resolve; });
+    fetchMock.mockImplementation(async (input, init) => {
+      const path = String(input);
+      if (path === "/api/developer/notifications") return notificationsResponse.clone();
+      if (path === csrfPath) return pendingSuccessfulCsrf;
+      if (path === `/api/developer/notifications/${notificationId}/read` && init?.method === "POST") return new Response(null, { status: 204 });
+      throw new Error(`Unexpected request: ${init?.method ?? "GET"} ${path}`);
+    });
+    const second = render(<DeveloperNotifications onSessionExpired={expired} onOpenReport={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: /mark read/i }));
+    second.unmount();
+    await act(async () => resolveSuccessfulCsrf(csrfResponse()));
+    expect(expired).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.some(([path]) => String(path) === `/api/developer/notifications/${notificationId}/read`)).toBe(false);
+  });
+
   it("refreshes status after checklist share", async () => {
     authenticated = true;
     let shared = false;

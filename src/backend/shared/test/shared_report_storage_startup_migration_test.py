@@ -118,7 +118,7 @@ def main():
             psql(database_uri(database),
                  "DROP TABLE IF EXISTS resolution_proposal_metadata, resolution_proposals, "
                  "report_history, report_comments, report_shared_notes, report_responses, "
-                 "developer_private_notes, investigation_checklists, reports, "
+                 "developer_notifications, developer_private_notes, investigation_checklists, reports, "
                  "mp4_shared_schema_history CASCADE; "
                  "DROP FUNCTION IF EXISTS mp4_capture_proposal_author(), mp4_report_version_timestamp()")
 

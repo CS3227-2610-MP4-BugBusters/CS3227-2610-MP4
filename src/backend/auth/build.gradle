@@ -61,6 +61,10 @@ tasks.named('processResources') {
         into 'db/shared'
         rename { 'V4__create_developer_private_notes.sql' }
     }
+    from('../developer/migrations/create_developer_notifications.sql') {
+        into 'db/shared'
+        rename { 'V5__create_developer_notifications.sql' }
+    }
 }
 
 tasks.named('test') {

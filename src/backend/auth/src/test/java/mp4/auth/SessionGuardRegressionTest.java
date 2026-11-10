@@ -21,6 +21,7 @@ class SessionGuardRegressionTest {
                 "MP4_AUTH_DB_USER", Objects.requireNonNull(System.getenv("MP4_AUTH_TEST_DB_USER")),
                 "MP4_AUTH_DB_PASSWORD", Objects.requireNonNull(System.getenv("MP4_AUTH_TEST_DB_PASSWORD"))));
         ProvisioningDatabase.initialize(SessionAuthenticationTest.db);
+        SessionAuthenticationTest.resetLoginAttemptFixtures();
         server = new SessionAuthenticationTest.Server();
     }
 
