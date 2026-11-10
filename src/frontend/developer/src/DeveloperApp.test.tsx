@@ -23,6 +23,7 @@ const csrfToken = "session-bound-csrf-token";
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
 let authenticated: boolean;
 let listResponse: Response;
+let detailResponse: Response;
 let activeDeveloper = "developer.one";
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -66,7 +67,7 @@ function responseFor(path: string, init?: RequestInit): Response {
     authenticated = false;
     return new Response(null, { status: 204 });
   }
-  if (path === `${reportsPath}/${assignedReport.id}`) return jsonResponse({ ...assignedReport, description: "Export fails after submission." });
+  if (path === `${reportsPath}/${assignedReport.id}`) return detailResponse.clone();
   if (path.startsWith(reportsPath) && init?.method !== "POST") {
     if (new URL(path, "http://localhost").searchParams.get("page") === "2") {
       return jsonResponse({ items: [assignedReport], page: 2, pageSize: 20, totalItems: 40 });
@@ -84,6 +85,7 @@ beforeEach(() => {
   authenticated = false;
   activeDeveloper = "developer.one";
   listResponse = jsonResponse({ items: [assignedReport], page: 1, pageSize: 20, totalItems: 1 });
+  detailResponse = jsonResponse({ ...assignedReport, description: "Export fails after submission." });
   fetchMock = vi.fn<typeof fetch>(async (input, init) => responseFor(String(input), init));
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -230,6 +232,21 @@ describe("DeveloperApp authenticated report journey", () => {
     expect(fetchMock).toHaveBeenCalledWith(`${reportsPath}/${assignedReport.id}`, expect.objectContaining({
       credentials: "same-origin", cache: "no-store",
     }));
+  });
+
+  it("shows the latest Maintainer return reason as plain text", async () => {
+    authenticated = true;
+    const reason = "Inspect <script>alert(1)</script> trace";
+    detailResponse = jsonResponse({
+      ...assignedReport,
+      status: "IN_PROGRESS",
+      description: "Export fails after submission.",
+      returnReason: reason,
+    });
+    render(<DeveloperApp />);
+    fireEvent.click(await screen.findByRole("button", { name: /Assigned export failure/ }));
+    expect(await screen.findByText(reason)).toBeTruthy();
+    expect(screen.getByText(/maintainer returned this resolution/i)).toBeTruthy();
   });
 
   it("selects a listed report and renders its DeveloperChecklist", async () => {

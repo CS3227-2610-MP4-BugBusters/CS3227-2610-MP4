@@ -38,8 +38,18 @@ final class DeveloperReportController {
         AuthProvider.CurrentUser user = (AuthProvider.CurrentUser)
                 SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         try (var connection = dataSource.getConnection();
-             var statement = connection.prepareStatement(
-                     "SELECT id, title, description, status, version, assignee_id FROM reports WHERE id = ? AND assignee_id = ?")) {
+             var statement = connection.prepareStatement("""
+                     SELECT r.id, r.title, r.description, r.status, r.version, r.assignee_id,
+                            CASE WHEN r.status = 'IN_PROGRESS' THEN (
+                                SELECT substring(h.text FROM length('Resolution returned: ') + 1)
+                                FROM report_history h
+                                WHERE h.report_id = r.id AND h.type = 'resolution_returned'
+                                  AND h.text LIKE 'Resolution returned: %'
+                                ORDER BY h.report_version DESC, h.created_at DESC, h.id DESC
+                                LIMIT 1
+                            ) ELSE NULL END AS return_reason
+                     FROM reports r WHERE r.id = ? AND r.assignee_id = ?
+                     """)) {
             statement.setObject(1, id);
             statement.setObject(2, user.id());
             try (var rows = statement.executeQuery()) {
@@ -47,9 +57,15 @@ final class DeveloperReportController {
                     AuthHttp.error(response, 404, "NOT_FOUND", "Report not found");
                     return null;
                 }
-                return Map.of("id", rows.getObject("id").toString(), "title", rows.getString("title"),
-                        "description", rows.getString("description"), "status", rows.getString("status"),
-                        "version", rows.getLong("version"), "assigneeId", rows.getObject("assignee_id").toString());
+                Map<String, Object> detail = new java.util.LinkedHashMap<>();
+                detail.put("id", rows.getObject("id").toString());
+                detail.put("title", rows.getString("title"));
+                detail.put("description", rows.getString("description"));
+                detail.put("status", rows.getString("status"));
+                detail.put("version", rows.getLong("version"));
+                detail.put("assigneeId", rows.getObject("assignee_id").toString());
+                detail.put("returnReason", rows.getString("return_reason"));
+                return detail;
             }
         } catch (SQLException unavailable) {
             AuthHttp.error(response, 503, "STORAGE_UNAVAILABLE", "Reports are temporarily unavailable");

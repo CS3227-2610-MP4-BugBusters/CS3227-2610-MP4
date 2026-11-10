@@ -106,6 +106,44 @@ class DeveloperAssignedReportsAuthenticatedIntegrationTest {
         assertEquals("Detail fixture title", SessionAuthenticationTest.json(reassigned).get("title"));
     }
 
+    @Test void detailReturnsOnlyLatestReturnReasonForCurrentInProgressAssignment() throws Exception {
+        var developer = SessionAuthenticationTest.account("DEVELOPER");
+        var stranger = SessionAuthenticationTest.account("DEVELOPER");
+        var reporter = SessionAuthenticationTest.account("REPORTER");
+        UUID report = UUID.randomUUID();
+        insert(report, reporter.id(), developer.id(), "Returned report", "IN_PROGRESS");
+        try (var c = SessionAuthenticationTest.connection(); var event = c.prepareStatement(
+                "INSERT INTO report_history(id,report_id,type,text,actor_id,report_version) VALUES(?,?,?,?,?,?)")) {
+            history(event, report, reporter.id(), "other_event", "Unrelated private history canary", 1);
+            history(event, report, reporter.id(), "resolution_returned", "Resolution returned: old reason", 2);
+            history(event, report, reporter.id(), "resolution_returned", "Resolution returned: Inspect <script>alert(1)</script> trace", 3);
+        }
+        var assignedDetail = SessionAuthenticationTest.authenticated(developer)
+                .get("/api/developer/reports/" + report);
+        SessionAuthenticationTest.status(200, assignedDetail, "current assigned detail");
+        var body = SessionAuthenticationTest.json(assignedDetail);
+        assertEquals("Inspect <script>alert(1)</script> trace", body.get("returnReason"));
+        assertFalse(assignedDetail.body().contains("Unrelated private history canary"));
+        assertFalse(assignedDetail.body().contains("old reason"));
+        SessionAuthenticationTest.error(SessionAuthenticationTest.authenticated(stranger)
+                .get("/api/developer/reports/" + report), 404, "NOT_FOUND");
+
+        try (var c = SessionAuthenticationTest.connection(); var update = c.prepareStatement(
+                "UPDATE reports SET status='ASSIGNED' WHERE id=?")) {
+            update.setObject(1, report); update.executeUpdate();
+        }
+        var assignedAgain = SessionAuthenticationTest.authenticated(developer)
+                .get("/api/developer/reports/" + report);
+        SessionAuthenticationTest.status(200, assignedAgain, "assigned report without applicable return reason");
+        assertNull(SessionAuthenticationTest.json(assignedAgain).get("returnReason"));
+    }
+
+    private static void history(java.sql.PreparedStatement event, UUID report, UUID actor,
+            String type, String text, long version) throws Exception {
+        event.setObject(1, UUID.randomUUID()); event.setObject(2, report); event.setString(3, type);
+        event.setString(4, text); event.setObject(5, actor); event.setLong(6, version); event.executeUpdate();
+    }
+
     @Test void startRequiresCsrfAssignmentAndCurrentVersion() throws Exception {
         var developer = SessionAuthenticationTest.account("DEVELOPER");
         var other = SessionAuthenticationTest.account("DEVELOPER");

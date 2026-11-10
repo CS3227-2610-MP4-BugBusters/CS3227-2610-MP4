@@ -1,0 +1,3 @@
+# Design
+
+The Maintainer records `resolution_returned` history with text prefixed `Resolution returned: ` and a monotonic report version. Developer detail returns the latest event by report version for a currently assigned Developer, only while status is IN_PROGRESS. Return a nullable `returnReason` field; legacy history without the expected prefix is not displayed as a reason. Do not expose other history, actor details or other reports. Use one authorized query and deterministic ordering. The frontend renders plain text with a clear label, omitting the section when no reason exists. Preserve existing report details and transitions. No notification behavior, schema migration or status change is included.

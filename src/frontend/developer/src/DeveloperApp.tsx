@@ -11,7 +11,7 @@ type User = {
 };
 
 type Report = { id: string; title: string; status: string };
-type ReportDetail = Report & { description: string; version?: number };
+type ReportDetail = Report & { description: string; version?: number; returnReason?: string | null };
 type ReportsPage = { items: Report[]; page: number; pageSize: number; totalItems: number };
 type SessionState = "checking" | "signed-out" | "active" | "denied" | "error";
 const reportPageSize = 20;
@@ -537,6 +537,12 @@ export function DeveloperApp() {
                 <>
                   <p className="developer-report-detail__description">{detail.description}</p>
                   <p className="developer-report-detail__status">Status: {formatStatus(detail.status)}</p>
+                  {detail.returnReason && detail.status === "IN_PROGRESS" && (
+                    <aside className="developer-return-reason" aria-label="Maintainer feedback">
+                      <h3>Maintainer returned this resolution</h3>
+                      <p>{detail.returnReason}</p>
+                    </aside>
+                  )}
                   {(detail.status === "IN_PROGRESS" || resolution.length > 0) && detail.version !== undefined && (
                     <form className="developer-resolution" onSubmit={(event) => void submitResolution(event)}>
                       <label htmlFor="resolution">Resolution</label>
@@ -741,5 +747,10 @@ async function readReportDetail(id: string, signal: AbortSignal): Promise<Report
   }
   const version = Number.isSafeInteger(value.version) && (value.version as number) >= 0
     ? value.version as number : undefined;
-  return { ...report, description: value.description, version };
+  if (value.returnReason !== undefined && value.returnReason !== null
+      && (typeof value.returnReason !== "string" || value.returnReason.length > 2000)) {
+    throw new Error("Unable to load report details.");
+  }
+  return { ...report, description: value.description, version,
+    returnReason: typeof value.returnReason === "string" ? value.returnReason : null };
 }

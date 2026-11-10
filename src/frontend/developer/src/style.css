@@ -400,3 +400,25 @@ button.developer-checklist__primary:hover:not(:disabled) { border-color: #075d60
   margin: 1rem 0 0;
   color: #9a3434;
 }
+
+.developer-return-reason {
+  margin: 0 0 1rem;
+  padding: .9rem 1rem;
+  border: 1px solid #e8c995;
+  border-left: 4px solid #c18427;
+  border-radius: .5rem;
+  background: #fff9ed;
+}
+
+.developer-return-reason h3 {
+  margin: 0 0 .35rem;
+  color: #704a13;
+  font-size: .95rem;
+}
+
+.developer-return-reason p {
+  margin: 0;
+  color: #463a29;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
