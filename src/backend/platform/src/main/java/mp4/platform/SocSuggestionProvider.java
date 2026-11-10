@@ -189,7 +189,8 @@ public final class SocSuggestionProvider implements SuggestionProvider {
     }
 
     private boolean containsCredentialInJson(String content) {
-        try (var parser = JSON.getFactory().createParser(content)) {
+        String normalized = normalizeSeparatedJsonStrings(content);
+        try (var parser = JSON.getFactory().createParser(normalized)) {
             com.fasterxml.jackson.core.JsonToken token;
             while ((token = parser.nextToken()) != null) {
                 if ((token == com.fasterxml.jackson.core.JsonToken.VALUE_STRING
@@ -203,6 +204,81 @@ public final class SocSuggestionProvider implements SuggestionProvider {
             // The service validates the nested suggestion JSON and returns its existing safe invalid-output error.
             return false;
         }
+    }
+
+    /** Recovers the provider's observed array format: valid JSON strings separated by whitespace. */
+    static String normalizeSeparatedJsonStrings(String input) {
+        if (input == null) return null;
+        StringBuilder normalized = new StringBuilder(input.length() + 8);
+        int cursor = 0;
+        while (true) {
+            while (cursor < input.length() && Character.isWhitespace(input.charAt(cursor))) {
+                normalized.append(input.charAt(cursor++));
+            }
+            if (cursor == input.length()) return normalized.toString();
+            if (input.charAt(cursor) != '[') return input;
+            normalized.append('[');
+            cursor++;
+            boolean hasItem = false;
+            while (true) {
+                while (cursor < input.length() && Character.isWhitespace(input.charAt(cursor))) {
+                    normalized.append(input.charAt(cursor++));
+                }
+                if (cursor >= input.length()) return input;
+                char next = input.charAt(cursor);
+                if (next == ']') {
+                    normalized.append(']');
+                    cursor++;
+                    break;
+                }
+                if (next != '"') return input;
+                int end = jsonStringEnd(input, cursor);
+                if (end < 0) return input;
+                normalized.append(input, cursor, end);
+                cursor = end;
+                hasItem = true;
+                int whitespaceStart = cursor;
+                while (cursor < input.length() && Character.isWhitespace(input.charAt(cursor))) cursor++;
+                if (cursor > whitespaceStart && cursor < input.length() && input.charAt(cursor) == '"') {
+                    normalized.append(',');
+                    normalized.append(input, whitespaceStart, cursor);
+                    continue;
+                }
+                normalized.append(input, whitespaceStart, cursor);
+                if (cursor < input.length() && input.charAt(cursor) == ',') {
+                    normalized.append(',');
+                    cursor++;
+                    continue;
+                }
+                if (cursor < input.length() && input.charAt(cursor) == ']') {
+                    normalized.append(']');
+                    cursor++;
+                    break;
+                }
+                return input;
+            }
+            if (!hasItem) continue;
+            int afterArray = cursor;
+            while (cursor < input.length() && Character.isWhitespace(input.charAt(cursor))) cursor++;
+            normalized.append(input, afterArray, cursor);
+            if (cursor == input.length()) return normalized.toString();
+            if (input.charAt(cursor) != '[') return input;
+        }
+    }
+
+    private static int jsonStringEnd(String input, int start) {
+        boolean escaped = false;
+        for (int i = start + 1; i < input.length(); i++) {
+            char current = input.charAt(i);
+            if (escaped) {
+                escaped = false;
+            } else if (current == '\\') {
+                escaped = true;
+            } else if (current == '"') {
+                return i + 1;
+            }
+        }
+        return -1;
     }
 
     private static Failure failure(FailureKind kind, String message) {

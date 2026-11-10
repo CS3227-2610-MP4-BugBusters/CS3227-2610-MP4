@@ -61,6 +61,13 @@ class SocSuggestionCredentialReflectionTest {
         assertReflectedCredentialRejected();
     }
 
+    @Test void rejectsUnicodeEscapedCredentialAfterMissingComma() throws Exception {
+        String escapedCanary = CANARY.replace("a", "\\" + "u0061");
+        responseContent = "[\"Inspect the login request\" \"Inspect Bearer " + escapedCanary + "\"]";
+
+        assertReflectedCredentialRejected();
+    }
+
     private void assertReflectedCredentialRejected() throws Exception {
         var adapter = new SocSuggestionProvider(HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NEVER)

@@ -389,7 +389,8 @@ final class SuggestionService {
             throw new IllegalArgumentException("invalid output");
         }
         List<String> steps = new ArrayList<>();
-        try (var parser = json.getFactory().createParser(raw)) {
+        String normalized = SocSuggestionProvider.normalizeSeparatedJsonStrings(raw);
+        try (var parser = json.getFactory().createParser(normalized)) {
             com.fasterxml.jackson.core.JsonToken token;
             while ((token = parser.nextToken()) != null) {
                 if (token != com.fasterxml.jackson.core.JsonToken.START_ARRAY) {

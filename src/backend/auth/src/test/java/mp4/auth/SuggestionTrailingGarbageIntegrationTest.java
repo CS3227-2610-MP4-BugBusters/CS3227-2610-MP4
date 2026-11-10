@@ -118,6 +118,57 @@ class SuggestionTrailingGarbageIntegrationTest {
         assertEquals(1, PROVIDER.calls.get());
     }
 
+    @Test void whitespaceSeparatedJsonStringsWithinArrayAreRecoveredInOrder() throws Exception {
+        PROVIDER.calls.set(0);
+        PROVIDER.output.set("[\"Inspect the event handler\"\n"
+                + " \"Check the browser console\"\n"
+                + " \"Review the login request\"]");
+        UUID developer = account("DEVELOPER");
+        UUID reporter = account("REPORTER");
+        UUID report = UUID.randomUUID();
+        fixture(report, reporter, developer);
+        Snapshot before = snapshot(report);
+        Browser browser = new Browser();
+        login(browser, developer);
+
+        HttpResponse<String> response = browser.request("POST",
+            "/api/reports/" + report + "/checklist/suggestions", "{}",
+            "Content-Type", "application/json", "X-CSRF-TOKEN", csrf(browser));
+
+        assertEquals(200, response.statusCode(), "whitespace-separated JSON strings should be recovered");
+        Map<String, Object> body = SessionAuthenticationTest.json(response);
+        assertEquals(java.util.List.of("Inspect the event handler", "Check the browser console",
+                "Review the login request"), body.get("steps"));
+        assertEquals(before, snapshot(report), "recovery must not mutate report or checklist state");
+        assertEquals(1, PROVIDER.calls.get());
+    }
+
+    @Test void missingCommasDoNotPermitUnquotedGarbageOrNonStringValues() throws Exception {
+        for (String malformed : java.util.List.of(
+                "[\"Inspect the event handler\" garbage \"Check the console\"]",
+                "[\"Inspect the event handler\"\"Check the console\"]",
+                "[\"Inspect the event handler\" 7]")) {
+            PROVIDER.calls.set(0);
+            PROVIDER.output.set(malformed);
+            UUID developer = account("DEVELOPER");
+            UUID reporter = account("REPORTER");
+            UUID report = UUID.randomUUID();
+            fixture(report, reporter, developer);
+            Snapshot before = snapshot(report);
+            Browser browser = new Browser();
+            login(browser, developer);
+
+            HttpResponse<String> response = browser.request("POST",
+                "/api/reports/" + report + "/checklist/suggestions", "{}",
+                "Content-Type", "application/json", "X-CSRF-TOKEN", csrf(browser));
+
+            assertEquals(502, response.statusCode(), "unquoted garbage and non-string values stay invalid");
+            assertEquals("AI_INVALID_OUTPUT", SessionAuthenticationTest.json(response).get("code"));
+            assertEquals(before, snapshot(report), "invalid recovery must not mutate domain state");
+            assertEquals(1, PROVIDER.calls.get());
+        }
+    }
+
     @Test void consecutiveArraysFollowedByNonJsonGarbageAreRejectedWithoutMutation() throws Exception {
         PROVIDER.calls.set(0);
         PROVIDER.output.set("[\"Inspect the event handler\"]\n[\"Check the console\"]\nnot JSON");
