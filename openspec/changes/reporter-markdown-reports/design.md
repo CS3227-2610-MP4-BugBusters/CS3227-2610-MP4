@@ -305,9 +305,7 @@ blockquotes. The blocklist doesn't converge, so parsing moves off the main threa
   - `GET /api/reporter/reports?page&pageSize`
   - `GET /api/reporter/reports/{id}`
   - `PUT /api/reporter/reports/{id}` (RPT-09) returns 200
-  - `POST /api/reporter/reports/{id}/close` (RPT-10) returns 200
-- 409 `REPORT_LOCKED` means the report is assigned or not `SUBMITTED` (including
-  already `CLOSED`). 409 `VERSION_CONFLICT` means the client's version is stale. Both
+- 409 `REPORT_LOCKED` means the report is assigned or not `SUBMITTED`. 409 `VERSION_CONFLICT` means the client's version is stale. Both
   apply only to the Reporter's own report; otherwise the RPT-05 404 applies.
 - Another Reporter's report returns **404 `REPORT_NOT_FOUND`**, not 403, so a
   Reporter can't probe whether report IDs exist (RPT-05). A malformed UUID in the
@@ -354,8 +352,8 @@ Inside the create transaction:
 3. If the count is 3 or more, roll back and return 429. `Retry-After` is
    `ceil(min(created_at) + 60s - now())`, at least 1. Otherwise insert and commit.
 
-Reports are never deleted (RPT-10 closes instead, owner decision 10 Nov), so
-stored rows remain a complete record of creates and closing never frees a slot.
+Reports are never deleted (owner decisions 10 Nov), so stored rows remain a
+complete record of creates.
 A creation-log table considered for hard delete was dropped with it.
 
 Why this approach:
@@ -380,30 +378,31 @@ fixture database with `created_at = now() - interval '61 seconds'` (and 59 s for
 the still-limited case). This avoids a 60-second sleep and needs no production
 clock hook. The concurrency scenario uses real parallel HTTP requests.
 
-### D17 Edit and close while unassigned (owner decisions 10 Nov)
+### D17 Edit while unassigned (owner decisions 10 Nov)
 - **Atomic condition.** Edit is one `UPDATE reports SET title = ?, description = ?,
   version = version + 1, updated_at = now() WHERE id = ? AND reporter_id = ? AND
   assignee_id IS NULL AND status = 'SUBMITTED' AND version = ? RETURNING ...`.
-  Close is the same `UPDATE` setting `status = 'CLOSED'` instead of the text.
-  Neither reads then writes, so a concurrent assignment either commits first (the
+  It never reads then writes, so a concurrent assignment either commits first (the
   conditional write then matches 0 rows) or waits on the row lock.
 - **Classifying 0 rows.** When the write matches nothing, the same transaction
   reads the row by `id` and `reporter_id`: no row is 404, an assignee or another
-  status (including `CLOSED`) is `REPORT_LOCKED`, otherwise `VERSION_CONFLICT`.
+  status is `REPORT_LOCKED`, otherwise `VERSION_CONFLICT`.
   The 404 body is the RPT-05 body, so another Reporter's report still looks
   missing.
-- **Close, not delete.** The owner first chose hard delete, then reverted it
-  (10 Nov). Rows are never removed, so foreign keys such as
-  `investigation_checklists` and the D10 rate-limit count are unaffected.
+- **No delete, no Reporter close (owner decisions 10 Nov).** The owner first
+  chose hard delete, replaced it with a Reporter close, then removed close too,
+  because `SUBMITTED → CLOSED` by a Reporter conflicts with the shared lifecycle,
+  where closure is a Maintainer-only action. Rows are never removed and Reporters
+  never change status, so foreign keys such as `investigation_checklists` and the
+  D10 rate-limit count are unaffected. A path below a report, such as
+  `/close`, returns the RPT-05 404.
 - **Version on the wire.** Edit carries `version` in its JSON body with the two
-  fields; close carries `{version}` alone. Both use the version returned by
-  RPT-05.
+  fields, using the version returned by RPT-05.
 - **Assumption.** Assignment by the Maintainer side sets `assignee_id` or changes
   `status` on the same row. It need not bump `version` for D17 to be safe,
   because the lock condition is part of the write.
-- Edits and closes are not rate limited; RPT-08 covers creates only. Reopening a
-  closed report is out of scope.
-- Tasks 2.8, 2.10 and 2.11.
+- Edits are not rate limited; RPT-08 covers creates only.
+- Tasks 2.8, 2.10 and 2.11 (2.11 now removes close).
 
 ## Risks / Trade-offs
 

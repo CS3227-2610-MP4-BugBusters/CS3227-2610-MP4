@@ -22,6 +22,9 @@ function imageText(node: Element): string {
   return typeof alt === "string" ? alt : "";
 }
 
+/** Elements that display no children (MDR-15), so their text is never shown. */
+const VOID_TAGS = new Set(["br", "hr", "img", "input"]);
+
 /**
  * The text as displayed (MDR-14): text, raw HTML shown as text, and image alt
  * text. Iterative, so deep nesting cannot overflow the stack.
@@ -39,22 +42,56 @@ function textOf(nodes: readonly ElementContent[]): string {
     if (node.type === "text" || node.type === "raw") text += node.value;
     else if (node.type === "element") {
       if (node.tagName === "img") text += imageText(node);
-      else stack.push({ items: node.children, index: 0 });
+      else if (!VOID_TAGS.has(node.tagName)) stack.push({ items: node.children, index: 0 });
     }
   }
   return text;
 }
 
-// Shown destinations (MDR-14). Unicode format characters (Cf), U+2028, U+2029
-// and non-ASCII whitespace appear as `<U+XXXX>`, whether raw or percent-encoded
-// as UTF-8, and `(` and `)` as `%28` and `%29`. Everything else is as written.
+// Shown destinations (MDR-14, MDR-15). Hidden characters appear as `<U+XXXX>`,
+// whether raw or percent-encoded as UTF-8: Unicode format characters (Cf),
+// controls (Cc), lone surrogates (Cs), combining marks (M), default-ignorable
+// code points (which include the Hangul fillers), U+2028, U+2029, U+2800 and
+// non-ASCII whitespace. `(` and `)` appear as `%28` and `%29`, and a space and
+// any non-ASCII bracket appear percent-encoded. Everything else is as written.
+// The suffix sits in `bdi dir="ltr"` so it cannot reorder the text around it.
 
-const HIDDEN = /^(?! )[\p{Cf}\p{Zs}\p{Zl}\p{Zp}\u0085]$/u;
-const HAS_HIDDEN = /(?! )[\p{Cf}\p{Zs}\p{Zl}\p{Zp}\u0085]/u;
-const DESTINATION_PART = /(?:%[\dA-Fa-f]{2})+|[()]|(?! )[\p{Cf}\p{Zs}\p{Zl}\p{Zp}\u0085]/gu;
+const HIDDEN_CLASS = String.raw`[\p{Cf}\p{Cc}\p{Cs}\p{M}\p{Default_Ignorable_Code_Point}\p{Zs}\p{Zl}\p{Zp}⠀]`;
+const HIDDEN = new RegExp(String.raw`^(?! )${HIDDEN_CLASS}$`, "u");
+const HAS_HIDDEN = new RegExp(String.raw`(?! )${HIDDEN_CLASS}`, "u");
+const HIDDEN_ALL = new RegExp(String.raw`(?! )${HIDDEN_CLASS}`, "gu");
+const DESTINATION_PART = new RegExp(
+  String.raw`(?:%[\dA-Fa-f]{2})+|[() ]|(?! )${HIDDEN_CLASS}|(?![\x00-\x7F])[\p{Ps}\p{Pe}]`,
+  "gu",
+);
 
 function codeOf(char: string): string {
   return `<U+${char.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}>`;
+}
+
+function hexByte(run: string, at: number): number {
+  return parseInt(run.slice(at + 1, at + 3), 16);
+}
+
+/**
+ * The character encoded as UTF-8 by the `%XX` escapes at `run[i]`, and how many
+ * escapes it uses, or undefined when they are not valid UTF-8. It never throws,
+ * so a long invalid run stays linear.
+ */
+function decodeUtf8(run: string, i: number): { char: string; count: number } | undefined {
+  const lead = hexByte(run, i);
+  const count =
+    lead < 0x80 ? 1 : lead >= 0xc2 && lead < 0xe0 ? 2 : lead >= 0xe0 && lead < 0xf0 ? 3 : lead >= 0xf0 && lead < 0xf5 ? 4 : 0;
+  if (count === 0 || i + count * 3 > run.length) return undefined;
+  let code = count === 1 ? lead : lead & (0xff >> (count + 1));
+  for (let k = 1; k < count; k++) {
+    const byte = hexByte(run, i + k * 3);
+    if ((byte & 0xc0) !== 0x80) return undefined;
+    code = (code << 6) | (byte & 0x3f);
+  }
+  const min = [0, 0, 0x80, 0x800, 0x10000][count];
+  if (code < min || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) return undefined;
+  return { char: String.fromCodePoint(code), count };
 }
 
 /** A run of `%XX` escapes with each UTF-8 encoded hidden character as its code. */
@@ -62,22 +99,13 @@ function showPercentRun(run: string): string {
   let shown = "";
   let i = 0;
   while (i < run.length) {
-    const lead = parseInt(run.slice(i + 1, i + 3), 16);
-    const bytes = lead >= 0xf0 ? 4 : lead >= 0xe0 ? 3 : lead >= 0xc0 ? 2 : 1;
-    const end = i + bytes * 3;
-    if (bytes > 1 && end <= run.length) {
-      let char = "";
-      try {
-        char = decodeURIComponent(run.slice(i, end));
-      } catch {
-        // Not valid UTF-8: shown as written.
-      }
-      if (HIDDEN.test(char)) {
-        shown += codeOf(char);
-        i = end;
-        continue;
-      }
+    const decoded = decodeUtf8(run, i);
+    if (decoded !== undefined && HIDDEN.test(decoded.char)) {
+      shown += codeOf(decoded.char);
+      i += decoded.count * 3;
+      continue;
     }
+    // Shown as written, one escape at a time, so the run is read once.
     shown += run.slice(i, i + 3);
     i += 3;
   }
@@ -88,8 +116,15 @@ function showDestination(dest: string): string {
   return dest.replace(DESTINATION_PART, (part) => {
     if (part === "(") return "%28";
     if (part === ")") return "%29";
-    return part.startsWith("%") ? showPercentRun(part) : codeOf(part);
+    if (part === " ") return "%20";
+    if (part.startsWith("%")) return showPercentRun(part);
+    return HIDDEN.test(part) ? codeOf(part) : encodeURIComponent(part);
   });
+}
+
+/** `text` with each raw hidden character as its code; nothing else changes. */
+function showHidden(text: string): string {
+  return text.replace(HIDDEN_ALL, codeOf);
 }
 
 /** `value` without leading and trailing ASCII whitespace; nothing else is removed. */
@@ -102,36 +137,80 @@ function trimAscii(value: string): string {
   return value.slice(start, end);
 }
 
+/** Destinations already shown during one render, so each is computed once (MDR-15). */
+type DestinationCache = Map<string, string>;
+
+/** The cache of the `toHast` run in progress; the link handlers read it. */
+let activeCache: DestinationCache | undefined;
+
+/** The source of the `toHast` run in progress, to tell autolinks from `[text](url)` links. */
+let activeSource: string | undefined;
+
+function shownDestination(dest: string, cache: DestinationCache | undefined): string {
+  if (cache === undefined) return showDestination(dest);
+  let shown = cache.get(dest);
+  if (shown === undefined) {
+    shown = showDestination(dest);
+    cache.set(dest, shown);
+  }
+  return shown;
+}
+
+/** How one link's text and destination are shown. */
+type ShownLink = { kind: "same" } | { kind: "escaped"; text: string } | { kind: "suffix"; suffix: string };
+
 /**
- * The ` (<destination>)` to show after a link whose displayed text is `text`,
- * or undefined when the destination does not differ from that text.
- * Autolinks, including the `mailto:` and `http://` forms GFM adds to bare
- * emails and `www.` addresses, show the address once unless it holds a hidden
- * character. Lengths are compared first, so a long text is never flattened.
+ * How to show a link whose displayed text is `text`. A destination that does
+ * not differ from the text is not repeated. Autolinks, including the `mailto:`
+ * and `http://` forms GFM adds to bare emails and `www.` addresses, show the
+ * address once with hidden characters escaped (MDR-15). A `[text](url)` link
+ * whose own text equals a destination with a hidden character keeps that text
+ * and shows the escaped destination after it (MDR-14). Otherwise the
+ * destination follows as ` (<destination>)`. Lengths are compared first, so a
+ * long text is never flattened.
  */
-function destinationSuffix(text: string, destination: unknown): string | undefined {
+function showLink(
+  text: string,
+  destination: unknown,
+  cache: DestinationCache | undefined,
+  autolink: boolean,
+): ShownLink {
   const dest = typeof destination === "string" ? trimAscii(destination) : "";
-  if (dest === "") return undefined;
+  if (dest === "") return { kind: "same" };
   const same =
     (text.length === dest.length && text === dest) ||
     (text.length === dest.length - 7 && (dest === `mailto:${text}` || dest === `http://${text}`));
-  if (same && !HAS_HIDDEN.test(dest)) return undefined;
-  return ` (${showDestination(dest)})`;
+  if (same && !HAS_HIDDEN.test(dest)) return { kind: "same" };
+  if (same && autolink) return { kind: "escaped", text: showHidden(text) };
+  return { kind: "suffix", suffix: ` (${shownDestination(dest, cache)})` };
 }
 
-/** A link's children, then ` (<destination>)` as text when it differs from them. */
-function linkAsText(children: ElementContent[], destination: unknown): ElementContent[] {
-  const suffix = destinationSuffix(textOf(children), destination);
-  return suffix === undefined ? children : [...children, { type: "text", value: suffix }];
+/** The suffix as hast: its text inside `bdi dir="ltr"` (MDR-15). */
+function suffixNode(suffix: string): Element {
+  return { type: "element", tagName: "bdi", properties: { dir: "ltr" }, children: [{ type: "text", value: suffix }] };
 }
 
-const link: Handler = (state, node) => linkAsText(state.all(node), node.url);
+/** A link's children, then ` (<destination>)` when it differs from them. */
+function linkAsText(children: ElementContent[], destination: unknown, autolink: boolean): ElementContent[] {
+  const shown = showLink(textOf(children), destination, activeCache, autolink);
+  if (shown.kind === "same") return children;
+  if (shown.kind === "escaped") return [{ type: "text", value: shown.text }];
+  return [...children, suffixNode(shown.suffix)];
+}
+
+/** Whether a link node was written as an autolink (`<url>` or a bare URL), not `[text](url)`. */
+function isAutolink(node: { position?: { start?: { offset?: number } } }): boolean {
+  const offset = node.position?.start?.offset;
+  return activeSource !== undefined && typeof offset === "number" && activeSource[offset] !== "[";
+}
+
+const link: Handler = (state, node) => linkAsText(state.all(node), node.url, isAutolink(node));
 
 const linkReference: Handler = (state, node) => {
   const definition = state.definitionById.get(String(node.identifier).toUpperCase());
   // Without a definition the default handler shows the source text, no link.
   if (definition === undefined) return defaultHandlers.linkReference(state, node);
-  return linkAsText(state.all(node), definition.url);
+  return linkAsText(state.all(node), definition.url, false);
 };
 
 /** remark-rehype handlers that turn links into text; titles are dropped. */
@@ -159,6 +238,7 @@ type UnlinkFrame = {
  * nested `a` elements can neither overflow the stack nor take quadratic time.
  */
 function unlink(tree: Root): void {
+  const cache: DestinationCache = new Map();
   const stack: UnlinkFrame[] = [{ node: tree, index: 0, out: [], start: 0, chunks: [] }];
   for (;;) {
     const frame = stack[stack.length - 1];
@@ -184,7 +264,7 @@ function unlink(tree: Root): void {
     const element = node as Element;
     let text = "";
     if (element.tagName === "img") text = imageText(element);
-    else for (const chunk of chunks) text += chunk;
+    else if (!VOID_TAGS.has(element.tagName)) for (const chunk of chunks) text += chunk;
     if (element.tagName !== "a") {
       element.children = out as ElementContent[];
       parent.out.push(element);
@@ -204,10 +284,17 @@ function unlink(tree: Root): void {
     } else {
       if (text !== "") parent.chunks.push(text);
       if (element.properties.dataFootnoteRef === undefined) {
-        const suffix = destinationSuffix(text, element.properties.href);
-        if (suffix !== undefined) {
-          out.push({ type: "text", value: suffix });
-          parent.chunks.push(suffix);
+        // Worker output has no source, so an `a` is treated as a `[text](url)` link.
+        const shown = showLink(text, element.properties.href, cache, false);
+        if (shown.kind === "escaped") {
+          // Only the escaped address is shown, in place of the link's own output.
+          out.length = frame.start;
+          out.push({ type: "text", value: shown.text });
+          if (text !== "") parent.chunks.pop();
+          parent.chunks.push(shown.text);
+        } else if (shown.kind === "suffix") {
+          out.push(suffixNode(shown.suffix));
+          parent.chunks.push(shown.suffix);
         }
       }
     }
@@ -311,7 +398,14 @@ export function toHast(source: string, prefix: string): Root {
     .use(remarkGfm)
     .use(remarkRehype, { allowDangerousHtml: true, clobberPrefix: prefix, handlers: noLinkHandlers })
     .use(rehypeNoLinks);
-  const tree = processor.runSync(processor.parse(source));
-  rawToText(tree);
-  return tree;
+  activeCache = new Map();
+  activeSource = source;
+  try {
+    const tree = processor.runSync(processor.parse(source));
+    rawToText(tree);
+    return tree;
+  } finally {
+    activeCache = undefined;
+    activeSource = undefined;
+  }
 }

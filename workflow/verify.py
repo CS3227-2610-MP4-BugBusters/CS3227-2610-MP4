@@ -9,6 +9,15 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
+# Every npm package under src/frontend that ships code; each has its own lockfile and `npm run verify`.
+FRONTENDS = ("developer", "maintainer", "shared/markdown")
+# Reporter backend black-box API tests (src/backend/reporter/README.md), in the two documented groups.
+REPORTER_TESTS = "src/backend/reporter/test"
+REPORTER_API_GROUPS = (
+    ("create_report_api_test.py", "create_report_validation_test.py", "create_report_rate_limit_test.py",
+     "list_own_reports_api_test.py", "read_own_report_api_test.py"),
+    ("reporter_access_api_test.py", "edit_report_api_test.py", "reporter_status_api_test.py"),
+)
 
 
 def _run(name, command, cwd=None):
@@ -35,7 +44,7 @@ def _openspec_validate():
 
 
 def _frontend(args):
-    selected = [args.frontend] if args.frontend else ["developer", "maintainer"]
+    selected = [args.frontend] if args.frontend else list(FRONTENDS)
     for frontend in selected:
         _npm_verify(frontend)
 
@@ -43,6 +52,16 @@ def _frontend(args):
 def _backend(_args):
     _run("auth Gradle wrapper checksum", _python("workflow/security/check.py", "--wrapper-only"))
     _run("auth setup", _python("src/backend/auth/test/run_setup.py"))
+
+
+def _reporter(_args):
+    # Needs Docker, a JDK 17+, `python` on PATH and POSTGRES_JDBC_JAR; each runner uses a disposable PostgreSQL.
+    tests = REPORTER_TESTS
+    _run("reporter timestamp migration",
+         ["sh", f"{tests}/run-reporter-db.sh", "python", "-B", f"{tests}/report_timestamps_migration_test.py"])
+    for number, group in enumerate(REPORTER_API_GROUPS, start=1):
+        _run(f"reporter API tests ({number}/{len(REPORTER_API_GROUPS)})",
+             ["sh", f"{tests}/run-reporter-api.sh", *(f"{tests}/{name}" for name in group)])
 
 
 def _security(_args):
@@ -63,6 +82,7 @@ def _tooling(_args):
 GROUPS = {
     "frontend": _frontend,
     "backend": _backend,
+    "reporter": _reporter,
     "security": _security,
     "tooling": _tooling,
 }
@@ -82,7 +102,7 @@ def _fixture(args):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--group", choices=("all", *GROUPS, "fixture"), default="all")
-    parser.add_argument("--frontend", choices=("developer", "maintainer"))
+    parser.add_argument("--frontend", choices=FRONTENDS)
     parser.add_argument("--fixture-root", help="Isolated synthetic evaluation directory; only with --group fixture")
     args = parser.parse_args(argv)
     if (args.group == "fixture") != bool(args.fixture_root):

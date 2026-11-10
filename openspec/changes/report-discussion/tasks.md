@@ -26,7 +26,7 @@ matching role's report detail screen.
   - the error envelope and `no-store`.
 
   Verify that the feature owner approves it before 2.2 Red starts. After approval, it is read-only for every agent.
-- [ ] 1.4 **[sec]** Wire the Reporter backend into the deployed app (D7):
+- [x] 1.4 **[sec]** Wire the Reporter backend into the deployed app (D7):
   - add `../reporter/src` to `auth/build.gradle`;
   - copy it in the Dockerfile;
   - mount the Reporter handler in `AuthController` with the trusted session actor.

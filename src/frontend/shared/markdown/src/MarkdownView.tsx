@@ -101,7 +101,7 @@ class RenderBoundary extends Component<BoundaryProps, { failed: boolean }> {
 // (images as alt text, links as text, heading IDs) applies on the main thread.
 
 const SUBSET_TAGS = new Set([
-  "a", "blockquote", "br", "code", "del", "em", "h1", "h2", "h3", "h4", "h5", "h6",
+  "a", "bdi", "blockquote", "br", "code", "del", "em", "h1", "h2", "h3", "h4", "h5", "h6",
   "hr", "img", "input", "li", "ol", "p", "pre", "section", "strong", "sup", "table",
   "tbody", "td", "th", "thead", "tr", "ul",
 ]);
@@ -112,6 +112,7 @@ const SUBSET_TAGS = new Set([
  */
 const TAG_PROPERTIES: Record<string, readonly string[]> = {
   a: ["href"],
+  bdi: ["dir"],
   img: ["alt"],
   input: ["type", "checked", "disabled"],
   ol: ["start"],
@@ -121,6 +122,9 @@ const TAG_PROPERTIES: Record<string, readonly string[]> = {
 };
 
 const COMMON_PROPERTIES: readonly string[] = ["id", "className"];
+
+/** Elements React renders without children; their children are dropped. */
+const VOID_ELEMENTS = new Set(["br", "hr", "img", "input"]);
 
 /**
  * The only property keys read per tag. They are read directly and never
@@ -193,6 +197,9 @@ function cleanProperty(
       return typeof value === "string" && value.startsWith(idPrefix) ? value : undefined;
     case "className":
       return cleanClassName(tagName, value);
+    case "dir":
+      // Only the isolate the renderer generates for shown destinations (MDR-15).
+      return value === "ltr" ? "ltr" : undefined;
     case "align":
       return typeof value === "string" && ALIGNMENTS.has(value) ? value : undefined;
     case "start":
@@ -289,8 +296,8 @@ function cleanTree(
       const nested = node.children;
       const element: Element = { type: "element", tagName, properties, children: [] };
       top.out.push(element);
-      // Anything but an array means no children, as before.
-      if (!Array.isArray(nested)) continue;
+      // Void elements display no children (MDR-15); anything but an array means none, as before.
+      if (VOID_ELEMENTS.has(tagName) || !Array.isArray(nested)) continue;
       const length = childrenLength(nested, limit - used);
       if (length === undefined) return undefined;
       if (length > 0) {

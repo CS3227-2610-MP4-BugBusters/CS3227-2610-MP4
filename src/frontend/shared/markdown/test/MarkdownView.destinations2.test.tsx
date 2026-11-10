@@ -69,8 +69,13 @@ function checkText(name: string, source: string, expected: string[]) {
 const hex = (ch: string) => ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0");
 
 describe("MDR-15 repeated references to a costly destination", () => {
+  // Spec scenario sources. Their shown text is far above MAX_TEXT_CHARS, so under
+  // D16 the view must finish quickly as plain text, not formatted (amended 10 Nov).
   const dos = "[r]: <" + "%E2%80".repeat(800) + ">\n\n" + "[r] ".repeat(3000);
   const valid = "[r]: <" + "%E2%80%8B".repeat(530) + ">\n\n" + "[r] ".repeat(3000);
+  // In-thread variants within MAX_IN_THREAD_SOURCE (4,000), so they are really parsed (D15).
+  const dosSmall = "[r]: <" + "%E2%80".repeat(300) + ">\n\n" + "[r] ".repeat(500);
+  const validSmall = "[r]: <" + "%E2%80%8B".repeat(200) + ">\n\n" + "[r] ".repeat(500);
 
   it("toHast on the 3000-reference source takes under 1 s", () => {
     const t0 = performance.now();
@@ -80,21 +85,48 @@ describe("MDR-15 repeated references to a costly destination", () => {
     expect(ms).toBeLessThan(1000);
   }, 120_000);
 
-  for (const path of paths) {
-    it(`invalid-escape 3000 references finish under 1 s [${path}]`, async () => {
-      const t0 = performance.now();
-      await view(dos, path);
-      const ms = performance.now() - t0;
-      console.log(`DOS_MS ${path} ${ms.toFixed(0)}`);
-      expect(ms).toBeLessThan(1000);
-    }, 120_000);
+  it("guard: in-thread variants are within the in-thread cap", () => {
+    expect(dosSmall.length).toBeLessThanOrEqual(4000);
+    expect(validSmall.length).toBeLessThanOrEqual(4000);
+  });
 
-    it(`guard: valid %E2%80%8B x530 with 3000 references finish under 1 s [${path}]`, async () => {
-      const t0 = performance.now();
-      await view(valid, path);
-      const ms = performance.now() - t0;
-      console.log(`VALID_MS ${path} ${ms.toFixed(0)}`);
+  /** Time from render until the parse has settled and the view shows its final state. */
+  async function settledMs(source: string, path: Path): Promise<{ ms: number; c: HTMLElement }> {
+    let done!: () => void;
+    const settled = new Promise<void>((resolve) => (done = resolve));
+    const base = path === "worker" ? realRunner : inThreadRunner;
+    const runner = {
+      parse: async (src: string, prefix: string, signal?: AbortSignal) => {
+        try {
+          return await base.parse(src, prefix, signal);
+        } finally {
+          done();
+        }
+      },
+    } as MarkdownRunner;
+    const t0 = performance.now();
+    const { container } = render(
+      <MarkdownParserProvider runner={runner}>
+        <MarkdownView source={source} />
+      </MarkdownParserProvider>,
+    );
+    if (path === "worker") await settled;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return { ms: performance.now() - t0, c: container };
+  }
+
+  for (const [name, source, path] of [
+    ["invalid-escape 3000 references", dos, "worker"],
+    ["valid %E2%80%8B x530 with 3000 references", valid, "worker"],
+    ["invalid-escape 500 references within the cap", dosSmall, "in-thread"],
+    ["valid %E2%80%8B x200 with 500 references within the cap", validSmall, "in-thread"],
+  ] as const) {
+    it(`${name} finish under 1 s as plain text [${path}]`, async () => {
+      const { ms, c } = await settledMs(source, path);
+      console.log(`DOS_MS ${path} ${name} ${ms.toFixed(0)}`);
       expect(ms).toBeLessThan(1000);
+      expect(c.querySelector("pre")?.textContent).toBe(source);
+      expect(c.querySelector("bdi")).toBeNull();
     }, 120_000);
   }
 });
@@ -198,7 +230,7 @@ describe("MDR-15 guards", () => {
     [
       "invoice (https://evil.example/<U+202E>fdp.exe)",
       "x (https://e.x/<U+200B>a)",
-      "a (b%29 %28https://bank.example)",
+      "a (b%29%20%28https://bank.example)", // MDR-15: a space shows as %20 (amended 10 Nov)
     ],
   );
   checkText("MDR-14 image alt text", "[https://evil![.bank.example](i)](https://evil)", [

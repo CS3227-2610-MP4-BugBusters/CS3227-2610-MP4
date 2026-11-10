@@ -67,7 +67,7 @@ It also adds the index `(report_id, created_at, id)` for the thread, and the ind
   after the author's role changes.
 - Display names are joined from the auth accounts table when the thread is read,
   never stored.
-- Reports are never deleted (RPT-10 closes instead), so the foreign key is safe.
+- Reports are never deleted, so the foreign key is safe.
 
 ### D2 One service, three role endpoints
 A `ReportDiscussionService` in a new `src/backend/discussion/src/` package takes a
@@ -101,7 +101,7 @@ Posting inserts one `report_comments` row and appends nothing else.
 
 **Why:**
 - If comments bumped the version, every comment would make a pending Reporter
-  edit or close fail with `VERSION_CONFLICT`.
+  edit fail with `VERSION_CONFLICT`.
 - It would also let anyone push a report up the Maintainer queue. The 2.10
   security review already flagged that effect for no-op edits.
 

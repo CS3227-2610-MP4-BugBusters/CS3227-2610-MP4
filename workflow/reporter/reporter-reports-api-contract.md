@@ -3,10 +3,12 @@
 Status: revision 1 (RPT-01..08) **approved** 9 November 2026 (sha256 2153c287).
 Revision 2 (edit and hard delete, sha256 9d0ad9b0) was approved and then
 superseded on 10 November 2026, when the owner replaced delete with close.
-Revision 3 (RPT-09 edit, RPT-10 close) **approved** by the Reporter feature
-owner, 10 November 2026 (task 2.8). Source requirements:
+Revision 3 (RPT-09 edit, RPT-10 close, sha256 575a27c8) was approved and then
+superseded on 10 November 2026, when the owner removed the Reporter close action
+because closure is Maintainer-only. Revision 4 (RPT-09 edit only) **approved** by
+the Reporter feature owner, 10 November 2026 (task 2.8). Source requirements:
 `openspec/changes/reporter-markdown-reports/specs/reporter-reports/spec.md`
-(RPT-01..10) and design D6–D8, D10 and D17. Once approved, this file is read-only for every
+(RPT-01..09) and design D6–D8, D10 and D17. Once approved, this file is read-only for every
 agent. Changes go back to the feature owner and reset any approved Red baseline
 that depends on them.
 
@@ -63,7 +65,7 @@ The server sets `id` (random UUID), `reporter_id` (the actor), status
 
 - A Reporter can create at most **3 reports in any rolling 60-second window**.
 - The window is counted from that Reporter's stored `created_at` values. Reports
-  are never deleted, so closing a report never frees a slot. Only successful
+  are never deleted. Only successful
   creates count; requests rejected for any reason don't.
 - A 4th create inside the window returns **429 `RATE_LIMITED`** and stores
   nothing. The response sends `Retry-After` with the whole seconds (rounded up,
@@ -74,7 +76,7 @@ The server sets `id` (random UUID), `reporter_id` (the actor), status
   another.
 - Order of checks: session, then validation, then rate limit. An invalid request
   gets 400 even when the Reporter is over the limit.
-- List, read, edit and close requests are not rate-limited by this rule.
+- List, read and edit requests are not rate-limited by this rule.
 
 ### `GET /api/reporter/reports`
 
@@ -118,38 +120,28 @@ sets `updatedAt` to the current time.
 
 **200** with the updated detail, same shape as the 201 response.
 
-### `POST /api/reporter/reports/{id}/close` (close, RPT-10)
-
-The body is a JSON object with exactly `version`, a JSON integer of 0 or more.
-A missing, non-integer or negative `version`, any other key, or a body that is
-not a JSON object returns 400 `VALIDATION_FAILED`. Query parameters are not
-accepted: any query parameter returns 400 `VALIDATION_FAILED`.
-
-The close is one atomic write under the same conditions as edit. It sets status
-`CLOSED`, increments `version` by 1, sets `updatedAt` to the current time and
-leaves `title` and `description` unchanged.
-
-**200** with the updated detail, same shape as the 201 response. The report stays
-readable and listed. Reopening is not supported.
-
-### Edit and close outcomes
+### Edit outcomes
 
 Checks run in this order: session, validation, then the report.
 
 | Condition | Response |
 | --- | --- |
 | No such report, another Reporter's report, or `{id}` not a canonical UUID | 404 `REPORT_NOT_FOUND`, byte-identical to the read 404 apart from `requestId` |
-| The actor's report has an assignee, or a status other than `SUBMITTED` (including `CLOSED`) | 409 `REPORT_LOCKED` |
+| The actor's report has an assignee, or a status other than `SUBMITTED` | 409 `REPORT_LOCKED` |
 | The actor's unlocked report has a different version | 409 `VERSION_CONFLICT` |
 | Otherwise | 200 |
 
-Nothing changes on any non-success response. If an assignment and an edit or
-close race, exactly one takes effect: either the edit or close succeeds first, or
-it returns 409 and the report stays assigned and unchanged.
+Nothing changes on any non-success response. If an assignment and an edit
+race, exactly one takes effect: either the edit succeeds first, or it returns 409
+and the report stays assigned and unchanged.
 
 Other methods on these paths return 405 `METHOD_NOT_ALLOWED`. The `Allow`
-header is `GET, POST` on the collection, `GET, PUT` on a report and `POST` on its
-`/close` path.
+header is `GET, POST` on the collection and `GET, PUT` on a report.
+
+Reporters never change a report's status. A `status` key in an edit body is 400
+`VALIDATION_FAILED`, and any path below a report, such as `/close`, returns the
+read 404 `REPORT_NOT_FOUND` and changes nothing. Closing is a Maintainer-only
+lifecycle action.
 
 ## Errors and headers
 
@@ -170,7 +162,7 @@ header is `GET, POST` on the collection, `GET, PUT` on a report and `POST` on it
 
 ## Not covered
 
-Editing or closing after assignment, deleting reports, reopening, other
-lifecycle transitions, assignee details, discussion, checklist responses,
+Editing after assignment, any Reporter status change (including closing),
+deleting reports, other lifecycle transitions, assignee details, discussion, checklist responses,
 and AI, including the AI suggestions for reproduction steps, expected and actual
 behavior, and environment.

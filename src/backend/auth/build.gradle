@@ -33,12 +33,14 @@ dependencies {
 sourceSets.main.java {
     srcDir '../platform/src/main/java'
     srcDir '../developer/src'
+    srcDir '../reporter/src'
     srcDir '../maintainer/src/main/java'
     srcDir '../socllm/src/main/java'
     include 'mp4/**', 'AssignedReportStore.java', 'AssignedReportListHttpHandler.java', 'ChecklistDraftStore.java',
             'ChecklistShareService.java', 'JdbcChecklistShareService.java',
             'ChecklistShareHttpHandler.java', 'ChecklistSharedHttpHandler.java',
-            'ChecklistDraftHttpHandler.java', 'socllm/**'
+            'ChecklistDraftHttpHandler.java', 'ReporterJson.java', 'ReporterReportStore.java',
+            'ReporterReportsHttpHandler.java', 'socllm/**'
 }
 
 tasks.named('processResources') {

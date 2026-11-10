@@ -147,33 +147,7 @@ A Reporter SHALL be able to replace the `title` and `description` of their own u
 - **WHEN** R1 edits an unassigned report
 - **THEN** the edit succeeds and does not change the create count
 
-### Requirement: RPT-10 Reporter closes an unassigned report
-
-A Reporter SHALL be able to close their own unassigned `SUBMITTED` report by sending exactly the `version` they last read. The close SHALL be one atomic step that succeeds only if ownership, no assignee, `SUBMITTED` and the version all hold, and SHALL set status `CLOSED`, increase the version by 1 and change `updatedAt`. A closed report SHALL stay readable and listed. Reopening is not supported.
-
-#### Scenario: Close an unassigned report
-- **GIVEN** R1 filed report A, which is unassigned with version 0
-- **WHEN** R1 closes A with version 0
-- **THEN** the response is 200 with status `CLOSED`, version 1, a later `updatedAt` and the title and description unchanged
-- **AND** A still reads with 200 and appears in R1's list with status `CLOSED`
-
-#### Scenario: Closed, assigned or progressed report is locked
-- **GIVEN** report A is already `CLOSED`, has an assignee, or has another status than `SUBMITTED`
-- **WHEN** R1 closes or edits A with the current version
-- **THEN** the response is 409 `REPORT_LOCKED` and nothing changes
-
-#### Scenario: Stale version, another Reporter, invalid body
-- **WHEN** R1 closes A with a version other than the stored one
-- **THEN** the response is 409 `VERSION_CONFLICT` and nothing changes
-- **AND** another Reporter's or a nonexistent report returns the RPT-05 404
-- **AND** a body that is not an object with exactly an integer `version` of 0 or more returns 400 `VALIDATION_FAILED`
-
-#### Scenario: Close races an assignment
-- **WHEN** R1's close and a Maintainer's assignment of the same unassigned report run concurrently
-- **THEN** either the close returns 200 before the assignment applies, or the close returns 409 and the report stays assigned and `SUBMITTED`
-- **AND** a report is never closed by the Reporter after it is assigned
-
-#### Scenario: Closing does not free a rate-limit slot
-- **GIVEN** R1 created 3 reports in the last 60 seconds and closed one of them
-- **WHEN** R1 posts a valid report
-- **THEN** the response is 429 `RATE_LIMITED`
+#### Scenario: Reporters cannot change status
+- **WHEN** a Reporter sends `status` in an edit body, or any request to a path below a report such as `POST /api/reporter/reports/{id}/close`
+- **THEN** the edit returns 400 `VALIDATION_FAILED` and the path returns 404 `REPORT_NOT_FOUND`, and the report's status is unchanged
+- **AND** closing a report remains a Maintainer-only lifecycle action (owner decision 10 Nov)

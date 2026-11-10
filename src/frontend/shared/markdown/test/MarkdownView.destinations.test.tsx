@@ -52,7 +52,7 @@ describe("MDR-14 scenarios", () => {
     [
       "invoice (https://evil.example/<U+202E>fdp.exe)",
       "x (https://e.x/<U+200B>a)",
-      "a (b%29 %28https://bank.example)",
+      "a (b%29%20%28https://bank.example)", // MDR-15: a space shows as %20 (amended 10 Nov)
     ],
   );
   check(

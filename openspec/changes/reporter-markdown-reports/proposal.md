@@ -16,9 +16,9 @@ triaging and investigating the bug.
   own report, with server-side ownership checks, validation, the shared error
   envelope and no client-supplied identity.
 - **RPT-09..10** (owner decision 10 Nov): a Reporter can edit the title and
-  description of, or close, their own report while it is unassigned and
-  `SUBMITTED`, with an optimistic `version` check. Once assigned or closed it is
-  locked. Reports are never deleted (owner reverted delete, 10 Nov).
+  description of their own report while it is unassigned and `SUBMITTED`, with
+  an optimistic `version` check. Once assigned it is locked. Reporters never
+  change status: closing is Maintainer-only (owner decision 10 Nov). Reports are never deleted (owner reverted delete, 10 Nov).
 - A report has **only two Reporter-authored fields: a plain-text `title` and a
   Markdown `description`**. Reproduction steps, expected and actual behavior, and
   environment are not report fields. They are things the future improve-report
@@ -44,7 +44,7 @@ triaging and investigating the bug.
 
 ### Out of Scope
 
-Editing or closing a report after it is assigned, and that lifecycle
+Editing a report after it is assigned, Reporter-initiated closing, and that lifecycle
 interaction (SEC-09), deleting reports, reopening a closed report, checklist
 responses,
 discussion, the improve-report AI feature (including its suggestions for

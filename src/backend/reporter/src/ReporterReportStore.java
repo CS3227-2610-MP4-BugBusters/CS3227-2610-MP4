@@ -11,7 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 import javax.sql.DataSource;
 
-/** Creates, reads, edits and closes reports owned by a Reporter resolved by the authentication layer. */
+/** Creates, reads and edits reports owned by a Reporter resolved by the authentication layer. */
 public final class ReporterReportStore {
     public record Report(UUID id, String title, String description, String status, long version,
             Instant createdAt, Instant updatedAt) {}
@@ -39,7 +39,7 @@ public final class ReporterReportStore {
         }
     }
 
-    /** Thrown when an edit or close matched no row; nothing was changed (design D17). */
+    /** Thrown when an edit matched no row; nothing was changed (design D17). */
     public static final class Refused extends Exception {
         public enum Reason { NOT_FOUND, LOCKED, VERSION_CONFLICT }
 
@@ -106,11 +106,6 @@ public final class ReporterReportStore {
     public Report edit(UUID reporterId, UUID reportId, long version, String title, String description)
             throws SQLException, Refused {
         return updateUnlocked(reporterId, reportId, version, "title = ?, description = ?", title, description);
-    }
-
-    /** RPT-10: closes the Reporter's unassigned SUBMITTED report at the given version; text is unchanged. */
-    public Report close(UUID reporterId, UUID reportId, long version) throws SQLException, Refused {
-        return updateUnlocked(reporterId, reportId, version, "status = 'CLOSED'");
     }
 
     public Page list(UUID reporterId, int page, int pageSize) throws SQLException {

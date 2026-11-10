@@ -52,14 +52,10 @@ def normalise_404(res):
     return st, keep, body
 
 
-# ---- additions for tasks 2.10 (edit) and 2.11 (close); nothing above this line changed ----
+# ---- additions for task 2.10 (edit); nothing above this line changed ----
 def edit(token, report_id, title="New title", description="New description", version=0, **kw):
     return request("PUT", PATH + "/" + report_id,
                    body={"title": title, "description": description, "version": version}, token=token, **kw)
-
-
-def close(token, report_id, version=0, **kw):
-    return request("POST", PATH + "/" + report_id + "/close", body={"version": version}, token=token, **kw)
 
 
 def snapshot(report_id):

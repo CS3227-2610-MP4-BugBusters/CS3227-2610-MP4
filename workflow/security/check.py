@@ -48,7 +48,8 @@ def dependencies_check():
     inventory = auth / "build/security/osv-scanner.json"
     run([binary("osv-scanner"), "scan", "source", "--lockfile", f"osv-scanner:{inventory}",
          "--lockfile", ROOT / "src/frontend/developer/package-lock.json",
-         "--lockfile", ROOT / "src/frontend/maintainer/package-lock.json"])
+         "--lockfile", ROOT / "src/frontend/maintainer/package-lock.json",
+         "--lockfile", ROOT / "src/frontend/shared/markdown/package-lock.json"])
 
 
 def main(argv=None):

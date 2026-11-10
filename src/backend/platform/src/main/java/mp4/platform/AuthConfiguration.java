@@ -106,6 +106,7 @@ public class AuthConfiguration {
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/reports/*/checklist/share").hasRole("DEVELOPER")
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reports/*/checklist/shared").hasAnyRole("REPORTER", "DEVELOPER", "MAINTAINER")
                 .requestMatchers("/api/developer/**").hasRole("DEVELOPER")
+                .requestMatchers("/api/reporter/**").hasRole("REPORTER")
                 .requestMatchers("/api/maintainer/**").hasRole("MAINTAINER").anyRequest().denyAll())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .formLogin(f -> f.disable()).httpBasic(b -> b.disable()).logout(l -> l.disable())

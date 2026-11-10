@@ -23,14 +23,12 @@ import mp4.reporter.ReporterReportStore.Refused;
 import mp4.reporter.ReporterReportStore.Report;
 import mp4.reporter.ReporterReportStore.Summary;
 
-/** HTTP adapter for Reporter report create, list, read, edit and close; authentication supplies the actor. */
+/** HTTP adapter for Reporter report create, list, read and edit; authentication supplies the actor. */
 public final class ReporterReportsHttpHandler {
     private static final String COLLECTION_PATH = "/api/reporter/reports";
     private static final String ITEM_PREFIX = COLLECTION_PATH + "/";
-    private static final String CLOSE_SUFFIX = "/close";
     private static final Set<String> CREATE_FIELDS = Set.of("title", "description");
     private static final Set<String> EDIT_FIELDS = Set.of("title", "description", "version");
-    private static final Set<String> CLOSE_FIELDS = Set.of("version");
     // Largest legal body is about 121 KB: 20,200 code units written as 6-byte \\u escapes, plus syntax.
     private static final int MAX_BODY_BYTES = 128 * 1024;
     private static final int MAX_TITLE_UNITS = 200;
@@ -74,15 +72,13 @@ public final class ReporterReportsHttpHandler {
         String method = exchange.getRequestMethod();
         boolean collection = COLLECTION_PATH.equals(path);
         String rest = path != null && path.startsWith(ITEM_PREFIX) ? path.substring(ITEM_PREFIX.length()) : null;
+        // RPT-09: Reporters never change status, so any path below a report, such as /close, is the read 404.
         boolean item = rest != null && rest.indexOf('/') < 0;
-        // {id}/close where the suffix holds the only '/'; the raw {id} is checked after validation.
-        boolean close = rest != null && rest.endsWith(CLOSE_SUFFIX)
-                && rest.indexOf('/') == rest.length() - CLOSE_SUFFIX.length();
-        if (!collection && !item && !close) {
+        if (!collection && !item) {
             sendError(exchange, ErrorCode.REPORT_NOT_FOUND);
             return;
         }
-        String allow = collection ? "GET, POST" : close ? "POST" : "GET, PUT";
+        String allow = collection ? "GET, POST" : "GET, PUT";
         if (!List.of(allow.split(", ")).contains(method)) {
             exchange.getResponseHeaders().set("Allow", allow);
             sendError(exchange, ErrorCode.METHOD_NOT_ALLOWED);
@@ -100,8 +96,6 @@ public final class ReporterReportsHttpHandler {
             if (collection) {
                 if (method.equals("POST")) create(exchange, actorId);
                 else list(exchange, actorId);
-            } else if (close) {
-                close(exchange, actorId, rest.substring(0, rest.length() - CLOSE_SUFFIX.length()));
             } else if (method.equals("PUT")) {
                 edit(exchange, actorId, rest);
             } else {
@@ -179,33 +173,6 @@ public final class ReporterReportsHttpHandler {
         sendJson(exchange, 200, detailJson(report));
     }
 
-    /** RPT-10. Same order as edit; any query parameter is a validation failure. */
-    private void close(HttpExchange exchange, UUID actorId, String rawId) throws IOException, SQLException {
-        long version;
-        try {
-            if (exchange.getRequestURI().getRawQuery() != null) {
-                throw new IllegalArgumentException("Query parameters are not accepted");
-            }
-            version = parseClose(readBounded(exchange));
-        } catch (BodyTooLarge | IOException | IllegalArgumentException invalidBody) {
-            sendError(exchange, ErrorCode.VALIDATION_FAILED);
-            return;
-        }
-        UUID reportId = canonicalId(rawId);
-        if (reportId == null) {
-            sendError(exchange, ErrorCode.REPORT_NOT_FOUND);
-            return;
-        }
-        Report report;
-        try {
-            report = store.close(actorId, reportId, version);
-        } catch (Refused refused) {
-            sendRefusal(exchange, refused);
-            return;
-        }
-        sendJson(exchange, 200, detailJson(report));
-    }
-
     /** NOT_FOUND reuses the read 404, so another Reporter's report looks the same as a missing one. */
     private static void sendRefusal(HttpExchange exchange, Refused refused) throws IOException {
         sendError(exchange, switch (refused.reason()) {
@@ -239,14 +206,6 @@ public final class ReporterReportsHttpHandler {
         }
         validateText(title, description);
         return new ReportEdit(title, description, version);
-    }
-
-    private static long parseClose(byte[] body) {
-        Map<String, Object> fields = ReporterJson.parseObject(body);
-        if (!fields.keySet().equals(CLOSE_FIELDS) || !(fields.get("version") instanceof Long version)) {
-            throw new IllegalArgumentException("Body must contain exactly version");
-        }
-        return version;
     }
 
     /** RPT-02 field rules, shared by create and edit. */

@@ -8,7 +8,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run --environment jsdom",
-    "verify": "npm run typecheck && npm test"
+    "smoke:vite": "node scripts/vite-smoke.mjs",
+    "verify": "npm run typecheck && npm test && npm run smoke:vite"
   },
   "peerDependencies": {
     "react": "19.3.1",
@@ -32,6 +33,7 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "typescript": "^5.9.3",
+    "vite": "8.3.6",
     "vitest": "5.1.0"
   }
 }

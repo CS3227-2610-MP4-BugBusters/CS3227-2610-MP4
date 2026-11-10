@@ -2538,3 +2538,106 @@ The security review is still running.
 **Not verified:** assignment does not check `version`, so a Reporter could change the text between a Maintainer reading the report and assigning it. This is a question for the Maintainer side.
 
 All of the stated checks passed, so tasks 2.10 and 2.11 are ticked.
+
+## 2.7, 3.15 and the worker build fix (10 Nov)
+
+**Summary.** The owner said: "dont use tdd fix reporter-markdown-reports: 2.7, the README; 3.15, whose two tests need adjusting first; fixing the Markdown worker so the Vite build works". Per that instruction, this work deviates from AGENTS.md. No test designer, baseline verifier, candidate verifier or security reviewer was used, and no Red baseline was approved first. The orchestrator wrote the changes and ran the checks directly.
+
+**Worker build (MDR-10, 3.9 follow-up)**
+- **Cause.** `decode-named-character-reference` 1.3.0 maps the `browser` export condition to `index.dom.js`, which calls `document` when it loads. Vite uses that condition for worker bundles too.
+- **Fix.** The package now ships `vite-plugin.mjs` (`markdownVite()`). It aliases that package to its DOM-free `default` build.
+- **New check.** `npm run smoke:vite` (`scripts/vite-smoke.mjs`) is added to `npm run verify`. It builds `smoke/vite/main.ts` with Vite 8.3.6, then loads the emitted worker chunk in Node, where there is no `document`, and parses `**bold** &copy; &amp; &notanentity;`.
+  - Without the plugin: `ReferenceError: document is not defined`.
+  - With the plugin: PASS.
+- **Dependency.** `vite` 8.3.6 is added as a dev dependency, and the lockfile has changed. The new lockfile is in the OSV scan.
+- **Still open for 3.9 and 3.3:** a build in a consuming app and a real-browser smoke test.
+
+**3.15 (MDR-15), implemented in `MarkdownView.pipeline.ts` and `MarkdownView.tsx`**
+- **Isolation.** The shown suffix is wrapped in `bdi dir="ltr"`. The sanitiser allows `bdi` only with `dir="ltr"`.
+- **Hidden characters.** The hidden set adds Cc, Cs, M, Default_Ignorable_Code_Point and U+2800. A space and non-ASCII brackets are shown percent-encoded.
+- **Decoding.** UTF-8 decoding no longer throws, and each destination is computed once per render, so the 3,000-reference case is linear.
+- **Autolinks.** An autolink containing a hidden character shows escaped text. An autolink is detected by checking that the source at the link start is not `[`. A `[text](url)` link keeps its own text and adds the escaped suffix.
+- **Void elements.** `br`, `hr`, `img` and `input` contribute no text, and the sanitiser drops their children.
+
+**Test amendments**
+- **destinations2.**
+  - The 3,000-reference worker cases now expect the D16 plain-text fallback within 1 s, timed with a wrapper that waits for the runner to settle.
+  - The in-thread cases now use sources of 4,000 characters or fewer.
+  - The parenthesis guard now shows `%20` for the space.
+- **destinations.** The MDR-14 parenthesis expectation is changed to `%20` for the space, as MDR-15 requires.
+- The pre-amendment copy of destinations2 is in `scratchpad\destinations2.before.tsx`.
+
+**2.7 README** (`src/backend/reporter/README.md`, LF hash `b876802d9ed1`)
+- **Contents.** The README covers:
+  - the endpoints;
+  - prerequisites, including the JDBC jar location and `python` versus `python3`;
+  - the migration order and the V4 twin;
+  - the two test groups with expected counts;
+  - timing and troubleshooting;
+  - the deployed wiring;
+  - setting up a Docker database for the auth mount test.
+- **Verification.** The documented commands were followed from the repo root and reproduce the expected results.
+
+**Checks run**
+- `npm run verify` in `src/frontend/shared/markdown`: typecheck clean, 15/15 test files, 444/444 tests, Vite smoke PASS.
+- Following the README, run from the repo root:
+  - schema smoke: rc 0;
+  - `report_timestamps_migration_test.py`: 6 PASS;
+  - group 1: create 12, validation 21, rate limit 14, list 12, read 5;
+  - group 2: access 17, edit 31, status 4;
+  - all 116 tests OK, rc 0.
+- README Docker auth database plus `./gradlew test --tests mp4.auth.ReporterApiMountTest`: 5 tests, 0 failures.
+- `openspec validate reporter-markdown-reports --strict`: valid.
+- `git diff --check`: clean.
+
+**Tasks.** 2.7, 3.15 and 3.13 are ticked, each marked as done without the TDD workflow. 3.9 and 3.3 stay open. Progress is 26/38.
+
+### Details
+
+LF sha256 (first 12 hex characters) of the changed files under `src/frontend/shared/markdown`:
+
+| File | sha256 |
+| --- | --- |
+| `vite-plugin.mjs` | `a046d06e24f5` |
+| `scripts/vite-smoke.mjs` | `c5746c190085` |
+| `smoke/vite/main.ts` | `f683400227f1` |
+| `src/MarkdownView.pipeline.ts` | `5f07a25031de` |
+| `src/MarkdownView.tsx` | `0ed2fd953e7c` |
+| `test/MarkdownView.destinations2.test.tsx` | `6cd2c2e0a537` |
+| `test/MarkdownView.destinations.test.tsx` | `a118fa0d15a8` |
+| `package.json` | `8a381d003611` |
+| `package-lock.json` | `112a4490ebeb` |
+
+## Reporter API tests and the migration test added to CI (10 Nov)
+
+**Summary.** The owner asked: "port Reporter API tests (116) and the migration test to CI". Both now run in CI through the existing single verification entry point. No separate pipeline was created (team plan sections 8 and 11).
+
+**Changes:**
+- **`workflow/verify.py`** has a new `reporter` group. It is part of the default `all` run. The group runs three commands, each against a disposable PostgreSQL:
+  1. `sh src/backend/reporter/test/run-reporter-db.sh python -B …/report_timestamps_migration_test.py`
+  2. `run-reporter-api.sh` for API group 1 (create, validation, rate limit, list, read)
+  3. `run-reporter-api.sh` for API group 2 (access, edit, status)
+- **`.github/workflows/ci.yml`** has a new `reporter-api` job, "Reporter API / Java 17", with a 30-minute timeout. Its steps:
+  - checkout;
+  - Temurin 17;
+  - `setup-python` 3.12, which provides the `python` the runners call;
+  - `apt install libpostgresql-jdbc-java`;
+  - `POSTGRES_JDBC_JAR=/usr/share/java/postgresql.jar python workflow/verify.py --group reporter`.
+
+  Docker is available on `ubuntu-24.04` runners.
+- **`workflow/test/test_verify.py`**:
+  - The default run must include the Reporter runners and the migration test.
+  - A new test checks that the `reporter` group runs all nine test files in three commands and does not run any frontend.
+- **`src/backend/reporter/README.md`** documents the one-command run.
+
+**Checks:**
+- `python -m unittest workflow/test/test_verify.py`: 4/4 OK.
+- `actionlint` (pinned): rc 0.
+- `git diff --check`: clean.
+- `POSTGRES_JDBC_JAR=… python workflow/verify.py --group reporter` locally: rc 0.
+  - Migration test: 6 PASS.
+  - API group 1: create 12, validation 21, rate limit 14, list 12, read 5, all OK.
+  - API group 2: access 17, edit 31, status 4, all OK.
+  - 116/116 in total. No leftover containers.
+
+**Not verified:** the job has not run on GitHub yet. It will run on the next push or pull request. A local run took about 10 minutes.
