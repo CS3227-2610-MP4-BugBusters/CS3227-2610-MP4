@@ -17,7 +17,7 @@ matching role's report detail screen.
 
 - [ ] 1.1 Get Maintainer owner approval for design D3 (comments don't change the aggregate version, which conflicts with the workflow contract) and D4 (Markdown bodies, which conflicts with MNT-DISC-01 and the `maintainer-report-browser` escaped-comment rule). Get Developer and Maintainer owner sign-off for the shared migration `003_report_comments.sql`. Verify by recording each approver and date in `logs/reporter/`.
 - [ ] 1.2 Once `reporter-markdown-reports` is archived, add a `maintainer-report-browser` delta to this change. It makes comment bodies render through `safe-markdown`, and it amends the "Render every … comment … as escaped text" prose. Verify with `openspec validate report-discussion --strict`.
-- [ ] 1.3 Write `workflow/reporter/report-discussion-api-contract.md` from DSC-01..06 and design D1–D6:
+- [x] 1.3 Write `workflow/reporter/report-discussion-api-contract.md` from DSC-01..06 and design D1–D6:
   - the three paths and methods;
   - the request body `{body}`;
   - the comment and page JSON;
@@ -39,13 +39,13 @@ matching role's report detail screen.
 
 ## 2. Discussion backend (`report-discussion`)
 
-- [ ] 2.1 Red/Green migration `src/backend/shared/migrations/003_report_comments.sql` (D1):
+- [x] 2.1 Red/Green migration `src/backend/shared/migrations/003_report_comments.sql` (D1):
   - the table, the checks and both indexes;
   - the foreign key to `reports`;
   - it applies after `001` and `002` on a fresh database.
 
   Verify with `report_comments_migration_test.py` via the Reporter disposable-PostgreSQL runner, plus the existing shared-storage suite still passing.
-- [ ] 2.2 **[sec]** Red/Green DSC-01, DSC-02 and DSC-04 through the shared service and the Reporter endpoint. Verify with `report_discussion_api_test.py`, covering:
+- [x] 2.2 **[sec]** Red/Green DSC-01, DSC-02 and DSC-04 through the shared service and the Reporter endpoint. Verify with `report_discussion_api_test.py`, covering:
   - post and read by the owner;
   - the RPT-05 404 for other Reporters, a missing ID and a malformed ID;
   - a spoofed author giving 400;
