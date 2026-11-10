@@ -391,8 +391,10 @@ export function DeveloperApp() {
       <h1>Developer reports</h1>
       {sessionState === "checking" && <p role="status">Checking your session…</p>}
       {sessionState === "signed-out" && (
-        <section aria-label="Sign in">
+        <section className="developer-sign-in" aria-label="Sign in">
+          <p className="developer-sign-in__eyebrow">DEVELOPER WORKSPACE</p>
           <h2>Sign in</h2>
+          <p className="developer-sign-in__intro">Sign in to view and investigate your assigned reports.</p>
           <form onSubmit={(event) => void signIn(event)}>
             <label htmlFor="username">Username</label>
             <input
