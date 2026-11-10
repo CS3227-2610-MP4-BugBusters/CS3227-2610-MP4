@@ -39,3 +39,14 @@ concurrent session logout during a transaction remains unverified.
 The shared AI gateway/live deployment and returned-reason Developer UI remain
 open. The standalone cancellation experiment and failing regression remain in
 the separate private-notes checkout and were not included in this candidate.
+
+## Hosted CI fixture follow-up
+
+The first PR #11 Java 17 assigned-reports job failed because its disposable
+startup test cloned a database containing the new V3/V4 tables, then attempted
+to drop `reports` without removing dependent shared tables. The fixture was
+updated to remove those shared tables and migration functions from its cloned,
+disposable databases before testing auth-only and incompatible startup. The
+production migration was not changed. `src/backend/shared/test/run-shared-report-storage.sh`
+then passed the storage and startup checks locally with disposable PostgreSQL.
+Hosted CI must be rerun for the updated commit.
