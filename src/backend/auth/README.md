@@ -41,6 +41,33 @@ Secure, HttpOnly, SameSite=Lax, host-only and Path=/ . `mp4.auth.public-origin`
 can name the exact browser origin when an external proxy changes the public
 origin; forwarded headers are ignored.
 
+### Local Developer AI configuration
+
+From the repository root, copy `.env.example` to `.env` and set
+`SOCLAAS_BASE_URL` and `SOCLAAS_API_KEY` in that local file. The model defaults
+to `qwen3.5:9b`; set `SOCLAAS_MODEL` to a team-approved model if needed. The
+example contains no credentials, and `.env` is ignored by Git. This file uses
+shell assignment syntax: quote values containing shell-special characters and
+only source a file you trust. Avoid putting credentials in terminal commands or
+sharing the file.
+
+The Java application does not automatically load `.env`. On macOS or Linux,
+load it into the shell before starting the backend:
+
+```sh
+set -a
+source .env
+set +a
+cd src/backend/auth
+./gradlew runAuth
+```
+
+The existing database and rate-limit environment variables listed above are
+also required to start the backend. Configure the SoC values as environment
+secrets separately in each deployed environment; do not commit real values.
+The Maintainer summary and Developer suggestions still require their respective
+gateway and integration work; setting a key alone does not complete those tasks.
+
 Browser flow: call `GET /api/auth/csrf`, send its `X-CSRF-TOKEN` on the
 URL-encoded `POST /api/auth/login`, then fetch a fresh CSRF token after login.
 The successful login returns `{id,displayName,role,active}` and rotates the
