@@ -51,6 +51,8 @@ public class AuthConfiguration {
     @Bean InitializingBean authMigrations(DataSource ds) { return () -> {
         Flyway.configure().dataSource(ds).defaultSchema("public").locations("classpath:db/auth").table("mp4_auth_schema_history").baselineOnMigrate(true).baselineVersion("99").load().migrate();
         mp4.maintainer.storage.SharedSchemaBootstrap.initialize(ds);
+        Flyway.configure().dataSource(ds).schemas("mp4_socllm").defaultSchema("mp4_socllm").locations("classpath:db/socllm")
+                .table("mp4_socllm_schema_history").load().migrate();
     }; }
     @Bean CookieSerializer sessionCookieSerializer(@Value("${mp4.auth.local:false}") boolean local,
             @Value("${server.address:127.0.0.1}") String bind) {

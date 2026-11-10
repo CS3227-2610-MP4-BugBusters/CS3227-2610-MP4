@@ -21,7 +21,8 @@ Read every member's version and assignment, but load source bodies only for the
 20 context candidates; context remains capped at 24 KiB. Exclude private drafts,
 private notes, identities and raw checklist bodies from provider input.
 
-The shared AI owner can provide these Spring beans from `SummaryContracts`:
+The [MP4 SoCLLM module](../socllm/README.md) supplies these Spring beans from
+`SummaryContracts` when explicitly enabled with complete Maintainer settings:
 
 - `SummaryGateway`: SoC model identity and provider calls with separate trusted
   instructions and untrusted report JSON.
@@ -32,6 +33,12 @@ Without both adapters, nonempty generation fails closed with `AI_UNAVAILABLE`.
 An empty queue returns `providerMode: none` without a provider call. Runtime
 deterministic providers remain disabled. Controlled test providers and the
 explicit frontend development preview do not establish live SoC behavior.
+
+Keep `SOC_LLM_ENABLED` disabled until the deployment's model, keys, budgets and
+connectivity are confirmed. The shared module routes Reporter, Developer and
+Maintainer keys separately; only the Maintainer queue-summary consumer is currently
+connected to an application endpoint. Role services retain authorization, context
+selection and output validation.
 
 ## Checks
 
