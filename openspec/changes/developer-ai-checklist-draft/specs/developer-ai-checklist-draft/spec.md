@@ -8,7 +8,7 @@ Provide safe, reviewable AI-generated investigation suggestions grounded in the 
 
 ### Requirement: AI-D01 Authorized advisory suggestions
 
-An active, currently assigned Developer MAY request suggestions from the report's bounded title, description and saved private checklist draft. Other reports, unsaved editor changes, private notes and credentials SHALL be excluded. Saved checklist context SHALL contain at most 20 steps and 8192 UTF-8 bytes in total, rejecting oversized input before provider invocation, and SHALL be treated as untrusted input; the provider SHALL be instructed to avoid duplicating existing steps. Generation SHALL NOT mutate domain state. Suggestions SHALL be shown separately and require explicit Developer action before applying them to the draft; Save and Share remain separate actions.
+An active, currently assigned Developer MAY request suggestions from the report's bounded title, description and saved private checklist draft. Other reports, unsaved editor changes, private notes and credentials SHALL be excluded. Generation SHALL NOT mutate domain state. Suggestions SHALL be shown separately and require explicit Developer action before applying them to the draft; Save and Share remain separate actions.
 
 #### Scenario: Developer reviews a suggestion
 - **WHEN** an assigned active Developer requests suggestions for a report
@@ -18,6 +18,14 @@ An active, currently assigned Developer MAY request suggestions from the report'
 #### Scenario: Unauthorized request
 - **WHEN** an unauthenticated, inactive, wrong-role, unrelated or former Developer requests suggestions
 - **THEN** the request is denied without invoking the model or disclosing report content
+
+### Requirement: Saved checklist context
+
+Saved checklist context SHALL contain at most 20 steps and 8192 UTF-8 bytes in total. The system SHALL reject oversized input before provider invocation, treat the checklist as untrusted input, and instruct the provider to avoid duplicating existing steps.
+
+#### Scenario: Oversized saved checklist
+- **WHEN** the saved checklist exceeds its step or byte limit
+- **THEN** generation is rejected before the provider is invoked
 
 ### Requirement: AI-D02 Stale and untrusted inputs
 
