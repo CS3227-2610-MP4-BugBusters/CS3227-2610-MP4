@@ -52,6 +52,12 @@ The system SHALL treat report text and model output as untrusted data. It SHALL 
 
 The system SHALL enforce request size, output size, deadlines and concurrency controls; it SHALL return safe errors when the provider fails or limits are reached. It SHALL record sanitized usage, latency, outcome, selected model and configured limits when available, without logging credentials, report content or provider response text. Production use SHALL follow the team's shared gateway and confirmed quota policy.
 
+#### Scenario: Developer model override
+- **GIVEN** a nonblank server-side `SOC_LLM_MODEL_DEVELOPER` is configured
+- **WHEN** the Developer gateway and suggestion provider are created
+- **THEN** both use that model, while other roles retain their shared model
+- **AND** an absent or blank Developer override falls back to `SOC_LLM_MODEL`
+
 #### Scenario: Provider times out
 - **WHEN** the configured deadline expires
 - **THEN** the request returns a safe failure and no report or checklist mutation occurs

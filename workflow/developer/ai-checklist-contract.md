@@ -56,16 +56,19 @@ The Developer provider uses the shared SoC role gateway, configured with
 `SOC_LLM_API_KEY_DEVELOPER`. It passes the authenticated Developer UUID and
 `DEVELOPER_ASSIST` task from trusted backend code. Credentials are never sent to
 the browser or logged; legacy `SOCLAAS_*` settings do not activate a provider.
+An optional server-side `SOC_LLM_MODEL_DEVELOPER` selects the Developer model;
+if absent or blank, use `SOC_LLM_MODEL`. The Developer gateway and suggestion
+metadata use the same selected value. Other roles retain the shared model.
 Use a finite 15-second feature deadline and 384 output tokens. The shared
 gateway owns transport, per-key admission and quota enforcement. Preflight the
 serialized report/checklist context against the gateway's 24,576-byte limit and
 return `INPUT_TOO_LARGE` before admission when it exceeds that bound. Do not
 claim provider quota or production availability without measured evidence.
 
-The fixed Developer system instruction is the reviewed candidate in
-`workflow/evaluation/developer/ai-prompt-candidate-v4.txt`; preserve its
-untrusted-input boundary and behavior while using the shared gateway's required
-JSON-object response envelope.
+The active shared-gateway Developer instruction is recorded in
+`workflow/evaluation/developer/ai-prompt-shared-v5.txt`; retain its
+untrusted-input and no-action boundaries and JSON-object response envelope.
+The earlier v4 candidate remains evidence for the legacy provider.
 
 Use safe structured errors `{code,message,requestId}` and no-store. Denied
 access returns 403 for an authenticated but unauthorized actor; missing or

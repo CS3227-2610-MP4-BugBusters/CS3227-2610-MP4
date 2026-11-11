@@ -30,6 +30,6 @@ class SuggestionProviderConfiguration {
         SocLlmRoleService developerGateway = services.get(SocLlmContracts.Role.DEVELOPER);
         return new SocLlmSuggestionProvider(developerGateway,
                 environment.getRequiredProperty("SOC_LLM_API_KEY_DEVELOPER"),
-                environment.getRequiredProperty("SOC_LLM_MODEL"));
+                SocLlmRoleConfiguration.modelForRole(environment, SocLlmContracts.Role.DEVELOPER));
     }
 }

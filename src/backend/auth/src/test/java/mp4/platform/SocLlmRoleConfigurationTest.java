@@ -81,4 +81,41 @@ class SocLlmRoleConfigurationTest {
                     assertEquals(java.util.Set.of(SocLlmContracts.Role.DEVELOPER), services.keySet());
                 });
     }
+
+    @Test void developerModelOverrideIsUsedBySuggestionProviderWhileReporterRemainsConfigured() {
+        contexts.withUserConfiguration(SocLlmRoleConfiguration.class, SuggestionProviderConfiguration.class)
+                .withPropertyValues("SOC_LLM_ENABLED=true", "SOC_LLM_API_KEY_REPORTER=reporter-placeholder",
+                        "SOC_LLM_API_KEY_DEVELOPER=developer-placeholder", "SOC_LLM_MODEL=shared-model",
+                        "SOC_LLM_MODEL_DEVELOPER=developer-model", "SOC_LLM_RPM=3", "SOC_LLM_TPM=2048")
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    @SuppressWarnings("unchecked") Map<SocLlmContracts.Role, SocLlmRoleService> services =
+                            (Map<SocLlmContracts.Role, SocLlmRoleService>) context.getBean("socLlmRoleServices");
+                    assertEquals(java.util.Set.of(SocLlmContracts.Role.REPORTER, SocLlmContracts.Role.DEVELOPER),
+                            services.keySet());
+                    assertEquals("developer-model",
+                            context.getBean(SuggestionProvider.class).modelName());
+                });
+    }
+
+    @Test void developerSuggestionModelFallsBackToSharedModelWhenOverrideIsMissing() {
+        contexts.withUserConfiguration(SocLlmRoleConfiguration.class, SuggestionProviderConfiguration.class)
+                .withPropertyValues("SOC_LLM_ENABLED=true", "SOC_LLM_API_KEY_DEVELOPER=developer-placeholder",
+                        "SOC_LLM_MODEL=shared-model", "SOC_LLM_RPM=3", "SOC_LLM_TPM=2048")
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertEquals("shared-model", context.getBean(SuggestionProvider.class).modelName());
+                });
+    }
+
+    @Test void blankDeveloperSuggestionModelOverrideFallsBackToSharedModel() {
+        contexts.withUserConfiguration(SocLlmRoleConfiguration.class, SuggestionProviderConfiguration.class)
+                .withPropertyValues("SOC_LLM_ENABLED=true", "SOC_LLM_API_KEY_DEVELOPER=developer-placeholder",
+                        "SOC_LLM_MODEL=shared-model", "SOC_LLM_MODEL_DEVELOPER=   ",
+                        "SOC_LLM_RPM=3", "SOC_LLM_TPM=2048")
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertEquals("shared-model", context.getBean(SuggestionProvider.class).modelName());
+                });
+    }
 }
