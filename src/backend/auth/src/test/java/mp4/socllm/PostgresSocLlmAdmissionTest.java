@@ -4,10 +4,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
 import javax.sql.DataSource;
 import mp4.maintainer.summary.SummaryContracts.*;
+import mp4.platform.SocLlmSuggestionProvider;
+import mp4.platform.SuggestionProvider;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +34,47 @@ class PostgresSocLlmAdmissionTest {
     }
 
     @BeforeEach void clearAttempts(){jdbc.update("DELETE FROM mp4_socllm.attempt");jdbc.update("DELETE FROM mp4_socllm.provider_budget");}
+
+    @Test void successfulDeveloperSuggestionUsesRealRoleServiceAndDurableAdmission() {
+        String developerKey = "developer-adapter-test-key";
+        UUID actorId = UUID.randomUUID();
+        String generated = "{\"steps\":[\"Inspect the authentication response\"]}";
+        java.util.concurrent.atomic.AtomicReference<String> usedInstructions = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<String> usedInput = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicInteger reservedOutputTokens = new java.util.concurrent.atomic.AtomicInteger();
+
+        try (var admission = admission(Map.of(SocLlmContracts.Role.DEVELOPER,
+                new PostgresSocLlmAdmission.KeyBudget(developerKey, 10, 10_000)));
+             var roleService = new SocLlmRoleService(SocLlmContracts.Role.DEVELOPER, admission,
+                (instructions, input, tokens, deadline) -> {
+                    usedInstructions.set(instructions);
+                    usedInput.set(input);
+                    reservedOutputTokens.set(tokens);
+                    return generated;
+                })) {
+            SuggestionProvider provider = new SocLlmSuggestionProvider(roleService, developerKey, "test-model");
+            SuggestionProvider.ProviderResponse result = provider.suggest(actorId, "Login button hangs",
+                    "Valid login leaves the page unchanged.", List.of("Reproduce with valid credentials"));
+
+            assertEquals("[\"Inspect the authentication response\"]", result.rawOutput());
+            assertTrue(usedInstructions.get().toLowerCase().contains("untrusted"));
+            assertTrue(usedInput.get().contains("Login button hangs"));
+            assertTrue(usedInput.get().contains("Reproduce with valid credentials"));
+            assertEquals(384, reservedOutputTokens.get());
+
+            Map<String, Object> attempt = jdbc.queryForMap("""
+                    SELECT actor_id, role, task, reserved_tokens, in_flight_until
+                    FROM mp4_socllm.attempt WHERE actor_id=?
+                    """, actorId);
+            assertEquals(actorId, attempt.get("actor_id"));
+            assertEquals("DEVELOPER", attempt.get("role"));
+            assertEquals("DEVELOPER_ASSIST", attempt.get("task"));
+            assertEquals(usedInstructions.get().getBytes(StandardCharsets.UTF_8).length
+                    + usedInput.get().getBytes(StandardCharsets.UTF_8).length + reservedOutputTokens.get(),
+                    attempt.get("reserved_tokens"));
+            assertNull(attempt.get("in_flight_until"), "successful completion must release the durable lease");
+        }
+    }
 
     @Test void separateInstancesSerializeSharedKeyBudgetAcrossRoleAliases() throws Exception {
         String sharedSecret="test-shared-key";

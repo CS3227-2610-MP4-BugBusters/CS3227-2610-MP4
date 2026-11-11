@@ -180,6 +180,26 @@ public final class JdbcMaintainerRepository implements Repository {
             });
         }
 
+        @Override public void createDeveloperNotification(UUID recipientId, UUID reportId,
+                NotificationType type, long reportVersion) {
+            requireReport(reportId);
+            execute(c -> {
+                try (var insert = c.prepareStatement("""
+                        INSERT INTO public.developer_notifications
+                            (id,recipient_id,report_id,event_type,report_version)
+                        VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING
+                        """)) {
+                    insert.setObject(1, UUID.randomUUID());
+                    insert.setObject(2, recipientId);
+                    insert.setObject(3, reportId);
+                    insert.setString(4, type.name());
+                    insert.setLong(5, reportVersion);
+                    insert.executeUpdate();
+                }
+                return null;
+            });
+        }
+
         @Override public void insertComment(UUID id, Comment comment) {
             requireReport(id);
             execute(c -> {

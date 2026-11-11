@@ -19,6 +19,18 @@ The server derives the active Developer identity from the authenticated session,
 
 The UI consumes the list without requiring a particular layout. An unfiltered zero total means no assignments; a zero total with a search or status filter means no matches. A nonzero total with an empty page means the requested page is out of range, not that there are no assignments. Loading and failure are distinct from empty results. Shared visual components, navigation and responsive layout remain pending team standardization.
 
+The dashboard provides an accessible Search input, a labelled Status selector,
+and Previous and Next page controls. Search can be submitted with Enter or an
+explicit action. Changing search or status returns to page 1. Page and filter
+changes clear the selected report and prevent obsolete responses from restoring
+an earlier list. Controls and visible labels use these names so keyboard and
+assistive-technology users can identify them consistently.
+
+Dashboard search, filter, pagination and selection state is private to the
+current authenticated Developer. Clear it on sign-out, session expiry or access
+denial, before another Developer signs in in the same app instance, and never
+issue that Developer's first list request using the previous identity's query.
+
 ## Verification and constraints
 
 Use synthetic identities and assignments to test direct API requests, combined search/filter, reassignment, and pagination. Do not infer security from hidden frontend controls. Auth, actual schema and routing must be integrated before marking implementation complete.

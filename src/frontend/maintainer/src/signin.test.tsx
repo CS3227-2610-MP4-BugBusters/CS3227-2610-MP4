@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentType } from "react";
 import { App } from "./App";
 import { QueryError, type Queries } from "./domain";
@@ -27,9 +27,14 @@ describe("Maintainer sign-in and sign-out", () => {
     const list = vi.fn();
     render(<AuthApp queries={{ ...createDemoQueries(), ...unauthenticated(), listReports: list }} authActions={actions()} />);
     await screen.findByText("Please sign in to continue.");
-    expect(screen.getByLabelText("Username")).toBeTruthy();
-    expect(screen.getByLabelText("Password")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy();
+    const signInRegion = screen.getByRole("region", { name: "Sign in" });
+    expect(signInRegion.classList.contains("role-sign-in")).toBe(true);
+    expect(within(signInRegion).getByLabelText("Username")).toBeTruthy();
+    expect(within(signInRegion).getByLabelText("Password")).toBeTruthy();
+    expect(signInRegion.querySelectorAll("input")).toHaveLength(2);
+    expect(signInRegion.querySelector('input[autocomplete="username"]')).toBeTruthy();
+    expect(signInRegion.querySelector('input[autocomplete="current-password"]')).toBeTruthy();
+    expect(within(signInRegion).getByRole("button", { name: "Sign in" })).toBeTruthy();
     expect(screen.queryByLabelText("Role")).toBeNull();
     expect(list).not.toHaveBeenCalled();
   });

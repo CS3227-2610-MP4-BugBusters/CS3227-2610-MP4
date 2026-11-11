@@ -69,10 +69,7 @@ def main(test_patterns=()):
         env["PGHOST"], env["PGPORT"], env["PGUSER"] = "127.0.0.1", str(port), "postgres"
         run([psql, "-v", "ON_ERROR_STOP=1", "-d", "postgres", "-c", "CREATE DATABASE mp4_auth_setup"], env=env, stdout=subprocess.DEVNULL)
         env.update({"MP4_AUTH_TEST_JDBC_URL": f"jdbc:postgresql://127.0.0.1:{port}/mp4_auth_setup", "MP4_AUTH_TEST_DB_USER": "postgres", "MP4_AUTH_TEST_DB_PASSWORD": password})
-        for migration in (ROOT / "src/backend/shared/migrations/001_create_reports.sql", ROOT / "src/backend/developer/migrations/create_investigation_checklists.sql"):
-            if not migration.is_file():
-                raise RuntimeError(f"Required existing migration missing: {migration.relative_to(ROOT)}")
-            run([psql, "-v", "ON_ERROR_STOP=1", "-d", "mp4_auth_setup", "-f", str(migration)], env=env, stdout=subprocess.DEVNULL)
+        run([str(wrapper), "--no-daemon", "test", "--tests", "mp4.auth.RunnerSetupTest"], cwd=AUTH, env=env)
         tasks = ["test"] if test_patterns else ["check"]
         for pattern in test_patterns:
             tasks.extend(["--tests", pattern])

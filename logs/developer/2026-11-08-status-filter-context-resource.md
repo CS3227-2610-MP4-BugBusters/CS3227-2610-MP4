@@ -23,3 +23,9 @@
 - Final candidate hashes: handler `845dd884d816b16d6ceb05906a9e09d0d2db0641c4edb4f10d15fdb5852c5d5a`; store `46773cb71d84e142e48cfc44271094f955d0a4edbd97030a7318b0174cdf4747`. Candidate files and the earlier search work remain uncommitted.
 - Resource reflection: bounded task-specific file lists were supplied to specialists; a higher-reasoning implementer and separate security reviewer were used for correctness and authorization. Local loopback required sandbox escalation for disposable test infrastructure. Actual per-agent tokens, tool-call totals, elapsed time and cost were not exposed in this trace; they are unavailable, not zero. There is no comparative run, so no token or cost saving can be concluded.
 - Limits: temporary `/private/tmp` runners are not durable project runners. Real authentication, shared schema/routing, production latency and UI integration remain unverified; pagination is a separate feature. No OpenSpec task covering those additional checks is marked complete.
+
+## Context and interpretation for reflection
+
+This record captures the intended context package, specialist roles and actual outcomes for a status-filter cycle. It also states the available model/effort settings and explicitly marks missing measurements.
+
+The role split and scoped paths are evidence of coordination and context selection. Since per-agent usage and a comparable alternative were unavailable, they cannot establish numerical savings.

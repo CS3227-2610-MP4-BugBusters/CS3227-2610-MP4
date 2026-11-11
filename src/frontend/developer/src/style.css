@@ -1,3 +1,5 @@
+@import "../../shared/role-workspace.css";
+
 body {
   margin: 0;
   color: #18212b;
@@ -33,11 +35,344 @@ textarea {
   resize: vertical;
 }
 
-button, select, textarea {
-  padding: .5rem;
+button,
+input,
+select,
+textarea {
+  border: 1px solid #bdcbd0;
+  border-radius: .45rem;
+  color: #18343a;
+  background: #fff;
   font: inherit;
+}
+
+button,
+select,
+textarea {
+  padding: .55rem .75rem;
+}
+
+input {
+  padding: .55rem .7rem;
+}
+
+button {
+  min-height: 2.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  border-color: #087c80;
+  background: #f2f9f8;
+}
+
+button:active:not(:disabled) {
+  background: #e5f3f1;
+}
+
+button:disabled {
+  color: #65777d;
+  background: #edf1f2;
+  cursor: not-allowed;
+  opacity: .7;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #20a9a7;
+  outline-offset: 2px;
+}
+
+textarea {
+  line-height: 1.5;
+}
+
+.developer-checklist-step input[type="text"] {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
 }
 
 button + button {
   margin-left: .5rem;
 }
+
+.developer-sign-out {
+  border-color: #9bb7b8;
+  color: #123b40;
+  background: #f5fbfa;
+  font-weight: 650;
+}
+
+.developer-report-list {
+  display: grid;
+  gap: .625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.developer-report-list li {
+  min-width: 0;
+}
+
+.developer-report-list__button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .75rem 1rem;
+  width: 100%;
+  min-height: 3.5rem;
+  padding: .8rem 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: .55rem;
+  color: #18343a;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.developer-report-list__button:hover {
+  border-color: #54898a;
+  background: #f7fbfb;
+}
+
+.developer-report-list__button[aria-pressed="true"] {
+  border-color: #087c80;
+  background: #eaf6f5;
+  box-shadow: inset 3px 0 #087c80;
+}
+
+.developer-report-list__button:focus-visible {
+  outline: 3px solid #20a9a7;
+  outline-offset: 2px;
+}
+
+.developer-report-list__title {
+  min-width: 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.developer-report-list__status {
+  justify-self: end;
+  padding: .25rem .6rem;
+  border: 1px solid #c6d9d8;
+  border-radius: 999px;
+  color: #315a5d;
+  background: #f2f8f7;
+  font-size: .84rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.developer-report-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: .75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.developer-report-search {
+  flex: 1 1 18rem;
+}
+
+.developer-report-search > div {
+  display: flex;
+  gap: .5rem;
+}
+
+.developer-report-search input {
+  flex: 1;
+  min-width: 0;
+}
+
+.developer-report-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-top: 1rem;
+}
+
+.developer-report-pagination button + button {
+  margin-left: 0;
+}
+
+@media (max-width: 420px) {
+  .developer-report-list__button {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .developer-report-list__status {
+    justify-self: start;
+  }
+}
+
+.developer-checklist > h2,
+.developer-checklist__suggestions > h3 { margin: 0; }
+
+.developer-checklist__intro,
+.developer-checklist__hint,
+.developer-checklist__suggestions > p {
+  color: #52666b;
+  font-size: .9rem;
+  margin: .4rem 0 1rem;
+}
+
+.developer-checklist__steps,
+.developer-checklist__choices {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.developer-checklist__steps legend,
+.developer-checklist__choices legend {
+  margin-bottom: .65rem;
+  color: #31545a;
+  font-size: .86rem;
+  font-weight: 700;
+}
+
+.developer-checklist-step {
+  display: flex;
+  align-items: end;
+  gap: .65rem;
+  margin-bottom: .75rem;
+}
+
+.developer-checklist-step__content { flex: 1; min-width: 0; }
+.developer-checklist-step label { margin-bottom: .25rem; color: #52666b; font-size: .8rem; font-weight: 650; }
+.developer-checklist__add { color: #086e71; border-style: dashed; }
+.developer-checklist__hint { margin: 1rem 0 .65rem; }
+.developer-checklist__actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.developer-checklist__actions button + button { margin-left: 0; }
+button.developer-checklist__primary:not(:disabled) { border-color: #087c80; color: #fff; background: #087c80; }
+button.developer-checklist__primary:hover:not(:disabled) { border-color: #075d60; background: #075d60; }
+.developer-checklist__suggestions { padding: 1rem; border-color: #b9dcd9; background: #f4fbfa; }
+.developer-checklist__choice {
+  display: flex;
+  align-items: flex-start;
+  gap: .7rem;
+  margin-bottom: .5rem;
+  padding: .75rem;
+  border: 1px solid #d6e7e5;
+  border-radius: .5rem;
+  background: #fff;
+  cursor: pointer;
+}
+.developer-checklist__choice:has(input:checked) { border-color: #52a7a0; background: #eaf7f5; }
+.developer-checklist__choice input { flex: none; width: 1rem; height: 1rem; margin: .25rem 0 0; accent-color: #087c80; }
+@media (max-width: 480px) {
+  .developer-checklist-step { flex-wrap: wrap; }
+  .developer-checklist-step__content { flex-basis: 100%; }
+}
+
+.developer-report-detail > h2 {
+  margin: 0;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.developer-report-detail__description {
+  color: #52666b;
+  margin: .65rem 0 .85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.developer-report-detail__status {
+  display: inline-block;
+  margin: 0 0 1rem;
+  padding: .3rem .7rem;
+  border: 1px solid #c6d9d8;
+  border-radius: 999px;
+  color: #315a5d;
+  background: #f2f8f7;
+  font-size: .85rem;
+  font-weight: 650;
+}
+
+.developer-resolution {
+  padding: 1rem;
+  border: 1px solid #dce6e8;
+  border-radius: .5rem;
+  background: #f9fbfb;
+}
+
+.developer-resolution label,
+.developer-private-notes label {
+  margin-bottom: .45rem;
+  color: #31545a;
+  font-size: .9rem;
+  font-weight: 650;
+}
+
+.developer-resolution textarea,
+.developer-private-notes textarea {
+  min-height: 6rem;
+  background: #fff;
+}
+
+.developer-resolution button,
+.developer-private-notes button {
+  margin-top: .7rem;
+}
+
+.developer-private-notes {
+  border-color: #dce6e8;
+  background: #f9fbfb;
+}
+
+.developer-private-notes h3 {
+  margin: 0 0 .8rem;
+}
+
+.developer-return-reason {
+  margin: 0 0 1rem;
+  padding: .9rem 1rem;
+  border: 1px solid #e8c995;
+  border-left: 4px solid #c18427;
+  border-radius: .5rem;
+  background: #fff9ed;
+}
+
+.developer-return-reason h3 {
+  margin: 0 0 .35rem;
+  color: #704a13;
+  font-size: .95rem;
+}
+
+.developer-return-reason p {
+  margin: 0;
+  color: #463a29;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.developer-notifications > h2 { margin: 0 0 .8rem; }
+.developer-notifications__list { display: grid; gap: .55rem; margin: 0; padding: 0; list-style: none; }
+.developer-notifications__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .55rem .8rem;
+  padding: .7rem .8rem;
+  border: 1px solid #dce7e7;
+  border-radius: .5rem;
+  background: #fbfdfd;
+}
+.developer-notifications__item time { color: #63777a; font-size: .82rem; }
+.developer-notifications__label { flex: 1 1 12rem; font-weight: 650; }
+.developer-notifications__report { color: #086e71; }
+.developer-notifications__read { color: #63777a; font-size: .82rem; }
+.developer-notifications__item.is-unread { border-left: 3px solid #087c80; background: #f4fbfa; }
+.developer-notifications__item button { min-height: 2.2rem; padding: .35rem .65rem; }

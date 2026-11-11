@@ -17,3 +17,9 @@
 ## Independent baseline review
 
 `list_al_baseline_verifier` (GPT-6 Luna, low reasoning) reviewed the fixture, assertions, recorded hashes and workflow. The reviewer confirmed that the session gate and fixture support local setup checks, but the unmounted application handler means the 404 results are setup observations, not a verified behavioral Red. The reviewer did not independently rerun the database-backed runner after its disposable cluster was removed. No baseline approval, implementation, integrated verification, or security-review pass is claimed. Token usage unavailable.
+
+## Context and interpretation for reflection
+
+This baseline isolated authentication controls and the assigned-report fixture before application routing existed. The separate verifier reviewed the evidence and classified missing-handler responses as setup observations.
+
+This is an example of why a failing test alone does not prove an implementation defect: the intended handler was absent. The later list implementation and real-session evidence are recorded separately; they should not be attributed to this baseline.

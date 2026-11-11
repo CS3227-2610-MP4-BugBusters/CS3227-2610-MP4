@@ -51,7 +51,7 @@ describe("DeveloperChecklist report isolation", () => {
 
     const view = render(<DeveloperChecklist reportId="report-a" />);
     expect(
-      (await screen.findByLabelText(/investigation steps/i) as HTMLTextAreaElement)
+      (await screen.findByRole("textbox", { name: "Step 1" }) as HTMLInputElement)
         .value,
     ).toBe("Sensitive report A investigation");
 
@@ -92,7 +92,7 @@ describe("DeveloperChecklist report isolation", () => {
     });
 
     const view = render(<DeveloperChecklist reportId="report-a" />);
-    const editorA = await screen.findByLabelText(/investigation steps/i);
+    const editorA = await screen.findByRole("textbox", { name: "Step 1" });
     fireEvent.change(editorA, { target: { value: "A edited step" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => {
@@ -104,15 +104,15 @@ describe("DeveloperChecklist report isolation", () => {
     });
 
     view.rerender(<DeveloperChecklist reportId="report-b" />);
-    const editorB = await screen.findByLabelText(/investigation steps/i);
-    await waitFor(() => expect((editorB as HTMLTextAreaElement).value).toBe("B saved step"));
+    const editorB = await screen.findByRole("textbox", { name: "Step 1" });
+    await waitFor(() => expect((editorB as HTMLInputElement).value).toBe("B saved step"));
 
     await act(async () => {
       saveA.resolve(jsonResponse({ draftRevision: 4 }));
       await saveA.promise;
     });
     expect.soft(screen.queryByText("Private draft saved.")).toBeNull();
-    expect.soft((editorB as HTMLTextAreaElement).value).toBe("B saved step");
+    expect.soft((editorB as HTMLInputElement).value).toBe("B saved step");
 
     fireEvent.change(editorB, { target: { value: "B edited step" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
