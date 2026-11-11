@@ -52,8 +52,7 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Install PostgreSQL tools and JDBC driver
         run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql postgresql-client libpostgresql-jdbc-java libjackson2-databind-java
+          bash workflow/ci-install-apt.sh postgresql postgresql-client libpostgresql-jdbc-java libjackson2-databind-java
           echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
       - name: Verify shared report migration
         if: matrix.java == '17'
@@ -92,8 +91,7 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Install disposable PostgreSQL prerequisites
         run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql postgresql-client
+          bash workflow/ci-install-apt.sh postgresql postgresql-client
           echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
       - name: Verify isolated auth setup
         run: python3 workflow/verify.py --group backend
@@ -113,8 +111,7 @@ jobs:
           python-version: '3.12'
       - name: Install the PostgreSQL JDBC driver
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libpostgresql-jdbc-java
+          bash workflow/ci-install-apt.sh libpostgresql-jdbc-java
       - name: Reporter migration and black-box API tests with disposable PostgreSQL
         env:
           POSTGRES_JDBC_JAR: /usr/share/java/postgresql.jar
