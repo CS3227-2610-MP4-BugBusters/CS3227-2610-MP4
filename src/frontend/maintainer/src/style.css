@@ -1,3 +1,5 @@
+@import "../../shared/role-workspace.css";
+
 :root {
   font-family:
     Inter,
@@ -179,19 +181,6 @@ dd {
   background: #fff0ed;
   padding: 14px;
   border-radius: 6px;
-}
-.auth-panel {
-  max-width: 440px;
-  display: grid;
-  gap: 12px;
-  background: white;
-  border: 1px solid #dce5e7;
-  border-radius: 10px;
-  padding: 24px;
-}
-.auth-panel form {
-  display: grid;
-  gap: 16px;
 }
 .account-bar {
   display: flex;

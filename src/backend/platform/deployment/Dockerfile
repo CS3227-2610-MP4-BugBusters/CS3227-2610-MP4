@@ -3,6 +3,7 @@ WORKDIR /workspace/src/frontend/maintainer
 COPY src/frontend/maintainer/package.json src/frontend/maintainer/package-lock.json ./
 RUN npm ci
 COPY src/frontend/maintainer/ ./
+COPY src/frontend/shared/ ../shared/
 RUN npm run build
 
 FROM node:22-bookworm-slim AS developer-frontend
@@ -10,6 +11,7 @@ WORKDIR /workspace/src/frontend/developer
 COPY src/frontend/developer/package.json src/frontend/developer/package-lock.json ./
 RUN npm ci
 COPY src/frontend/developer/ ./
+COPY src/frontend/shared/ ../shared/
 RUN npm run build
 
 FROM node:22-bookworm-slim AS reporter-frontend

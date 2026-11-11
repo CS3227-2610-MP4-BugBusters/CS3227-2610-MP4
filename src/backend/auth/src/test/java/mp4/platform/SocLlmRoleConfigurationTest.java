@@ -56,4 +56,29 @@ class SocLlmRoleConfigurationTest {
             assertEquals(0, context.getBeansOfType(BudgetAndAdmission.class).size());
         });
     }
+
+    @Test void legacyDeveloperProviderIsNotRegisteredFromOldSoCSettings() {
+        contexts.withUserConfiguration(SuggestionProviderConfiguration.class)
+                .withPropertyValues(
+                        "SOCLAAS_BASE_URL=https://soc.example.invalid/v1",
+                        "SOCLAAS_API_KEY=legacy-placeholder")
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertEquals(0, context.getBeansOfType(SuggestionProvider.class).size(),
+                            "Developer suggestions must use the shared role gateway, not the legacy direct provider");
+                });
+    }
+
+    @Test void validDeveloperRoleKeyWiresOnlyTheSharedGatewaySuggestionProvider() {
+        contexts.withUserConfiguration(SocLlmRoleConfiguration.class, SuggestionProviderConfiguration.class)
+                .withPropertyValues("SOC_LLM_ENABLED=true", "SOC_LLM_API_KEY_DEVELOPER=developer-placeholder",
+                        "SOC_LLM_MODEL=test-model", "SOC_LLM_RPM=3", "SOC_LLM_TPM=2048")
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertInstanceOf(SocLlmSuggestionProvider.class, context.getBean(SuggestionProvider.class));
+                    @SuppressWarnings("unchecked") Map<SocLlmContracts.Role, SocLlmRoleService> services =
+                            (Map<SocLlmContracts.Role, SocLlmRoleService>) context.getBean("socLlmRoleServices");
+                    assertEquals(java.util.Set.of(SocLlmContracts.Role.DEVELOPER), services.keySet());
+                });
+    }
 }

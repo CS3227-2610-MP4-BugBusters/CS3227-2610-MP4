@@ -12,7 +12,7 @@ Mutable report operations must use `UPDATE reports ... WHERE id = ? AND version 
 
 ## Migration lifecycle
 
-A numbered SQL file applies once to a fresh disposable PostgreSQL database before `create_investigation_checklists.sql`. No `CREATE TABLE IF NOT EXISTS` or silent upgrade of an existing table: a runner must track applied versions and fail on an incompatible existing schema. No migration framework currently exists; document manual `psql -v ON_ERROR_STOP=1` use, and add migration tracking when the shared application's framework is selected. Never run test fixtures against a shared or production database.
+A numbered SQL migration applies reports before investigation checklists. The application uses the existing Flyway dependency to track shared migrations in a separate history table and runs them on startup. A fresh database receives both tables; subsequent startups preserve the schema and data. An untracked existing report or checklist table is not silently baselined or overwritten: startup fails until an explicit upgrade path is designed. Do not use `CREATE TABLE IF NOT EXISTS`. Never run test fixtures against a shared or production database. Identity and proposal foreign keys remain a separate integration requirement.
 
 ## Verification
 

@@ -21,7 +21,8 @@ The runner also checks the standard PostgreSQL 17 Windows install path. On Linux
 the tools must be on `PATH` or configured explicitly.
 
 The runner creates a private loopback-only cluster and database in a fresh system
-temporary directory, applies the existing migrations, invokes `gradlew --no-daemon check`,
+temporary directory, applies the shared migrations through Flyway in the setup control,
+invokes `gradlew --no-daemon check`,
 then stops and removes only its own cluster and scratch directory. It never uses
 an externally configured database. The generated database password is passed via
 environment, not command arguments, and is not printed. Missing tools fail the

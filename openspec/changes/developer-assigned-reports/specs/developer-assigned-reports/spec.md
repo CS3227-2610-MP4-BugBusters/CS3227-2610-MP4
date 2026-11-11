@@ -40,3 +40,13 @@ The system SHALL order results by report ID ascending and paginate the authorize
 - **GIVEN** the filtered total is nonzero
 - **WHEN** the Developer requests a page beyond the last page
 - **THEN** the items are empty and the total remains nonzero
+
+### Requirement: DR-04 Identity-scoped dashboard state
+
+The dashboard SHALL clear a Developer's search, filters, pagination and report selection when access ends or another Developer signs in. It SHALL NOT replay the previous Developer's query under the new session.
+
+#### Scenario: Sign out and sign in as another Developer
+- **GIVEN** Developer D1 has entered or submitted a report search, selected a status or navigated to another page
+- **WHEN** D1 signs out and Developer D2 signs in in the same application instance
+- **THEN** the search input, filters, page and selected report are cleared
+- **AND** the application requests D2's reports without D1's previous query parameters

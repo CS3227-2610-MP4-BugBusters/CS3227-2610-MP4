@@ -89,6 +89,9 @@ public final class MaintainerService {
             if (reassignment) requireReason(change.reason());
             ReportCore changed = next(report, Status.ASSIGNED, report.priority(), change.developerId(), report.currentProposalId());
             tx.updateReport(changed);
+            if (reassignment && report.assigneeId() != null)
+                tx.createDeveloperNotification(report.assigneeId(), reportId, NotificationType.UNASSIGNED, changed.version());
+            tx.createDeveloperNotification(change.developerId(), reportId, NotificationType.ASSIGNED, changed.version());
             String eventText = initialAssignment
                     ? "Assigned to " + tx.person(change.developerId()).displayName()
                     : "Reassigned to " + tx.person(change.developerId()).displayName() + ": " + cleanText(change.reason());
@@ -105,6 +108,8 @@ public final class MaintainerService {
             tx.updateProposal(reportId, withProposalStatus(proposal, ProposalStatus.SUPERSEDED));
             ReportCore changed = next(report, Status.IN_PROGRESS, report.priority(), report.assigneeId(), null);
             tx.updateReport(changed);
+            tx.createDeveloperNotification(report.assigneeId(), reportId, NotificationType.RESOLUTION_RETURNED,
+                    changed.version());
             history(tx, reportId, "resolution_returned", "Resolution returned: " + cleanText(change.reason()), actor);
             return tx.projectSummary(changed);
         });
@@ -130,6 +135,8 @@ public final class MaintainerService {
             requireStatus(report, Status.CLOSED);
             ReportCore changed = next(report, Status.SUBMITTED, report.priority(), null, null);
             tx.updateReport(changed);
+            if (report.assigneeId() != null)
+                tx.createDeveloperNotification(report.assigneeId(), reportId, NotificationType.REOPENED, changed.version());
             history(tx, reportId, "report_reopened", "Report reopened: " + cleanText(change.reason()), actor);
             return tx.projectSummary(changed);
         });

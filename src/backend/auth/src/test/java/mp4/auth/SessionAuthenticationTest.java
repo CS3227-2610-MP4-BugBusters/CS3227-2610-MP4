@@ -94,10 +94,16 @@ class SessionAuthenticationTest {
             "MP4_AUTH_DB_USER", Objects.requireNonNull(System.getenv("MP4_AUTH_TEST_DB_USER")),
             "MP4_AUTH_DB_PASSWORD", Objects.requireNonNull(System.getenv("MP4_AUTH_TEST_DB_PASSWORD"))));
         ProvisioningDatabase.initialize(db);
+        resetLoginAttemptFixtures();
         app = new Server();
     }
     @AfterAll static void shutdown() { if (app != null) app.close(); }
     static Connection connection() throws SQLException { return DriverManager.getConnection(db.url(), db.user(), db.password()); }
+    static void resetLoginAttemptFixtures() throws SQLException {
+        try (var connection = connection(); var statement = connection.createStatement()) {
+            statement.executeUpdate("DELETE FROM public.mp4_auth_login_attempt");
+        }
+    }
     static Account account(String role) throws Exception {
         Account a = new Account(UUID.randomUUID(), "test-" + UUID.randomUUID(), UUID.randomUUID().toString(), role);
         try (var connection = connection(); var statement = connection.prepareStatement(

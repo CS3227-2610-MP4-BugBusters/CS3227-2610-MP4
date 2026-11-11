@@ -36,6 +36,7 @@ public final class MaintainerContracts {
     public enum Priority { LOW, MEDIUM, HIGH, CRITICAL }
     /** Stored proposal lifecycle labels used by the Developer proposal adapter. */
     public enum ProposalStatus { PENDING, SUPERSEDED, CLOSED }
+    public enum NotificationType { ASSIGNED, UNASSIGNED, RESOLUTION_RETURNED, REOPENED }
 
     /** Trusted server-side identity. No session token or credential is carried in this contract. */
     public record Actor(UUID accountId, Role role, boolean active, long generation) {
@@ -195,6 +196,8 @@ public final class MaintainerContracts {
         /** Persists the shared report row; caller appends any matching history/child edits in this unit. */
         void updateReport(ReportCore report);
         void appendHistory(UUID reportId, HistoryEvent event);
+        default void createDeveloperNotification(UUID recipientId, UUID reportId, NotificationType type,
+                                                  long reportVersion) { }
         void insertComment(UUID reportId, Comment comment);
         void updateProposal(UUID reportId, Proposal proposal);
     }
