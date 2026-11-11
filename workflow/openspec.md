@@ -27,9 +27,10 @@ Start with `openspec-propose` to prepare artifacts, or `openspec-update-change` 
 revise an existing proposal. Use `openspec-apply-change` only after reviewing the
 artifacts and satisfying the project gates in [tdd.md](tdd.md).
 
-OpenSpec does not replace the named specialist roles in `.codex/agents/`: test
-designer, fresh baseline verifier, feature-owner approval, implementer, fresh
-candidate verifier, and a separate security reviewer for authorization/AI changes.
+OpenSpec does not replace verification. Choose the appropriate path in
+[workflow selection](workflow-selection.md). The full path uses the named
+specialist roles and independent security review for authorization/AI changes;
+the lightweight path uses proportionate checks as described in `tdd.md`.
 Never mark a task complete merely because its artifact files exist.
 
 For the Maintainer frontend, run `npm run verify` from `src/frontend/maintainer`.

@@ -13,21 +13,22 @@
 
 ## Behavior changes
 
-- Follow the [TDD workflow](workflow/tdd.md). Before starting Red, confirm
-  that the contract, fixtures, and runner needed for the selected test are
-  available.
-- Use the named roles in `.codex/agents/`. Spawn `test_designer` and then
+- Select a proportionate path using [workflow selection](workflow/workflow-selection.md)
+  and follow the applicable [TDD workflow](workflow/tdd.md). Before starting
+  Red, confirm that the contract, fixtures, and runner are available.
+- For the full path, use the named roles in `.codex/agents/`. Spawn `test_designer` and then
   a fresh `baseline_verifier`. After the verifier confirms Red, summarize
-  its verdict and any open decisions, then ask the feature owner whether
-  to proceed with implementation. The verifier checks the tests and
-  evidence. Treat a clear go-ahead as approval to use that baseline.
+  its verdict and resolve any open decisions. Proceed when implementation has
+  already been authorized and the baseline matches the agreed behavior; otherwise
+  obtain the feature owner's approval. The verifier checks tests and evidence.
   After implementation, spawn a
   fresh `candidate_verifier`. Authorization and AI security changes also
   require a separate `security_reviewer`.
 - Give specialists the task ID, relevant paths, starting revision, allowed
   edits, and expected evidence. Specialists work within that scope, return
   their findings, and do not dispatch other agents.
-- If delegation is unavailable, report it before editing application code.
+- If delegation required by the selected path is unavailable, report it before
+  editing application code; do not claim the independent review was completed.
 
 ## Verification
 
@@ -40,7 +41,13 @@
   `src/backend/developer/README.md` when the backend is present.
 - Start evidence logs with a plain-language summary of the goal, changes,
   checks and results, review findings and fixes, and remaining limitations.
-  Put commands, revisions, hashes, and agent details afterward for reviewers.
+  Follow it with the detailed reflection format in the TDD workflow, including
+  agent coordination, context supplied, review findings and fixes, test scope,
+  resource measurements and limitations. Put commands, revisions and hashes
+  after the summary. Do not invent missing details or measurements.
 - Record the checks run, the revision tested, and any blocked checks using
   the evidence format in the TDD workflow. Mark an OpenSpec task complete
   only when its stated checks have passed.
+- For future agent runs, record the process and available usage measurements
+  as specified in `workflow/tdd.md`. Keep handoffs focused and refer to
+  sanitized trace locations instead of copying full transcripts into prompts.

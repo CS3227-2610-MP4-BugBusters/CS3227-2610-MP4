@@ -1,5 +1,9 @@
 # Repository verification
 
+Select the appropriate development process in [workflow selection](workflow-selection.md).
+Use the [integration and release checklist](integration-release-checklist.md)
+to record shared-app and deployment evidence before release.
+
 Run the standard checks from the repository root with:
 
 ```sh
