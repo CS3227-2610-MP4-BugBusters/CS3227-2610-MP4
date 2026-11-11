@@ -28,6 +28,7 @@ public final class SocLlmRoleService implements SocLlmContracts.RoleGateway, Aut
     private final Role role;
     private final RoleAdmission admissions;
     private final ProviderCall provider;
+    private final SocLlmTaskPolicies policies;
     private final ThreadPoolExecutor workers;
 
     public SocLlmRoleService(Role role, String apiKey, String model, RoleAdmission admissions, Clock clock) {
@@ -41,9 +42,14 @@ public final class SocLlmRoleService implements SocLlmContracts.RoleGateway, Aut
     }
 
     SocLlmRoleService(Role role, RoleAdmission admissions, ProviderCall provider) {
+        this(role, admissions, provider, SocLlmTaskPolicies.defaults());
+    }
+
+    SocLlmRoleService(Role role, RoleAdmission admissions, ProviderCall provider, SocLlmTaskPolicies policies) {
         this.role = Objects.requireNonNull(role);
         this.admissions = Objects.requireNonNull(admissions);
         this.provider = Objects.requireNonNull(provider);
+        this.policies = Objects.requireNonNull(policies);
         workers = new ThreadPoolExecutor(2, 2, 0, TimeUnit.SECONDS, new ArrayBlockingQueue<>(8), action -> {
             Thread thread = new Thread(action, "mp4-socllm-" + role.name().toLowerCase());
             thread.setDaemon(true);
@@ -103,11 +109,15 @@ public final class SocLlmRoleService implements SocLlmContracts.RoleGateway, Aut
     private void validate(Role actorRole, UUID actorId, Task task, String instructions, String input,
             int outputTokens, Duration deadline) {
         if (actorRole != role || actorId == null || task == null || task.role() != role
-                || instructions == null || instructions.isBlank() || input == null || input.isBlank()
-                || input.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 24_576
-                || instructions.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 8_192
-                || outputTokens < 1 || outputTokens > 2_048 || deadline == null || deadline.isNegative()
-                || deadline.isZero() || deadline.compareTo(Duration.ofSeconds(30)) > 0) {
+                || instructions == null || instructions.isBlank() || input == null || input.isBlank()) {
+            throw new SummaryFailure(FailureCode.AI_UNAVAILABLE);
+        }
+        // Limits come from the server-owned policy of this call's own task, never from the caller.
+        SocLlmTaskPolicy policy = policies.forTask(task);
+        if (input.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > policy.maxInputBytes()
+                || instructions.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > policy.maxInstructionBytes()
+                || outputTokens < 1 || outputTokens > policy.maxOutputTokens() || deadline == null
+                || deadline.isNegative() || deadline.isZero() || deadline.compareTo(policy.maxDeadline()) > 0) {
             throw new SummaryFailure(FailureCode.AI_UNAVAILABLE);
         }
     }

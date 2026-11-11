@@ -12,14 +12,16 @@ import mp4.maintainer.workflow.MaintainerContracts.Role;
 
 /** Adapts the existing authenticated Maintainer summary port to the shared admission store. */
 public final class MaintainerAdmissionAdapter implements BudgetAndAdmission {
-    private static final int MAX_INSTRUCTION_BYTES = 8_192;
-    private static final int MAX_REPORT_BYTES = 24_576;
-    private static final int MAX_OUTPUT_TOKENS = 2_048;
-
     private final SocLlmContracts.RoleAdmission admissions;
+    private final SocLlmTaskPolicies policies;
 
     public MaintainerAdmissionAdapter(SocLlmContracts.RoleAdmission admissions) {
+        this(admissions, SocLlmTaskPolicies.defaults());
+    }
+
+    public MaintainerAdmissionAdapter(SocLlmContracts.RoleAdmission admissions, SocLlmTaskPolicies policies) {
         this.admissions = Objects.requireNonNull(admissions);
+        this.policies = Objects.requireNonNull(policies);
     }
 
     @Override
@@ -29,8 +31,8 @@ public final class MaintainerAdmissionAdapter implements BudgetAndAdmission {
             throw new SummaryFailure(FailureCode.AI_UNAVAILABLE);
         }
         // The summary port does not expose serialized input at admission time. Reserve its maximum
-        // instruction, report-data and output bounds so the configured TPM budget fails closed.
-        int reservation = MAX_INSTRUCTION_BYTES + MAX_REPORT_BYTES + MAX_OUTPUT_TOKENS;
+        // instruction, report-data and output bounds from its task policy so the TPM budget fails closed.
+        int reservation = policies.forTask(SocLlmContracts.Task.MAINTAINER_QUEUE_SUMMARY).maxReservation();
         return admissions.acquire(SocLlmContracts.Role.MAINTAINER, actor.accountId(),
                 SocLlmContracts.Task.MAINTAINER_QUEUE_SUMMARY, reservation, lease);
     }
