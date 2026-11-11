@@ -12,6 +12,7 @@ import mp4.maintainer.summary.SummaryContracts.SummaryGateway;
 import mp4.socllm.MaintainerAdmissionAdapter;
 import mp4.socllm.SocLlmContracts;
 import mp4.socllm.SocLlmHttpProvider;
+import mp4.socllm.SocLlmTaskPolicies;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Condition;
 import org.springframework.context.annotation.ConditionContext;
@@ -39,6 +40,8 @@ class SocLlmConfiguration {
                 "SoCLaaS", environment.getRequiredProperty("SOC_LLM_MODEL"), "fixed-endpoint-v1");
         SocLlmHttpProvider provider = new SocLlmHttpProvider(
                 environment.getRequiredProperty("SOC_LLM_API_KEY_MAINTAINER"), identity.model(), clock);
+        int maxReportBytes = SocLlmTaskPolicies.defaults()
+                .forTask(SocLlmContracts.Task.MAINTAINER_QUEUE_SUMMARY).maxInputBytes();
 
         return new SummaryGateway() {
             @Override public ModelIdentity modelIdentity() { return identity; }
@@ -49,7 +52,7 @@ class SocLlmConfiguration {
                 mp4.socllm.SocLlmTransactionBoundary.requireNoCallerTransaction();
                 String reports = request.reports().value();
                 int reportBytes = reports.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
-                if (reportBytes > 24_576) throw new SummaryFailure(FailureCode.AI_INVALID_OUTPUT);
+                if (reportBytes > maxReportBytes) throw new SummaryFailure(FailureCode.AI_INVALID_OUTPUT);
                 String response = provider.generate(request.instructions().value(), reports,
                         request.outputTokenLimit(), request.deadline());
                 return new GatewayResponse(response, identity, ProviderMode.LIVE);

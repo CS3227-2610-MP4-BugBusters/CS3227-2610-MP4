@@ -1,0 +1,18 @@
+{
+  "idleCompaction": false,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/workflow/packet.py\" check",
+            "timeout": 20,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ]
+  }
+}

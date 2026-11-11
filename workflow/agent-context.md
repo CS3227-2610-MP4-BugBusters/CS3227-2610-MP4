@@ -44,6 +44,28 @@ OUT OF SCOPE:  <explicit exclusions>
 The packet should be self-contained. Quote the relevant requirement text
 rather than describing it from memory.
 
+Build packets with `python workflow/packet.py make`. A `PreToolUse` hook in
+`.claude/settings.json` denies Agent calls to these roles when a field is
+missing, when an independent packet carries designer or implementer claims, or
+when the verifier method or report budget is absent. The hook does not cover
+messages sent to an agent that is already running.
+
+## Orchestrator session rules
+
+The orchestrator's own context was the largest cost in the Reporter session, and
+the packet format was lost at an idle compaction
+([evidence](../logs/experiments/2026-11-11-context-discipline.md)).
+
+- Use a fresh orchestrator session for each OpenSpec task. Keep state in
+  `tasks.md` and the evidence log, not in the conversation.
+- Compact only at task boundaries. Idle compaction is off in project settings.
+  After any compaction, re-read this file before dispatching.
+- Verifiers write the full report to SCRATCH and return the verdict and findings
+  only. Open the file only on FAIL.
+- Launch independent roles together and handle their results in one turn.
+- Do not add defect-specific coaching questions to a verifier packet. The
+  coverage method in the template is the standard check.
+
 ## What each role receives
 
 | Role | Gets | Does not get |
