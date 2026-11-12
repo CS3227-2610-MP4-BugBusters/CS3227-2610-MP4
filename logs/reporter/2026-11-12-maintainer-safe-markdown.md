@@ -63,7 +63,15 @@ owner's existing implementation authorization; no product decision was open.
 - A cold development-worker load initially used the safe plaintext fallback;
   selecting the report again after loading rendered the Markdown. Kept the
   shared one-second parser budget unchanged.
-- Fresh candidate and security verdicts: pending at this checkpoint.
+- Fresh candidate verifier passed `e37f65d`: approved test hash matched;
+  independently ran `npm run verify` once, passing all 116 tests, typecheck and
+  build. Confirmed dependency order in CI and the image.
+- Separate security reviewer found no actionable integration issue on `e37f65d`.
+  Confirmed description-only rendering, existing access/session gates, bounded
+  worker use, DOM-free production worker and absence of demo fixture markers in
+  production assets. Did not independently repeat the browser or Docker checks.
+- Final documentation-only follow-up records those verdicts; application and
+  approved tests remain the reviewed candidate. See PR #20 for CI results.
 
 ## Resources and limits
 
@@ -75,7 +83,7 @@ unavailable. Did not infer savings. Reused the shared renderer rather than addin
 another parser. Kept the log to the task evidence and material findings.
 
 The local Docker engine was unavailable, so a local image build could not run.
-CI's packaged-image check remains the image-build evidence. Browser preview uses
+Use PR #20's packaged-image check for image-build evidence (pending at this record). Browser preview uses
 synthetic reports and identity, not a hosted application or new real-session test.
 Cross-role Reporter API parity task 6.1 and final team acceptance are not claimed
 by this Maintainer adoption record.
