@@ -4,6 +4,14 @@ BugBusters helps Reporters submit bugs, Developers investigate them, and Maintai
 
 For a local exercise, ask the operator for a running instance and active Reporter, Developer and Maintainer accounts. Use a disposable database and fictional reports. Do not enter passwords, personal information or real customer data into reports or AI requests. Operators can follow the [account setup](../src/backend/auth/README.md) and [local deployment instructions](../src/backend/platform/deployment/README.md). There are no default credentials in this guide.
 
+## Getting access
+
+A Maintainer creates accounts for Reporters, Developers and other Maintainers. Ask your team’s Maintainer for a username and temporary password, then sign in and change your password from the **Account** page. Each account has one role.
+
+**For reviewers:** Your team will privately provide a Maintainer account so you can create separate accounts for each role and test the complete workflow. Use fictional reports and sample data during testing.
+
+For a new installation, the operator privately provisions the first Maintainer using the [operator command](../src/backend/auth/README.md#operator-command). The Maintainer can then create accounts from the Account page. These instructions depend on the secure account-management changes being integrated.
+
 ## Sign in and sign out
 
 1. Open the address for your role: `/reporter/`, `/developer/`, or `/` for Maintainer.
