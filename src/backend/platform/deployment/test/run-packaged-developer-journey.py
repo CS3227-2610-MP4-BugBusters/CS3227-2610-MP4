@@ -227,7 +227,7 @@ def exercise_journey(origin, developer, other_developer, reporter, report_id, ps
     assert status == 200 and published == {"steps": steps}, published
 
 
-def main():
+def main(exercise=exercise_journey, success_message="Packaged Developer real-session HTTP journey passed (not a browser check)."):
     initdb, pg_ctl, createdb, psql_bin = (executable(name) for name in
                                           ("initdb", "pg_ctl", "createdb", "psql"))
     required = (
@@ -312,9 +312,8 @@ def main():
             f"('{report_id}',ARRAY[]::text[],0,ARRAY[]::text[]);"
         )
         psql(psql_bin, db_env, "mp4_developer_journey", fixture)
-        exercise_journey(origin, developer, other_developer, reporter, report_id,
-                         psql_bin, db_env)
-        print("Packaged Developer real-session HTTP journey passed (not a browser check).")
+        exercise(origin, developer, other_developer, reporter, report_id, psql_bin, db_env)
+        print(success_message)
     finally:
         if app is not None and app.poll() is None:
             app.terminate()
