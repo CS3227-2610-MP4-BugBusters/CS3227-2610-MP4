@@ -21,6 +21,11 @@ write transactions and maps account revocation to 401, including failures consum
 by existing handlers. Private checklist saves do not change report versions.
 
 Authentication uses fixed roles, hashed passwords, server-side sessions and CSRF.
+Added V103 and startup provisioning for the immutable public demo Maintainer.
+Account creation checks Maintainer identity in the write transaction; own-password
+changes verify the current password and update only the session actor, with an
+atomic credential/generation check. Kept the shared Account page under the auth
+module so all role frontends use the same form and endpoints.
 Use the authentication README for provisioning and local setup. Keep credentials
 out of source, command arguments and logs. Shared report migrations and auth
 migrations use separate histories; package canonical SQL sources rather than

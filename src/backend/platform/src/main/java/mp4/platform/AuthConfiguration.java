@@ -38,6 +38,7 @@ public class AuthConfiguration {
             @Override public void addViewControllers(ViewControllerRegistry registry) {
                 registry.addViewController("/developer/").setViewName("forward:/developer/index.html");
                 registry.addViewController("/reporter/").setViewName("forward:/reporter/index.html");
+                registry.addViewController("/account/").setViewName("forward:/account/index.html");
             }
         };
     }
@@ -49,11 +50,12 @@ public class AuthConfiguration {
         return ds;
     }
     @Bean Clock authClock() { return Clock.systemUTC(); }
-    @Bean InitializingBean authMigrations(DataSource ds) { return () -> {
+    @Bean InitializingBean authMigrations(DataSource ds, DelegatingPasswordEncoder encoder) { return () -> {
         Flyway.configure().dataSource(ds).defaultSchema("public").locations("classpath:db/auth").table("mp4_auth_schema_history").baselineOnMigrate(true).baselineVersion("99").load().migrate();
         mp4.maintainer.storage.SharedSchemaBootstrap.initialize(ds);
         Flyway.configure().dataSource(ds).schemas("mp4_socllm").defaultSchema("mp4_socllm").locations("classpath:db/socllm")
                 .table("mp4_socllm_schema_history").load().migrate();
+        DemoAccountBootstrap.seed(ds, encoder);
     }; }
     @Bean CookieSerializer sessionCookieSerializer(@Value("${mp4.auth.local:false}") boolean local,
             @Value("${server.address:127.0.0.1}") String bind) {
@@ -103,6 +105,8 @@ public class AuthConfiguration {
             .authorizeHttpRequests(r -> r.requestMatchers("/api/health", "/api/auth/**", "/", "/index.html", "/assets/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/developer", "/developer/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/reporter", "/reporter/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/account/", "/account/**").permitAll()
+                .requestMatchers("/api/account", "/api/account/**").authenticated()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reports/*/checklist/draft").hasRole("DEVELOPER")
                 .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/reports/*/checklist/draft").hasRole("DEVELOPER")
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/reports/*/checklist/share").hasRole("DEVELOPER")
