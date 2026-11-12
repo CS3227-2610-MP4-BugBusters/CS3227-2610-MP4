@@ -76,6 +76,7 @@ export function App() {
         </a>
         {user && (
           <nav className="app-nav" aria-label="Account">
+            <a className="app-nav-link" href="/account/">Account</a>
             <a className="app-nav-link" href={backHref} aria-current={route.name === "list" ? "page" : undefined}>
               Your reports
             </a>

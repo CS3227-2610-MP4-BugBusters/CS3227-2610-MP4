@@ -14,8 +14,11 @@ provisioned account, security test result or deployment is claimed.
 ## Goals / Non-Goals
 
 Deliver one real identity boundary for all roles and a narrow integration path.
-Keep account creation operator-only: no public signup, role editor, password-reset
-email, SSO or user-management dashboard in this increment. Do not take over the
+Provide Maintainer-only browser account creation alongside the operator command.
+Seed the fixed shared demo Maintainer on startup; protect its row from changes.
+Provide a shared Account page with current-password verification and generation
+revocation for ordinary accounts. Keep public signup, role editing, password-reset
+email and SSO out of scope. Do not take over the
 Developer-owned shared shell/database tooling or implement report lifecycle rules.
 
 ## Decisions
@@ -62,7 +65,8 @@ The team-operated command creates, disables or resets accounts, connecting throu
 environment-provided database configuration. Read the password from a console prompt
 or standard input; never accept it as a command argument or print it. Provision
 explicit UUIDs for synthetic fixtures; generate UUIDs for ordinary creation. Duplicate
-usernames fail unchanged. No default production accounts or startup password seeds.
+usernames fail unchanged. The public fixed demo Maintainer defined in AUTH-08 is the only startup seed;
+ordinary accounts have no default passwords.
 Use Spring Security delegating encoders with BCrypt cost 12 for new hashes. Provision
 passwords of 12-72 UTF-8 bytes, reject overlong values rather than truncate, never
 trim passwords. Login accepts 1-72 bytes and compares through the encoder; unknown

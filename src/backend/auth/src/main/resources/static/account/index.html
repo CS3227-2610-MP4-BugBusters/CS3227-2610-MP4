@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Account · Bug Tracker</title>
+<link rel="stylesheet" href="/account/style.css"><script src="/account/account.js" defer></script>
+</head>
+<body><main>
+<header><a id="back" href="/">← Back to reports</a><h1>Account</h1></header>
+<p id="status" role="status">Checking your session…</p>
+<section id="signed-out" hidden><h2>Sign in</h2><p>Open your role’s page to sign in.</p><nav><a href="/">Maintainer</a><a href="/developer/">Developer</a><a href="/reporter/">Reporter</a></nav></section>
+<div id="account" hidden>
+<section><h2>Your account</h2><p id="identity"></p></section>
+<section id="password-section" hidden><h2>Change password</h2><p>Use 12–72 UTF-8 bytes. Changing your password signs you out of all sessions.</p>
+<form id="password-form">
+<label>Current password<input name="currentPassword" type="password" autocomplete="current-password" required></label>
+<label>New password<input name="newPassword" type="password" autocomplete="new-password" required></label>
+<label>Confirm new password<input name="confirmation" type="password" autocomplete="new-password" required></label>
+<button type="submit">Change password</button></form></section>
+<section id="create-section" hidden><h2>Create account</h2><p>Give the person their username and initial password privately. They can change that password after signing in.</p>
+<form id="create-form">
+<label>Username<input name="username" autocomplete="off" maxlength="64" pattern="[A-Za-z0-9._-]+" required></label>
+<label>Display name<input name="displayName" autocomplete="off" maxlength="200" required></label>
+<label>Role<select name="role"><option value="REPORTER">Reporter</option><option value="DEVELOPER">Developer</option><option value="MAINTAINER">Maintainer</option></select></label>
+<label>Initial password<input name="password" type="password" autocomplete="new-password" required></label>
+<button type="submit">Create account</button></form></section>
+</div>
+</main></body></html>

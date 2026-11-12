@@ -51,3 +51,7 @@ Recorded candidate `61cb733` and independently verified results in
 against the auth-owned initializer; this does not claim canonical shared migration
 registration or teammate acceptance. Tasks 1.1, 4.1 and 4.2 remain open for their
 remaining DTO/handoff, shared integration/routing and human-review criteria.
+
+## 5. Browser account management
+
+- [x] 5.1 Seed and protect the shared demo Maintainer; add Maintainer-only browser creation and own-password changes for every non-demo role. Verify real HTTP role/CSRF checks, duplicate rejection, unchanged seed across restart, current-password verification and session revocation; check the shared Account page in a browser. Update only affected feature documentation.

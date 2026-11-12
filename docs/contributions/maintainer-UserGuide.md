@@ -5,11 +5,16 @@ application behavior; have not verified a live Render deployment.
 
 ## Accounts and access
 
-Sign in with an operator-provisioned account. There is no public registration or
-account-management webpage. An operator creates fixed Reporter, Developer or
-Maintainer accounts, resets passwords and disables accounts using the backend
-commands documented in the authentication README. Resetting a password or disabling
-an account invalidates its existing sessions. Sign out when finished.
+Added a fixed shared demo account: username `demo.maintainer`, password
+`demo-maintainer-2026`, display name `Demo Maintainer`. Kept that account's name
+and password unchanged so everyone can continue using it.
+
+Added an **Account** link to each role. Maintainers can create accounts there for
+all three roles and privately give each person their initial credentials. Ordinary
+accounts can change their own password by supplying their current password;
+this signs out all their sessions. There is no public signup or forgotten-password
+page. Retained operator commands for creating, resetting and disabling ordinary
+accounts. Each account keeps one fixed role.
 
 ## Maintainer workflow
 

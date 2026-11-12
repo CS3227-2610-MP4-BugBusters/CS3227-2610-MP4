@@ -1,4 +1,23 @@
-# Account provisioning
+# Accounts and provisioning
+
+Added `/account/`, linked from every role. A signed-in Maintainer can create
+Reporter, Developer and Maintainer accounts with a username, display name and
+initial password. Ordinary accounts can change their own password by supplying
+the current password and a new 12–72 UTF-8 byte password. A successful change
+invalidates all sessions; sign in again afterward.
+
+Seeded this fixed public demo account at application startup:
+
+- Username: `demo.maintainer`
+- Display name: `Demo Maintainer`
+- Password: `demo-maintainer-2026`
+
+Kept its name, password, role and active state immutable, including through the
+operator commands. Restarting never overwrites another account or resets ordinary
+passwords. The auth V103 migration adds the database protection. The operator
+command remains available for creating and recovering ordinary accounts.
+
+## Operator command
 
 `provisionAccount` is an operator-only create command. It reads password bytes from standard input through EOF and preserves every byte, including a final newline. Supply 12–72 valid UTF-8 bytes; values are never trimmed. The CLI arguments contain no password. The command accepts only `create --username VALUE --display-name VALUE --role REPORTER|DEVELOPER|MAINTAINER --password-stdin`, with optional `--id UUID` for fixtures.
 
@@ -16,7 +35,7 @@ raise SystemExit(result.returncode)
 '@ | python -
 ```
 
-The dedicated `mp4_auth_schema_history` table owns auth migrations V100–V102 and baselines a nonempty schema at 99. Account insertion is a separate transaction; success is printed only after commit. Existing rows are never replaced. Output is one JSON line: `ACCOUNT_CREATED` (exit 0), `VALIDATION_FAILED` (2), `ACCOUNT_EXISTS` (3), or `STORAGE_UNAVAILABLE` (4). Gradle may itself return its build-failure status for a nonzero Java process exit; the JSON code records the command result. Never put secrets in shell history, command arguments, URLs, logs or committed files.
+The dedicated `mp4_auth_schema_history` table owns auth migrations V100–V103 and baselines a nonempty schema at 99. Account insertion is a separate transaction; success is printed only after commit. Existing rows are never replaced. Output is one JSON line: `ACCOUNT_CREATED` (exit 0), `VALIDATION_FAILED` (2), `ACCOUNT_EXISTS` (3), or `STORAGE_UNAVAILABLE` (4). Gradle may itself return its build-failure status for a nonzero Java process exit; the JSON code records the command result. Never put secrets in shell history, command arguments, URLs, logs or committed files.
 
 
 ## Recovery operations
@@ -87,5 +106,7 @@ migration history. Budgets allow 10 attempts per normalized username and 100
 per client address in 15 minutes, with 24-hour retention cleanup. Authentication
 and protected access fail closed when account, session or limiter storage is
 unavailable. The real `/api/developer/reports` route passes the current session
-actor to the existing assigned-report handler and store; account signup, web
-password reset and role changes are not exposed.
+actor to the existing assigned-report handler and store; public signup and role changes are not exposed. Added `GET /api/account`,
+`POST /api/maintainer/accounts` and `POST /api/account/password`; writes use
+JSON, the current session and `X-CSRF-TOKEN`. Password changes accept only
+`currentPassword` and `newPassword`, never a target account ID.
