@@ -285,9 +285,13 @@ button.developer-checklist__primary:hover:not(:disabled) { border-color: #075d60
 .developer-report-detail__description {
   color: #52666b;
   margin: .65rem 0 .85rem;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.developer-report-detail__description > :first-child { margin-top: 0; }
+.developer-report-detail__description > :last-child { margin-bottom: 0; }
+.developer-report-detail__description pre { overflow-x: auto; }
+.developer-report-detail__description table { display: block; max-width: 100%; overflow-x: auto; }
 
 .developer-report-detail__status {
   display: inline-block;

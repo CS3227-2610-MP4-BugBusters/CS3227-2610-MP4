@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { DeveloperApp } from "./DeveloperApp";
 import { DeveloperNotifications } from "./DeveloperNotifications";
+import { inThreadRunner, MarkdownParserProvider } from "@mp4/markdown";
 
 vi.mock("./DeveloperChecklist", () => ({
   DeveloperChecklist: ({ reportId, onReportVersionChange }: { reportId: string; onReportVersionChange?: (previous: number, current: number) => void }) => (
@@ -364,6 +365,31 @@ describe("DeveloperApp authenticated report journey", () => {
     expect(fetchMock).toHaveBeenCalledWith(`${reportsPath}/${assignedReport.id}`, expect.objectContaining({
       credentials: "same-origin", cache: "no-store",
     }));
+  });
+
+  it("renders the Reporter description with shared Markdown and keeps the title plain text", async () => {
+    authenticated = true;
+    const report = { ...assignedReport, title: "**bold**" };
+    listResponse = jsonResponse({ items: [report], page: 1, pageSize: 20, totalItems: 1 });
+    detailResponse = jsonResponse({
+      ...report,
+      description: "- first item\n- second item\n\n| Name | Value |\n| --- | --- |\n| row | 1 |\n\n<b>x</b>\n\n![remote](https://attacker.example/image.png)",
+    });
+
+    render(
+      <MarkdownParserProvider runner={inThreadRunner}>
+        <DeveloperApp />
+      </MarkdownParserProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /\*\*bold\*\*/ }));
+
+    const detail = await screen.findByRole("region", { name: "Selected report" });
+    expect(within(detail).getByRole("heading", { level: 2, name: "**bold**" })).toBeTruthy();
+    expect(within(detail).getByText("first item")).toBeTruthy();
+    expect(within(detail).getByRole("table")).toBeTruthy();
+    expect(within(detail).getByText("<b>x</b>")).toBeTruthy();
+    expect(detail.querySelector("b, img, a")).toBeNull();
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("attacker.example"))).toBe(false);
   });
 
   it("shows the latest Maintainer return reason as plain text", async () => {

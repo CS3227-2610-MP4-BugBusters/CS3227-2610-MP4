@@ -98,7 +98,7 @@ can run in parallel in separate worktrees. Groups 4 and 5 depend on group 3.
 
 ## 5. Developer adoption (MDR-07)
 
-- [ ] 5.1 Add the `file:` dependency to `src/frontend/developer` and verify that `npm install` and `npm run verify` still pass.
+- [x] 5.1 Add the `file:` dependency to `src/frontend/developer` and verify that `npm install` and `npm run verify` still pass.
 - [ ] 5.2 **[sec]** Red/Green a read-only `ReportDescriptionPanel` (D9) rendering the description through `MarkdownView`, with the title as plain text. Verify with a vitest test asserting the same DOM as the Maintainer for the MDR-07 fixture, and `npm run verify` in `src/frontend/developer`.
 
 ## 6. Cross-role integration
