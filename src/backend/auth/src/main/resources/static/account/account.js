@@ -62,7 +62,6 @@ void request("/api/account").then((user) => {
   el("identity").textContent = `${user.displayName} · ${user.username} · ${user.role.toLowerCase()}`;
   el("back").href = routes[user.role] || "/";
   el("account").hidden = false;
-  el("locked").hidden = !user.demoLocked;
   el("password-section").hidden = user.demoLocked;
   el("create-section").hidden = user.role !== "MAINTAINER";
   status("");
