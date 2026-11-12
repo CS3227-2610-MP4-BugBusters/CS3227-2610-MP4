@@ -9,8 +9,9 @@ references rather than copied application code.
 Use `src/frontend/maintainer` for React controls and typed same-origin HTTP adapters.
 Use `src/backend/maintainer` for workflow rules, safe DTOs, JDBC repositories and
 bounded queue-summary processing. Spring controllers and shared identity integration
-live under `src/backend/platform`. The Maintainer backend README describes the
-summary gateway and durable admission ports the shared AI owner must supply.
+live under `src/backend/platform`. Connected the summary gateway and durable
+admission ports to `src/backend/socllm`; the backend README describes configuration.
+PR #12 supplied the shared gateway; PR #15 added per-task limits.
 
 Preserve the Developer checklist constructor and Save/Share contracts. The main
 application adds an in-transaction publication observer for history. Account
@@ -42,6 +43,38 @@ prevents self-review. Neither Render provisioning nor live deployment has been
 performed here; deploy hooks and host connectivity remain unverified. The Pages
 site is a separate team deliverable, not the application host. The repository uses
 `main`; reconcile any assignment reference to `master` with the final submission.
+
+## Current integration results
+
+Checked source `0b35be5` against disposable PostgreSQL and real role sessions on
+12 November. Exercised the cross-role API lifecycle and browser workflow; recorded
+the exact scope in [release checks](../../logs/maintainer/2026-11-12-release-checks.md).
+An independent verifier passed four cross-role tests and three migration tests.
+
+Used real SoC through `/api/maintainer/queue-summary`, with credentials and model
+settings supplied only to the local process. Tried `qwen3.6:35b` and `qwen3.5:9b`.
+Settings of six requests and 120,000 reserved token units per minute were local
+evaluation budgets, not confirmed provider quotas or production recommendations.
+Kept the 30-second deadline and three-starts-per-account/five-minute limit intact.
+Observed timeout/rate-limit failures and a grounding problem in a returned answer.
+Have not established reliable live quality, prompt-injection resistance, provider
+token accounting or deployment-host connectivity. Keep release generation disabled
+until its settings and acceptance checks pass. This check does not complete the
+planned repeated full-context-versus-selected-context experiment.
+
+Added `SOC_LLM_MODEL_MAINTAINER` after those initial trials. Evaluated
+alternative models independently of the shared model; a blank/absent override falls back
+to the existing required `SOC_LLM_MODEL`. This does not change the Developer or
+Reporter settings. Preserved the response schema and advanced the internal
+context/cache policy. Kept deadlines and shared limits intact. See the
+[focused repair evidence](../../logs/maintainer/2026-11-12-summary-live-repair.md).
+Did not select Llama for release: later trials exposed format and grounding failures.
+Gemma returned provider unavailability. Kept Qwen as the example model with revised
+context and instructions, including omission of the empty strings used by real
+database defaults rather than only null test values.
+The final local Qwen run returned all three tested cases within the unchanged
+deadline, reused unchanged results and correctly limited a fourth generation.
+Kept human review, actual provider quotas and deployment acceptance open.
 
 ## Acknowledgements
 

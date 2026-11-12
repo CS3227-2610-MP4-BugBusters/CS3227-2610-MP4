@@ -36,8 +36,14 @@ class SocLlmConfiguration {
 
     @Bean
     SummaryGateway maintainerSocLlmSummaryGateway(Environment environment, Clock clock) {
+        String maintainerModel = environment.getProperty("SOC_LLM_MODEL_MAINTAINER");
+        if (maintainerModel == null || maintainerModel.isBlank()) {
+            maintainerModel = environment.getRequiredProperty("SOC_LLM_MODEL");
+        } else {
+            maintainerModel = maintainerModel.trim();
+        }
         ModelIdentity identity = new ModelIdentity(
-                "SoCLaaS", environment.getRequiredProperty("SOC_LLM_MODEL"), "fixed-endpoint-v1");
+                "SoCLaaS", maintainerModel, "fixed-endpoint-v1");
         SocLlmHttpProvider provider = new SocLlmHttpProvider(
                 environment.getRequiredProperty("SOC_LLM_API_KEY_MAINTAINER"), identity.model(), clock);
         int maxReportBytes = SocLlmTaskPolicies.defaults()
