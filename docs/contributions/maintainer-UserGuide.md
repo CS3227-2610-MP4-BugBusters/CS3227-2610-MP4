@@ -21,8 +21,10 @@ if someone changes the report first, refresh and review before submitting again.
 
 Review the current resolution proposal before returning it for investigation or
 closing the report. Supply the requested reason when returning or reopening.
-Reopening retains the previous proposal in history. Discussion is plain text;
-report content is displayed as text rather than executable markup.
+Reopening retains the previous proposal in history. Added safe Markdown formatting
+for report descriptions, including lists, tables and code blocks. HTML appears
+literally; images are not loaded and links are not clickable. Kept titles, other
+report fields and discussion as plain text.
 
 ## Queue summary
 

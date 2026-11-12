@@ -16,6 +16,7 @@ import type { AuthActions } from "./auth-client";
 import { createRoleWorkspace } from "../../shared/RoleWorkspace";
 import { createRoleSignIn } from "../../shared/RoleSignIn";
 import { parseSummaryResult } from "./summary";
+import { MarkdownView } from "@mp4/markdown";
 type Load<T> = {
   state: "loading" | "ready" | "error";
   data?: T;
@@ -718,9 +719,14 @@ function Report({ detail: r, developers, queries, pending, error, runAction, cle
         <dd>{r.updatedAt}</dd>
       </dl>
       {(queries.updatePriority || queries.assignReport || queries.returnResolution || queries.closeReport || queries.reopenReport || queries.addComment) && <ActionControls r={r} developers={developers} queries={queries} pending={pending} error={error} runAction={runAction} clearError={clearError} refreshReport={refreshReport} />}
+      <section>
+        <h3>Description</h3>
+        <div className="markdown-view">
+          <MarkdownView source={r.description} />
+        </div>
+      </section>
       {(
         [
-          "description",
           "reproductionSteps",
           "expectedBehavior",
           "actualBehavior",
@@ -731,7 +737,6 @@ function Report({ detail: r, developers, queries, pending, error, runAction, cle
           <h3>
             {
               [
-                "Description",
                 "Reproduction steps",
                 "Expected behavior",
                 "Actual behavior",

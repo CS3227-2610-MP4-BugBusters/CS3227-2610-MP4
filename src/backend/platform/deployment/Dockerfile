@@ -1,4 +1,8 @@
 FROM node:22-bookworm-slim AS frontend
+WORKDIR /workspace/src/frontend/shared/markdown
+COPY src/frontend/shared/markdown/package.json src/frontend/shared/markdown/package-lock.json ./
+RUN npm ci
+COPY src/frontend/shared/markdown/ ./
 WORKDIR /workspace/src/frontend/maintainer
 COPY src/frontend/maintainer/package.json src/frontend/maintainer/package-lock.json ./
 RUN npm ci

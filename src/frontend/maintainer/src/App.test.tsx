@@ -10,6 +10,7 @@ import {
 import { App } from "./App";
 import { QueryError, type Page, type Queries, type Detail } from "./domain";
 import { createDemoQueries, fixtureId, reports } from "./demo";
+import { MarkdownParserProvider, inThreadRunner } from "@mp4/markdown";
 afterEach(cleanup);
 const setup = (overrides: Partial<Queries> = {}) => ({
   ...createDemoQueries(),
@@ -24,6 +25,37 @@ const deferred = <T,>() => {
   return { promise, resolve, reject };
 };
 describe("QR-01/04/05/07 feature states", () => {
+  it("formats only the description as safe Markdown", async () => {
+    const source =
+      "- first item\n- second item\n\n```js\nconst answer = 42;\n```\n\n| Name | Value |\n| --- | --- |\n| one | two |\n\n<img src=x onerror=alert(1)>\n\n![tracker](https://attacker.example/p.png)";
+    const fixture = structuredClone(reports);
+    fixture[0].title = "**bold**";
+    fixture[0].description = source;
+    fixture[0].reproductionSteps = "**steps**";
+    render(
+      <MarkdownParserProvider runner={inThreadRunner}>
+        <App queries={createDemoQueries(fixture, false)} />
+      </MarkdownParserProvider>,
+    );
+    await screen.findByText("63 matching reports");
+    fireEvent.click(screen.getByRole("button", { name: /^\*\*bold\*\*/ }));
+    await screen.findByRole("heading", { name: "Description" });
+
+    const description = screen.getByRole("heading", { name: "Description" })
+      .parentElement!;
+    expect(description.querySelectorAll("li")).toHaveLength(2);
+    expect(description.querySelector("pre code")?.textContent?.trimEnd()).toBe(
+      "const answer = 42;",
+    );
+    expect(description.querySelector("table")).toBeTruthy();
+    expect(description.textContent).toContain("<img src=x onerror=alert(1)>");
+    expect(description.querySelector("img")).toBeNull();
+    expect(description.textContent).toContain("tracker");
+    expect(description.querySelector("a")).toBeNull();
+
+    expect(screen.getByRole("heading", { name: "**bold**" })).toBeTruthy();
+    expect(screen.getByText("**steps**")).toBeTruthy();
+  });
   it("renders all read-only evidence as text and visibly labels the demo", async () => {
     render(<App queries={setup()} synthetic />);
     await screen.findByText("63 matching reports");

@@ -32,15 +32,15 @@ jobs:
           cache-dependency-path: src/frontend/${{ matrix.frontend }}/package-lock.json
       - name: Install dependencies
         working-directory: src/frontend/${{ matrix.frontend }}
-        if: matrix.frontend != 'developer'
+        if: matrix.frontend == 'shared/markdown'
         run: npm ci
       - name: Install shared Markdown dependency
-        if: matrix.frontend == 'developer'
+        if: matrix.frontend != 'shared/markdown'
         working-directory: src/frontend/shared/markdown
         run: npm ci
-      - name: Install Developer dependencies
-        if: matrix.frontend == 'developer'
-        working-directory: src/frontend/developer
+      - name: Install frontend dependencies
+        if: matrix.frontend != 'shared/markdown'
+        working-directory: src/frontend/${{ matrix.frontend }}
         run: npm ci
       - name: Typecheck, test and build
         run: python3 workflow/verify.py --group frontend --frontend ${{ matrix.frontend }}

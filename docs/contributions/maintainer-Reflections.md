@@ -73,3 +73,13 @@ and the malicious case was treated as an attempt rather than executed instructio
 Kept the output validator strict and rejected Llama as a release choice after its
 unsafe/malformed trial outputs; Gemma's service was unavailable. These are diagnostic examples, not a controlled
 model comparison or completed human scoring.
+
+Reused the Reporter-owned Markdown renderer for Maintainer descriptions after
+Developer adoption merged. A focused test first exposed the missing formatting;
+implementation then exposed an incorrect test expectation about a final newline
+in code blocks. Corrected and independently rechecked the test rather than changing
+the renderer to match a faulty assertion. Browser inspection also found that the
+new styles needed an explicit wrapper around the shared component. Kept the
+integration and dependency setup small; did not create a second Markdown parser.
+Recorded the checks and limits in
+[the integration evidence](../../logs/reporter/2026-11-12-maintainer-safe-markdown.md).
