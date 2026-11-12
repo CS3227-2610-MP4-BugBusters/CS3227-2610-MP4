@@ -2,15 +2,15 @@
 
 BugBusters helps Reporters submit bugs, Developers investigate them, and Maintainers assign and review work. Open the application address provided by your team. This guide describes the screens in checkout `26f80a2`; the application available to you may differ.
 
-For a local exercise, ask the operator for a running instance and active Reporter, Developer and Maintainer accounts. Use a disposable database and fictional reports. Do not enter passwords, personal information or real customer data into reports or AI requests. Operators can follow the [account setup](../src/backend/auth/README.md) and [local deployment instructions](../src/backend/platform/deployment/README.md). There are no default credentials in this guide.
+For a local exercise, ask the operator for a running instance and active Reporter, Developer and Maintainer accounts. Use a disposable database and fictional reports. Do not enter passwords, personal information or real customer data into reports or AI requests. Operators can follow the [account setup](../src/backend/auth/README.md) and [local deployment instructions](../src/backend/platform/deployment/README.md).
 
 ## Getting access
 
-A Maintainer creates accounts for Reporters, Developers and other Maintainers. Ask your team’s Maintainer for a username and temporary password, then sign in and change your password from the **Account** page. Each account has one role.
+A Maintainer creates accounts for Reporters, Developers and other Maintainers. Ask a Maintainer for your username and initial password. Each account has one role, and credentials should be shared privately.
 
-**For reviewers:** Your team will privately provide a Maintainer account so you can create separate accounts for each role and test the complete workflow. Use fictional reports and sample data during testing.
+**For reviewers:** In a deployment that includes the account-management feature, sign in with the demo Maintainer account provided by the team. Open **Account**, create separate accounts for the roles you want to try, and sign out before signing in as each role. Ordinary users can change their password from the **Account** page.
 
-For a new installation, the operator privately provisions the first Maintainer using the [operator command](../src/backend/auth/README.md#operator-command). The Maintainer can then create accounts from the Account page. These instructions depend on the secure account-management changes being integrated.
+The demo Maintainer uses a shared, published password. Anyone with that password can access the application as a Maintainer and create accounts. Use fictional reports and sample data, and do not put sensitive information in a deployment using this account. For a production deployment with real data, use privately provisioned credentials instead; the public demo account requires further changes before it can be considered secure for that use.
 
 ## Sign in and sign out
 
@@ -18,7 +18,7 @@ For a new installation, the operator privately provisions the first Maintainer u
 2. Enter the username and password supplied by your operator, then select **Sign in**.
 3. Select **Sign out** when finished or before switching roles. Separate browser profiles can be used to test roles at the same time.
 
-Each account has one role. If sign-in fails, check your details and role with the operator. There is no self-service registration or password reset. After repeated failed attempts, wait before retrying.
+Each account has one role. If sign-in fails, check your details and role with the operator. There is no public self-service registration or password reset; an account holder can change their password from the Account page where account management is available. After repeated failed attempts, wait before retrying.
 
 ## Reporter
 
