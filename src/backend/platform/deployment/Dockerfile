@@ -7,6 +7,10 @@ COPY src/frontend/shared/ ../shared/
 RUN npm run build
 
 FROM node:22-bookworm-slim AS developer-frontend
+WORKDIR /workspace/src/frontend/shared/markdown
+COPY src/frontend/shared/markdown/package.json src/frontend/shared/markdown/package-lock.json ./
+RUN npm ci
+COPY src/frontend/shared/markdown/ ./
 WORKDIR /workspace/src/frontend/developer
 COPY src/frontend/developer/package.json src/frontend/developer/package-lock.json ./
 RUN npm ci

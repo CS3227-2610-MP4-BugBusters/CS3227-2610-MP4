@@ -4,6 +4,7 @@ import { DeveloperPrivateNotes } from "./DeveloperPrivateNotes";
 import { DeveloperNotifications } from "./DeveloperNotifications";
 import { createRoleWorkspace } from "../../shared/RoleWorkspace";
 import { createRoleSignIn } from "../../shared/RoleSignIn";
+import { MarkdownView } from "@mp4/markdown";
 
 type User = {
   id: string;
@@ -530,7 +531,9 @@ export function DeveloperApp() {
               {detailState === "error" && <p role="alert">Unable to load report details.</p>}
               {detailState === "ready" && detail?.id === selectedReportId && (
                 <>
-                  <p className="developer-report-detail__description">{detail.description}</p>
+                  <div className="developer-report-detail__description">
+                    <MarkdownView source={detail.description} />
+                  </div>
                   <p className="developer-report-detail__status">Status: {formatStatus(detail.status)}</p>
                   {detail.returnReason && detail.status === "IN_PROGRESS" && (
                     <aside className="developer-return-reason" aria-label="Maintainer feedback">
