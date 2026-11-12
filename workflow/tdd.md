@@ -1,4 +1,12 @@
-# Test-driven development with subagents
+# Test-driven development and review
+
+First select the lightweight or full path in [workflow selection](workflow-selection.md).
+For the lightweight path, one agent may write the focused test, verify the
+expected failure where applicable, implement and run relevant checks. Review
+its own diff and record the evidence; do not claim independent verification.
+For documentation or presentation-only work, use proportionate inspection
+instead of creating a Red test. The remaining numbered gates describe the full
+path; they are not mandatory for the lightweight path.
 
 Use the approved OpenSpec change and relevant interface contracts as the source of expected behavior. The main agent coordinates the sequence. Each specialist receives the task ID, required paths, starting revision, and allowed edits.
 
@@ -16,9 +24,9 @@ Spawn a fresh `baseline_verifier` with the approved spec and contract, test and 
 
 The baseline verifier reports a verdict and evidence. It does not edit tests, logs, or application code. Send findings to the test designer for correction and repeat verification before requesting approval. An unreproduced or setup-blocked Red cannot pass this gate.
 
-## 3. Ask the feature owner whether to proceed
+## 3. Confirm authorization to proceed
 
-Summarize the agreed behavior, the verifier's verdict, and any remaining decisions in plain language. Ask, “The verifier confirmed Red for this behavior. Do you want me to proceed with implementation?” Link the evidence for reference. The independent verifier reviews the tests, fixtures, and hashes. The feature owner decides whether to proceed and resolves any open product decisions.
+Summarize the agreed behavior, verifier's verdict and any remaining decisions in plain language. The independent verifier reviews the tests, fixtures and hashes. The feature owner resolves open product decisions. If the owner has already authorized implementation and the verified baseline matches the agreed behavior, proceed; otherwise ask whether to proceed.
 
 Treat the feature owner's clear go-ahead as approval to implement against that verified baseline. Record the approved test commit or checksum, including any fixtures and runner settings that affect the verdict. Changes to the approved tests require a new baseline review and owner approval.
 
@@ -59,3 +67,14 @@ For subsequent logs, use the detailed structure demonstrated by
 Keep a short historical checkpoint short when no further evidence was captured;
 link related follow-up evidence and explicitly identify missing details rather
 than inventing agent actions, results or measurements.
+
+For future runs, record a concise timeline of dispatches, handoffs, commands,
+findings, fixes and rechecks, with agent roles, actual models and timestamps when
+available. Record context supplied and relevant files retrieved, and link to
+sanitized trace evidence where available. For each identifiable agent and the
+coordinator, record reported input, cached input, output, reasoning output and
+total tokens, plus elapsed time when available. Identify the measurement source
+and scope, and avoid double-counting cumulative updates or overlapping totals.
+Mark anything unavailable or unattributable; do not infer cost, quota usage or
+savings from token counts. Avoid copying full transcripts or sensitive data into
+the log or subsequent handoffs. Prefer a short summary and evidence references.
