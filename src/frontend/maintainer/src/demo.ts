@@ -39,7 +39,10 @@ export const reports: Detail[] = Array.from({ length: 63 }, (_, i) => {
     version: i,
     createdAt: stamp,
     updatedAt: stamp,
-    description: "The reported behavior needs investigation.",
+    description:
+      i === 3
+        ? "## Investigation example\n\n- Reproduced on desktop\n- Also seen on mobile\n\n```text\nGET /api/search?q=sample\nstatus: 504\nrequestFingerprint=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n```\n\n| Viewport | Browser and build details | Result |\n| --- | --- | --- |\n| Desktop | Chromium with a deliberately wide sample value for horizontal scrolling | Delayed response |\n| Mobile | Narrow viewport with a deliberately wide sample value for horizontal scrolling | Delayed response |\n\nSource supplied as literal text: <img src=x onerror=alert(1)>\n\n![tracking example](https://attacker.example/tracker.png)"
+        : "The reported behavior needs investigation.",
     reproductionSteps: "Open the page. Repeat the action.",
     expectedBehavior: "The operation completes.",
     actualBehavior: "The operation stalls.",

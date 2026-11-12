@@ -82,14 +82,27 @@ of server-side authorization.
 ### Requirement: MNT-READ-05 Safe and distinct display states
 
 The frontend SHALL distinguish access checking, list/detail loading, empty results,
-safe failure/retry and missing-detail states. Source content SHALL render as escaped
-text without interpreted HTML or Markdown. Filters and buttons SHALL have accessible
-names, and the layout SHALL support narrow mobile viewports without horizontal overflow.
+safe failure/retry and missing-detail states. The Reporter-authored `description`
+SHALL render through the shared `safe-markdown` renderer. Every other value,
+including the title and the remaining source fields, SHALL render as escaped text
+without interpreted HTML or Markdown. Filters and buttons SHALL have accessible names, and the layout SHALL
+support narrow mobile viewports without horizontal overflow.
 
 #### Scenario: Show source markup as text
 
-- **WHEN** a report contains markup-like source text
-- **THEN** the literal text is displayed without creating an injected element
+- **WHEN** a report's title, other source fields, notes, comments, checklist, responses, proposal or history contain markup-like or Markdown text
+- **THEN** the literal text is displayed without creating an injected element or formatting
+
+#### Scenario: Render Reporter Markdown safely
+
+- **WHEN** a report's description contains a list, a fenced code block, `<img src=x onerror=alert(1)>` and `![x](https://attacker.example/p.png)`
+- **THEN** the list and code block render formatted
+- **AND** no img element, event handler or request to the image URL exists, and the HTML markup appears as literal text
+
+#### Scenario: Wide Markdown content on a narrow viewport
+
+- **WHEN** a rendered table or code block is wider than a mobile viewport
+- **THEN** that block scrolls horizontally within itself and the page has no horizontal overflow
 
 ### Requirement: MNT-READ-06 Synthetic development boundary
 
@@ -166,7 +179,7 @@ Start with an identity check and show no protected content before an active Main
 
 Changing filters resets offset and selection, immediately clears stale rows/details and cancels previous requests. Page changes clear selection/details. Show matching total and page navigation without crossing bounds. Selecting a report clears the previous detail immediately. Sequence requests or associate them with an identity/filter/selection generation so obsolete responses cannot repopulate content, even if an adapter ignores cancellation. Retry only the current failed operation and retain current filters. Distinguish initial loading, list empty, list failure, detail loading, detail missing, detail failure and access/session denial.
 
-Render every source, author, comment, proposal and history value as escaped text. Use no raw HTML or interpreted Markdown; never construct navigation from untrusted generated links. Provide labelled filters, semantic buttons and headings, and readable status announcements. Show no editing or AI action controls in this increment.
+Render the Reporter-authored description through the shared safe-markdown renderer. Keep every other source, author, comment, proposal and history value as escaped text without interpreted Markdown. Never enable raw HTML, image loading or navigation from untrusted generated links. Provide labelled filters, semantic buttons and headings, and readable status announcements. Show no editing or AI action controls in this increment.
 
 ### Acceptance and verification
 
@@ -178,7 +191,7 @@ Render every source, author, comment, proposal and history value as escaped text
 | QR-04 | Initial inactive/wrong-role/unauthenticated identity prevents protected reads; protected 401/403 clears existing data and blocks late results; refresh rechecks identity. Trace MT-02/13. This verifies UI handling only. |
 | QR-05 | Loading, empty, network failure/retry, detail missing and safe errors remain distinct; no raw upstream body appears. Trace MT-03/13. |
 | QR-06 | Deferred responses delivered out of order after filter, selection, refresh and access changes cannot overwrite current state, including cancellation-ignoring adapters. Trace MT-13. |
-| QR-07 | Markup-like fixture content renders as text with no script, injected element or interpreted link execution; controls have accessible names. Trace Q1/MT-13. |
+| QR-07 | Description lists, tables and code render through shared safe-markdown; HTML and images remain inert, other fields stay literal, and wide blocks scroll internally on mobile. Controls have accessible names. Trace Q1/MT-13. |
 | QR-08 | Default startup selects HTTP; demo is visibly synthetic and gated to development; production has no automatic fake fallback. Build and adapter-wiring checks support the boundary. |
 
 The existing package verification command is `npm run verify`; record new execution results separately from this oracle. Use deterministic adapter and component tests for QR-01–08, including request construction, payload validation and deferred race tests. A browser smoke check verifies the rendered demo and responsive layout where available. Independent verification reports PASS/FAIL/PARTIAL by ID; backend authorization, PostgreSQL and real shared-service integration remain explicitly pending.

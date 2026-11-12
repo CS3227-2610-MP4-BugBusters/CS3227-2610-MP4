@@ -92,9 +92,14 @@ can run in parallel in separate worktrees. Groups 4 and 5 depend on group 3.
 
 ## 4. Maintainer adoption (MNT-READ-05 delta)
 
-- [ ] 4.1 Add the `file:` dependency to `src/frontend/maintainer` and verify that `npm install` and `npm run verify` still pass with no behavior change.
-- [ ] 4.2 **[sec]** Red/Green the modified MNT-READ-05: the `description` goes through `MarkdownView`, and the title, the other source fields, notes, comments, checklist, responses, proposal and history stay escaped. Verify with updated QR-07 tests in `App.test.tsx` (Markdown renders, `<img onerror>` and image URL inert, title `**bold**` literal) and the narrow-viewport overflow scenario. All existing QR-01..08 tests must still pass under `npm run verify`.
-- [ ] 4.3 Add Markdown and injection examples to the demo fixtures in `demo.ts` and verify them visually in `npm run demo` at mobile and desktop widths. Record screenshots or notes in `logs/reporter/`.
+- [x] 4.1 Add the `file:` dependency to `src/frontend/maintainer` and verify that `npm install` and `npm run verify` still pass with no behavior change.
+- [x] 4.2 **[sec]** Red/Green the modified MNT-READ-05: the `description` goes through `MarkdownView`, and the title, the other source fields, notes, comments, checklist, responses, proposal and history stay escaped. Verify with updated QR-07 tests in `App.test.tsx` (Markdown renders, `<img onerror>` and image URL inert, title `**bold**` literal) and the narrow-viewport overflow scenario. All existing QR-01..08 tests must still pass under `npm run verify`.
+- [x] 4.3 Add Markdown and injection examples to the demo fixtures in `demo.ts` and verify them visually in `npm run demo` at mobile and desktop widths. Record screenshots or notes in `logs/reporter/`.
+
+Recorded Maintainer adoption checks and review in
+`logs/reporter/2026-11-12-maintainer-safe-markdown.md`. Synced only the
+Maintainer display delta and its supporting QR-07 prose; left other role and
+cross-role completion decisions with their owners.
 
 ## 5. Developer adoption (MDR-07)
 

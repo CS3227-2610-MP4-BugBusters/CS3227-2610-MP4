@@ -26,6 +26,15 @@ out of source, command arguments and logs. Shared report migrations and auth
 migrations use separate histories; package canonical SQL sources rather than
 maintaining duplicate migration files.
 
+Reused `src/frontend/shared/markdown` for report descriptions only, matching the
+Developer frontend. Connected its worker through `MarkdownParserProvider` and
+the shared Vite plugin. Kept every other report field as escaped text. Install
+the shared package's dependencies before the Maintainer package (`npm ci` in
+`src/frontend/shared/markdown`, then in `src/frontend/maintainer`); CI and the
+deployment image follow that order. Tables and code blocks scroll within the
+description on narrow screens. See the [frontend README](../../src/frontend/maintainer/README.md)
+for startup and integration details.
+
 ## Verification and delivery
 
 Use `python workflow/verify.py` for the repository frontend/backend/security/tooling
