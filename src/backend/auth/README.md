@@ -52,6 +52,11 @@ shell assignment syntax: quote values containing shell-special characters and
 only source a file you trust. Avoid putting credentials in terminal commands or
 sharing the file.
 
+Optionally set `SOC_LLM_MODEL_DEVELOPER=llama3.1:8b` to use that model only for
+Developer suggestions. An absent or blank override falls back to `SOC_LLM_MODEL`;
+Reporter and Maintainer continue using the shared setting. Confirm model access
+and team policy before deployment.
+
 The Java application does not automatically load `.env`. On macOS or Linux,
 load it into the shell before starting the backend:
 

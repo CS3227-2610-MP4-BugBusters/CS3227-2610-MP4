@@ -42,6 +42,17 @@ class SocLlmRoleConfiguration {
         }
     }
 
+    static String modelForRole(Environment environment, SocLlmContracts.Role role) {
+        String sharedModel = environment.getRequiredProperty("SOC_LLM_MODEL");
+        if (role == SocLlmContracts.Role.DEVELOPER) {
+            String developerModel = environment.getProperty("SOC_LLM_MODEL_DEVELOPER");
+            if (SocLlmConfiguration.hasValue(developerModel)) {
+                return developerModel.trim();
+            }
+        }
+        return sharedModel;
+    }
+
     @Bean
     PostgresSocLlmAdmission socLlmAdmission(DataSource dataSource, Environment environment) {
         int requestsPerMinute = Integer.parseInt(environment.getRequiredProperty("SOC_LLM_RPM"));
@@ -75,7 +86,7 @@ class SocLlmRoleConfiguration {
             String key = environment.getProperty("SOC_LLM_API_KEY_" + role.name());
             if (SocLlmContracts.isValidApiKey(key)) {
                 services.put(role, new SocLlmRoleService(
-                        role, key, environment.getRequiredProperty("SOC_LLM_MODEL"), admission, clock));
+                        role, key, modelForRole(environment, role), admission, clock));
             }
         }
         return Collections.unmodifiableMap(services);

@@ -1,0 +1,7 @@
+# Merged main shared gateway recheck — 11 November 2026
+
+At merged main revision `0b35be5`, focused task-policy, role-service and Developer suggestion adapter Gradle tests passed. One authenticated synthetic Developer request through a fresh disposable local app/database and the configured live SoC provider returned HTTP 502 `AI_INVALID_OUTPUT` after 8.11 seconds. Login returned 200, and report status/version remained `IN_PROGRESS|0`. This is a failed availability/format result, not an injection or reliability evaluation.
+
+The test used the existing local integration-worktree key and model in process memory only; no credential was copied into this checkout or recorded. Temporary admission values were 1 request/minute and 10,000 reserved tokens/minute, not confirmed team/provider quotas. Temporary services and database were removed. The provider's raw response and actual token usage were not collected, so the precise rejection layer is not established. The owner had previously declined the experimental `reasoning_effort: none` change; it is absent from merged main. Browser Apply/Save/Share and the real team quota remain open.
+
+Checks: `./gradlew test --tests 'mp4.socllm.SocLlmTaskPolicyTest' --tests 'mp4.socllm.SocLlmRoleServiceTest' --tests 'mp4.platform.SocLlmSuggestionProviderTest' --no-daemon --console=plain` from `src/backend/auth`, passed. One synthetic live request is not a reliability measurement. Agent token measurements were not collected.
