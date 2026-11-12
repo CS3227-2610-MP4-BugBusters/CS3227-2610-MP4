@@ -53,6 +53,10 @@ An unavailable contract, fixture or runner is BLOCKED, not a passing Red.
 - [x] 5.4 Coordinate shared DEV-SEC-01 through DEV-SEC-04 and DEV-WF-01 through DEV-WF-04 with the workflow owner. Verify isolated canary/scope/bypass/test-preservation and failed-check/recheck evidence, distinguish enforced denials from voluntary refusals, and expose no canary value.
 - [x] 5.5 Contribute real coordination handoffs, defects, retries, context/model choices and available resource metrics. Verify isolated comparable starting states before claiming a single-agent versus multi-agent experiment; document incomplete measurements honestly.
 
+- [x] 5.6 Repair the live-summary context and Maintainer-only model configuration. Independently verify failing context/configuration tests before implementation; preserve the wire schema and other roles' model settings. Recheck the focused suite and security boundaries, then run two legitimate and bounded malicious-input cases through the real app without raising deadlines/limits. Record failures, model identity, grounding limitations and remaining human/provider acceptance separately.
+
+- [x] 5.7 Match real stored report context: independently reproduce blank/whitespace optional fields reaching the provider, then omit those placeholders without losing populated fields. Preserve the approved tests and repeat the two legitimate and malicious real-app checks with the final model/prompt; keep failed model trials and remaining human acceptance explicit.
+
 ## 6. Release verification (MNT-P6)
 
 - [x] 6.1 Run the full cross-role browser/API flow against real services with separate role sessions. Verify MT-25 state/history/denial controls and independently reviewed candidate checks; record revision and separate controlled AI from live trials.
@@ -91,3 +95,7 @@ The real AI trials returned timeouts, rate limiting and one answer with a ground
 problem; have not marked live AI acceptance complete. Task 6.3 retains final guide
 assembly/team review, Pages, deployed behavior and submission targeting. Updated
 all three Maintainer contributions without claiming those shared deliverables.
+
+Completed focused repairs 5.6/5.7 with unchanged approved tests, independent candidate/
+security checks and final real-app trials; see logs/maintainer/2026-11-12-summary-live-repair.md.
+Kept 5.1–5.3 open for provider/host, human scoring and the repeated context protocol.

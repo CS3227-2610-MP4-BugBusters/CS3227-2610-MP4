@@ -42,6 +42,24 @@ output shape, sizes and supplied report IDs, and render generated content as pla
 text. Generated links or instructions SHALL NOT gain execution or mutation authority.
 Invalid output SHALL NOT be presented as a valid summary.
 
+#### Scenario: Facts supplied in the description
+
+- **GIVEN** a Reporter supplies browser, reproduction or expected-behavior facts in
+  the description while the corresponding structured fields are absent
+- **WHEN** the summary context is prepared
+- **THEN** supplied description facts remain available and absent optional fields
+  are omitted rather than serialized as null or blank-string placeholders
+- **AND** trusted instructions require checking all supplied text before describing
+  information as missing, without interpreting embedded instructions as authority
+
+#### Scenario: Maintainer-only model selection
+
+- **GIVEN** a nonblank server setting `SOC_LLM_MODEL_MAINTAINER`
+- **WHEN** the configured Maintainer gateway is created
+- **THEN** its provider and model/cache identity use that model, without changing
+  Reporter or Developer model selection
+- **AND** absent or blank overrides retain the shared `SOC_LLM_MODEL` fallback
+
 #### Scenario: SEC-02 Invalid report reference
 
 - **WHEN** the provider cites a report absent from the included input set

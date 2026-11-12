@@ -62,6 +62,20 @@ token accounting or deployment-host connectivity. Keep release generation disabl
 until its settings and acceptance checks pass. This check does not complete the
 planned repeated full-context-versus-selected-context experiment.
 
+Added `SOC_LLM_MODEL_MAINTAINER` after those initial trials. Evaluated
+alternative models independently of the shared model; a blank/absent override falls back
+to the existing required `SOC_LLM_MODEL`. This does not change the Developer or
+Reporter settings. Preserved the response schema and advanced the internal
+context/cache policy. Kept deadlines and shared limits intact. See the
+[focused repair evidence](../../logs/maintainer/2026-11-12-summary-live-repair.md).
+Did not select Llama for release: later trials exposed format and grounding failures.
+Gemma returned provider unavailability. Kept Qwen as the example model with revised
+context and instructions, including omission of the empty strings used by real
+database defaults rather than only null test values.
+The final local Qwen run returned all three tested cases within the unchanged
+deadline, reused unchanged results and correctly limited a fourth generation.
+Kept human review, actual provider quotas and deployment acceptance open.
+
 ## Acknowledgements
 
 Used Spring Security/Spring Session, Gradle, PostgreSQL JDBC/Flyway, React and Vite

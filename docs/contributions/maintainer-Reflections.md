@@ -57,3 +57,19 @@ repeated context comparison or human scoring. Provider cost, actual quotas, depl
 connectivity and production rollback remain unverified. Recorded the detailed scope
 in [release checks](../../logs/maintainer/2026-11-12-release-checks.md).
 These contributions still need coordinated team review and final guide/site assembly.
+
+Followed the failed live trials with a focused repair cycle: independently verified
+the failing context/configuration tests, omitted null context placeholders, clarified
+cross-field evidence and concise overviews, and selected a separately configured
+Maintainer model using a teammate's measured example as a starting point. This
+demonstrates why live evaluation matters after deterministic safety checks. Recorded
+the actual follow-up and its limits in [repair results](../../logs/maintainer/2026-11-12-summary-live-repair.md);
+did not treat a different model as automatically correct or alter quotas to force a pass.
+The first regression fixture assumed nulls, while the real schema used empty
+strings. Added a storage-shaped failing test and a populated-field control, then
+independently verified the small omission fix. The final Qwen trials all returned
+valid summaries within 4.7–13.9 seconds; the description-only facts were recognized
+and the malicious case was treated as an attempt rather than executed instructions.
+Kept the output validator strict and rejected Llama as a release choice after its
+unsafe/malformed trial outputs; Gemma's service was unavailable. These are diagnostic examples, not a controlled
+model comparison or completed human scoring.

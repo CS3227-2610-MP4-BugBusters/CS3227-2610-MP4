@@ -36,9 +36,13 @@ require the server's Maintainer API key, selected model and application budgets;
 without that configuration, generation reports unavailability. Kept the explicit
 development preview separate from the real application.
 
-Tested real summaries locally on 12 November. Some requests timed out, and one
-returned answer incorrectly described information in the description as missing.
+Initial real-summary trials on 12 November timed out or incorrectly described
+information in the description as missing. Repaired the context/instructions and
+added a separately configured Maintainer model. The final Qwen trials returned
+valid summaries in 4.7–13.9 seconds and recognized the description-only facts.
+Recorded the small-sample follow-up in
+[the repair results](../../logs/maintainer/2026-11-12-summary-live-repair.md).
 Treat the summary as advice and check the original reports before acting. A timeout
 or rate-limit error leaves report actions available and changes no report state.
-Have not verified live AI prompt-injection resistance, provider quotas or Render.
+Have not established broad live AI prompt-injection resistance, provider quotas or Render.
 See the [release check results](../../logs/maintainer/2026-11-12-release-checks.md).
