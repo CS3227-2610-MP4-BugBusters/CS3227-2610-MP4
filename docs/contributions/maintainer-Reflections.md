@@ -14,8 +14,8 @@ Kept these checks focused on authorization and atomic data changes. Reduced repe
 full-suite runs during development and reserved them for integration checkpoints.
 
 Kept shared checklist interfaces compatible and added auth checks at the application
-boundary. The queue-summary pipeline uses real database snapshots but fails closed
-without the shared provider/admission adapters. Controlled providers verify context
+boundary. Connected real database snapshots to the shared SoC provider/admission
+adapters; generation fails closed when they are not configured. Controlled providers verify context
 and revocation behavior; they do not prove live model grounding, cost or latency.
 
 Independent review was temporarily unavailable because agent capacity/usage was
@@ -41,7 +41,19 @@ refusal of malicious instructions; did not establish OS-level denial or complete
 access telemetry. See [security results](../../logs/security/2026-11-09-development-agent-cases.md)
 and [workflow results](../../logs/agent-runs/2026-11-09-workflow-cases.md).
 
-Have not measured live SoC quality/cost, deployed connectivity or production rollback.
-Prepared the Maintainer context examples and scoring rubric for the shared live
-experiment. These contributions still need the Reporter owner's coordinated
-review and assembly into the final guide/site.
+Ran the two prepared Maintainer examples and a combined malicious-input case through
+the real local application on 12 November. With `qwen3.6:35b`, one legitimate request
+timed out, another returned a summary and reused it successfully, and the malicious
+case was rate-limited. With `qwen3.5:9b`, all three timed out. A returned answer
+incorrectly treated information present in a description as missing; the separate
+structured fields were empty. This is evidence that valid JSON and passing
+safety tests do not establish useful, grounded answers. These were sequential
+diagnostic trials, not a controlled model comparison; the first successful trial
+also included an additional browser-test report in its matching queue.
+
+Preserved domain state on each observed failure. Cannot claim prompt-injection
+resistance from a rate-limited or timed-out call, and have not completed the planned
+repeated context comparison or human scoring. Provider cost, actual quotas, deployed
+connectivity and production rollback remain unverified. Recorded the detailed scope
+in [release checks](../../logs/maintainer/2026-11-12-release-checks.md).
+These contributions still need coordinated team review and final guide/site assembly.

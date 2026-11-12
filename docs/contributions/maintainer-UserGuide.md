@@ -31,7 +31,14 @@ call. Generated findings include report references and context/coverage informat
 review the original reports before acting. Closed reports remain browsable, but
 summary generation for the Closed filter is disabled.
 
-The application currently has no live shared SoC/budget adapter. A nonempty summary
-request reports unavailability while ordinary report actions remain usable. The
-explicit development preview uses synthetic output; it does not establish live AI
-behavior. No summary automatically changes report state.
+Connected the shared SoC adapter and database-backed usage controls. Live summaries
+require the server's Maintainer API key, selected model and application budgets;
+without that configuration, generation reports unavailability. Kept the explicit
+development preview separate from the real application.
+
+Tested real summaries locally on 12 November. Some requests timed out, and one
+returned answer incorrectly described information in the description as missing.
+Treat the summary as advice and check the original reports before acting. A timeout
+or rate-limit error leaves report actions available and changes no report state.
+Have not verified live AI prompt-injection resistance, provider quotas or Render.
+See the [release check results](../../logs/maintainer/2026-11-12-release-checks.md).
