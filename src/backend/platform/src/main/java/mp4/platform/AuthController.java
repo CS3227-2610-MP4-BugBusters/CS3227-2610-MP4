@@ -231,7 +231,7 @@ final class AuthController {
         return new ChecklistDraftStore.Actor(user.id(), role, true);
     }
 
-    private boolean originAllowed(HttpServletRequest request) {
+    boolean originAllowed(HttpServletRequest request) {
         String origin = request.getHeader("Origin");
         if (origin == null) return true;
         if (!publicOrigin.isBlank() && publicOrigin.equals(origin)) return true;
