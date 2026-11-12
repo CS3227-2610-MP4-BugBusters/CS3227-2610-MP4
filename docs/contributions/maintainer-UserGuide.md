@@ -31,7 +31,18 @@ call. Generated findings include report references and context/coverage informat
 review the original reports before acting. Closed reports remain browsable, but
 summary generation for the Closed filter is disabled.
 
-The application currently has no live shared SoC/budget adapter. A nonempty summary
-request reports unavailability while ordinary report actions remain usable. The
-explicit development preview uses synthetic output; it does not establish live AI
-behavior. No summary automatically changes report state.
+Connected the shared SoC adapter and database-backed usage controls. Live summaries
+require the server's Maintainer API key, selected model and application budgets;
+without that configuration, generation reports unavailability. Kept the explicit
+development preview separate from the real application.
+
+Initial real-summary trials on 12 November timed out or incorrectly described
+information in the description as missing. Repaired the context/instructions and
+added a separately configured Maintainer model. The final Qwen trials returned
+valid summaries in 4.7–13.9 seconds and recognized the description-only facts.
+Recorded the small-sample follow-up in
+[the repair results](../../logs/maintainer/2026-11-12-summary-live-repair.md).
+Treat the summary as advice and check the original reports before acting. A timeout
+or rate-limit error leaves report actions available and changes no report state.
+Have not established broad live AI prompt-injection resistance, provider quotas or Render.
+See the [release check results](../../logs/maintainer/2026-11-12-release-checks.md).

@@ -163,6 +163,24 @@ budget. Report unavailable cache/reasoning-token measurements rather than guessi
 
 ## Risks / Trade-offs
 
+### Live-summary repair — 12 November
+
+Observed Qwen timeouts and a live answer treating empty structured fields as missing
+information despite facts in the description. Will omit null or blank optional context
+fields and clarify that all supplied text is evidence; null/absence alone is not a
+blocker. Keep description text untrusted and preserve all output/authorization bounds.
+Will request concise findings rather than exhaustive repeated missing-field lists.
+Advance the internal context/cache policy revision; preserve the existing
+MNT-SUMMARY-1 wire schema and frontend contract.
+
+Will add optional server-owned `SOC_LLM_MODEL_MAINTAINER` with blank/absent fallback
+to the required shared model, changing only the Maintainer configuration. This is
+independent of PR #16's Developer override. Will evaluate `llama3.1:8b` using the
+teammate's measured result as a starting point, not proof of Maintainer quality.
+Keep deadlines, shared budgets and start limits unchanged; a legitimate 429 remains
+an expected limit, not a failure to fix by bypassing admission. Use isolated actors
+and bounded live trials, preserve failed results, and require separate human review.
+
 - Draft-only data in report detail -> use the same shared-only checklist projection
   for direct and embedded responses; future tests must inspect absence, not only UI.
 - Long-lived AI work -> release DB transactions before calls and recheck all queue
