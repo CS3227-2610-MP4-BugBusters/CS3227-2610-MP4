@@ -8,9 +8,11 @@ For a local exercise, ask the operator for a running instance and active Reporte
 
 A Maintainer creates accounts for Reporters, Developers and other Maintainers. Ask a Maintainer for your username and initial password. Each account has one role, and credentials should be shared privately.
 
-**For reviewers:** In a deployment that includes the account-management feature, sign in with the demo Maintainer account provided by the team. Open **Account**, create separate accounts for the roles you want to try, and sign out before signing in as each role. Ordinary users can change their password from the **Account** page.
+**For public demo visitors:** In a deployment that includes the account-management feature, use the shared demo Maintainer account described in the [account setup documentation](../src/backend/auth/README.md) to try the application without contacting the team. Open **Account** and create separate Reporter, Developer and Maintainer accounts. Sign out and sign in with each account to try its role. Ordinary accounts can change their own password from the **Account** page.
 
-The demo Maintainer uses a shared, published password. Anyone with that password can access the application as a Maintainer and create accounts. Use fictional reports and sample data, and do not put sensitive information in a deployment using this account. For a production deployment with real data, use privately provisioned credentials instead; the public demo account requires further changes before it can be considered secure for that use.
+**Public demo limitation:** Anyone with the published demo credentials can sign in as a Maintainer, view or change demo data, and create accounts. Use only fictional, disposable data; do not enter personal, confidential or real customer information. Keep the demo database and secrets separate from environments containing real data.
+
+This shared account is an intentional convenience for an open demo. A production deployment for real users needs privately provisioned Maintainer credentials and the public demo account disabled. The current account-management implementation needs further changes to support that safely.
 
 ## Sign in and sign out
 
