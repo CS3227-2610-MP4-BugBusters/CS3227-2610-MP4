@@ -15,6 +15,20 @@ startup does not silently repair them or rewrite existing rows.
 
 ## Summary integration
 
+Added optional `SOC_LLM_MODEL_MAINTAINER` for this role's model. A blank or absent
+override retains the required shared `SOC_LLM_MODEL`; Reporter and Developer
+settings are unaffected. Evaluated `llama3.1:8b` for speed but found format and
+grounding failures; `gemma4:26b` was unavailable. The example selects `qwen3.6:35b`
+with the repaired context/prompt. Recorded results separately from configuration.
+Keep the shared model,
+keys, budgets and enable flag explicit; this override does not enable AI by itself.
+
+Prepared the summary context without null or blank optional-field placeholders. Preserved
+description facts and instructed the model to check all supplied text before
+claiming information is missing. Advanced the internal context/cache policy while
+retaining the existing `MNT-SUMMARY-1` response schema. These safeguards do not
+guarantee factual accuracy; summaries still require review.
+
 Connected `/api/maintainer/queue-summary` to real sessions and consistent queue
 snapshots. Check current account/session access before delivery and cache reuse.
 Read every member's version and assignment, but load source bodies only for the
