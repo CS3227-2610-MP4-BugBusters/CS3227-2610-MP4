@@ -52,9 +52,11 @@ export function createRoleSignIn<Element>(
   return createElement(
     "section",
     { className: "role-sign-in", "aria-label": "Sign in" },
-    createElement("p", { className: "role-sign-in__eyebrow" }, `${options.role.toUpperCase()} WORKSPACE`),
-    createElement("h2", null, "Sign in"),
-    createElement("p", { className: "role-sign-in__intro" }, options.description),
+    createElement("svg", { className: "role-sign-in__logo", viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
+      createElement("ellipse", { cx: "8", cy: "9", rx: "3.5", ry: "4.25" }),
+      createElement("path", { d: "M8 4.75V13.25M4.5 9H1.75M14.25 9H11.5M5 5.5L3 3.75M11 5.5l2-1.75M5 12.5l-2 1.5M11 12.5l2 1.5" }),
+    ),
+    createElement("h1", null, options.role === "Bug Tracker" ? "Sign in to Bug Tracker" : `Sign in to ${options.role.toLowerCase()} workspace`),
     options.notice ?? null,
     createElement(
       "form",

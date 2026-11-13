@@ -11,3 +11,7 @@ The focused account suite passed with a disposable PostgreSQL cluster; Developer
 - Implementer added the authenticated self-update endpoint and Account form. A fresh candidate verifier matched the test hash, passed the focused PostgreSQL suite and Developer `npm run verify`. The security reviewer passed the final code, Vite proxy smoke and a jsdom Account-page smoke; these do not substitute for a live browser test.
 - Commands: `python3 src/backend/auth/test/run_setup.py --tests mp4.auth.AccountManagementTest`; `npm run verify` in `src/frontend/developer`; `openspec validate add-shared-authentication --strict --no-interactive`; `node --check src/backend/auth/src/main/resources/static/account/account.js`; `git diff --check`.
 - One read-only `codex exec --json` review reported 211,283 input tokens, of which 175,616 were cached, and 983 output tokens, of which 224 were reasoning output. This measures that CLI review only; coordinator and subagent token counts, elapsed time and cost were unavailable. The local raw trace is `/tmp/mp4-account-name-review.jsonl`; inspect and sanitize before sharing. No controlled resource comparison was performed.
+
+## Main integration
+
+Merged `03b415b` after PR #25 landed. The Maintainer Vite conflict was resolved by retaining the Account proxy together with the Developer and Reporter workspace proxies. Developer verification passed 63 tests plus typecheck/build; Maintainer verification passed 121 tests plus typecheck/build after the merge. No live browser or deployed test was performed for the merged candidate.

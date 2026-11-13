@@ -17,3 +17,7 @@ Separate build systems must resolve shared files in development and production. 
 ## Shared sign-in presentation
 
 Use a shared presentation-only sign-in component with role-specific introductory copy. Developer and Maintainer keep their existing authentication, error, busy and session-refresh logic. The shared interface accepts controlled username and password, submit and change callbacks, busy state and optional status/error content. It never chooses a role, calls an API, redirects, or authorizes a user. Reporter may consume it once its own frontend exists. Keep the existing shared role workspace as the dashboard frame.
+
+## Shared root entry follow-up
+
+The user has requested a role-neutral sign-in at `/`. Use the existing server session identity to route active users to their role frontend. Preserve server-side role authorization, sign-out behavior, the Maintainer Markdown provider and direct role workspace access. Shared presentation remains independent of authentication decisions.

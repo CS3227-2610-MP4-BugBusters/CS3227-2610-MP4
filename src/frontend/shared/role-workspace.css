@@ -1,7 +1,7 @@
 :root {
-  color: #18343a;
-  background: #f3f6f6;
-  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  color: #1f2328;
+  background: #f6f8fa;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
   font-synthesis: none;
 }
 
@@ -20,7 +20,7 @@ body {
   display: grid;
   grid-template-columns: 15rem minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
-  background: #f3f6f6;
+  background: #f6f8fa;
 }
 
 .role-workspace--anonymous {
@@ -37,9 +37,9 @@ body {
   gap: 1.5rem;
   margin-bottom: 0;
   padding: 0.75rem 1.5rem;
-  color: #f5fbfa;
-  background: #123b40;
-  border-bottom: 1px solid #28545a;
+  color: #ffffff;
+  background: #1f2328;
+  border-bottom: 1px solid #3d444d;
 }
 
 .role-workspace__brand,
@@ -60,14 +60,14 @@ body {
 
 .role-workspace__role {
   padding: 0.25rem 0.6rem;
-  border: 1px solid #64878a;
+  border: 1px solid #6e7781;
   border-radius: 999px;
-  color: #d2e7e5;
+  color: #f0f3f6;
   font-size: 0.8rem;
 }
 
 .role-workspace__account {
-  color: #d9e8e7;
+  color: #f0f3f6;
   font-size: 0.9rem;
 }
 
@@ -80,14 +80,15 @@ body {
   gap: 0.35rem;
   margin: 0;
   padding: 1.25rem 0.75rem;
-  background: #17464b;
+  background: #f6f8fa;
+  border-right: 1px solid #d1d9e0;
 }
 
 .role-workspace__navigation-link {
   display: block;
   padding: 0.7rem 0.85rem;
   border-radius: 0.45rem;
-  color: #e2efee;
+  color: #1f2328;
   font-size: 0.95rem;
   font-weight: 600;
   text-decoration: none;
@@ -95,8 +96,12 @@ body {
 
 .role-workspace__navigation-link:hover,
 .role-workspace__navigation-link[aria-current="page"] {
-  color: #fff;
-  background: #27666a;
+  color: #1f2328;
+  background: #eaeef2;
+}
+
+.role-workspace__navigation-link[aria-current="page"] {
+  box-shadow: inset 3px 0 #0969da;
 }
 
 .role-workspace__content {
@@ -110,74 +115,53 @@ body {
 }
 
 .role-sign-in {
-  display: grid;
-  gap: 0.75rem;
-  box-sizing: border-box;
-  width: min(100%, 29rem);
-  margin: 2rem auto;
-  padding: clamp(1.35rem, 4vw, 2rem);
-  border: 1px solid #d8e4e4;
-  border-radius: 0.8rem;
-  background: #fff;
-  box-shadow: 0 12px 32px rgba(24, 52, 58, 0.07);
+  width: min(100%, 340px);
+  margin: 40px auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: center;
 }
 
-.role-sign-in__eyebrow {
-  margin: 0 0 -0.35rem;
-  color: #087c80;
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.09em;
-}
-
-.role-sign-in h2,
-.role-sign-in__intro {
-  margin: 0;
-}
-
-.role-sign-in__intro {
-  margin-top: -0.4rem;
-  color: #52666b;
-  font-size: 0.94rem;
-}
-
+.role-sign-in__logo { width: 48px; height: 48px; }
+.role-sign-in h1 { margin: 16px 0; font-size: 24px; font-weight: 300; }
 .role-sign-in form {
   display: grid;
-  gap: 0.6rem;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #d1d9e0;
+  border-radius: 6px;
+  background: #f6f8fa;
+  text-align: left;
 }
-
-.role-sign-in label {
-  display: grid;
-  gap: 0.3rem;
-  color: #31545a;
-  font-size: 0.9rem;
-  font-weight: 650;
-}
-
+.role-sign-in label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
 .role-sign-in input {
-  box-sizing: border-box;
   width: 100%;
-  min-height: 2.9rem;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid #d1d9e0;
+  border-radius: 6px;
+  color: #1f2328;
+  background: #fff;
 }
-
 .role-sign-in button[type="submit"] {
-  margin-top: 0.35rem;
-}
-
-.role-sign-in button[type="submit"]:not(:disabled) {
-  border-color: #087c80;
+  margin-top: 4px;
+  border-color: #1f883d;
+  border-radius: 6px;
   color: #fff;
-  background: #087c80;
+  background: #1f883d;
 }
+.role-sign-in button[type="submit"]:hover:not(:disabled) { background: #1c8139; }
+.role-sign-in [role="alert"] { margin: 0.25rem 0 0; color: #d1242f; }
+.role-workspace--anonymous .role-workspace__content > main:has(.role-sign-in) > h1 { display: none; }
+.role-workspace--anonymous .role-workspace__content > main:has(.role-sign-in) > header { display: none; }
 
-.role-sign-in button[type="submit"]:hover:not(:disabled) {
-  border-color: #075d60;
-  background: #075d60;
-}
-
-.role-sign-in [role="alert"] {
-  margin: 0.25rem 0 0;
-  color: #9a3434;
+@media (prefers-color-scheme: dark) {
+  .role-workspace--anonymous:has(.role-sign-in) { color: #f0f6fc; background: #0d1117; }
+  .role-workspace--anonymous .role-workspace__header { background: #010409; }
+  .role-sign-in form { border-color: #3d444d; background: #151b23; }
+  .role-sign-in input { color: #f0f6fc; border-color: #3d444d; background: #0d1117; }
+  .role-sign-in [role="alert"] { color: #f85149; }
 }
 
 .role-workspace__content > main {
@@ -188,7 +172,7 @@ body {
 }
 
 .role-workspace :focus-visible {
-  outline: 3px solid #29b6b2;
+  outline: 3px solid #0969da;
   outline-offset: 3px;
 }
 
@@ -200,7 +184,7 @@ body {
   transform: translateY(-160%);
   padding: 0.65rem 0.85rem;
   border-radius: 0.35rem;
-  color: #123b40;
+  color: #1f2328;
   background: #fff;
   font-weight: 700;
 }
@@ -228,6 +212,8 @@ body {
     grid-column: 1;
     grid-row: 2;
     flex-direction: row;
+    border-right: 0;
+    border-bottom: 1px solid #d1d9e0;
     overflow-x: auto;
     padding: 0.5rem 0.75rem;
   }
@@ -252,4 +238,45 @@ body {
   .role-workspace__account {
     font-size: 0.82rem;
   }
+}
+
+/* Match the Reporter workspace frame. */
+.role-workspace:not(.role-workspace--anonymous) {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #1f2328;
+}
+.role-workspace:not(.role-workspace--anonymous) .role-workspace__header {
+  min-height: 48px;
+  padding: 12px 24px;
+}
+.role-workspace:not(.role-workspace--anonymous) .role-workspace__navigation {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 24px;
+  border-right: 0;
+  border-bottom: 1px solid #d1d9e0;
+  background: #f6f8fa;
+}
+.role-workspace:not(.role-workspace--anonymous) .role-workspace__navigation-link {
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.role-workspace:not(.role-workspace--anonymous) .role-workspace__navigation-link[aria-current="page"] {
+  box-shadow: inset 0 -2px #fd8c73;
+}
+.role-workspace:not(.role-workspace--anonymous) .role-workspace__content > main {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+@media (prefers-color-scheme: dark) {
+  .role-workspace:not(.role-workspace--anonymous) { background: #0d1117; color: #f0f6fc; color-scheme: dark; }
+  .role-workspace:not(.role-workspace--anonymous) .role-workspace__header { background: #010409; border-color: #3d444d; }
+  .role-workspace:not(.role-workspace--anonymous) .role-workspace__navigation { background: #151b23; border-color: #3d444d; }
+  .role-workspace:not(.role-workspace--anonymous) .role-workspace__navigation-link { color: #f0f6fc; }
+  .role-workspace:not(.role-workspace--anonymous) .role-workspace__navigation-link:hover,
+  .role-workspace:not(.role-workspace--anonymous) .role-workspace__navigation-link[aria-current="page"] { background: #262c36; }
 }
