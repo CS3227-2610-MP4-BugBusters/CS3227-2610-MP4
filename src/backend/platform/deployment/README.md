@@ -9,6 +9,37 @@ Reporter app at `/reporter/`. Installed the shared Markdown dependencies before
 each frontend that consumes them.
 The public `/assets/revision.txt` asset identifies the source revision passed to the image build.
 
+## Render dashboard with an existing Supabase database
+
+For a manually created Docker web service, use these settings:
+
+- Branch: `main` (after the Dockerfile change has been pushed/merged).
+- Root Directory: leave blank so all frontend and backend sources are available.
+- Dockerfile Path: `./Dockerfile`.
+- Docker Build Context Directory, if shown: `.`.
+- Docker Command: leave blank to use the image's startup script.
+- Health Check Path: `/api/health`.
+
+The root Dockerfile mirrors `src/backend/platform/deployment/Dockerfile`, which
+remains the path used by CI and the existing Blueprints. Keep their build stages
+in sync. Both images normalize startup-script line endings inside the image so
+Windows checkouts can launch the default Linux entrypoint.
+
+Configure the existing Supabase connection through Render environment variables:
+`MP4_AUTH_DB_HOST`, `MP4_AUTH_DB_PORT`, `MP4_AUTH_DB_NAME`, `MP4_AUTH_DB_USER`,
+and `MP4_AUTH_DB_PASSWORD`. Use the values for the same connection type from your
+Supabase connection settings; do not put credentials into the Dockerfile. Keep
+your existing `MP4_AUTH_RATE_LIMIT_SECRET` (at least 32 UTF-8 bytes), and set
+`MP4_AUTH_PUBLIC_ORIGIN` to the service's actual HTTPS origin. Alternatively, keep
+an existing compatible `MP4_AUTH_JDBC_URL` plus the database user and password.
+The startup script expects a credential-free JDBC URL without query parameters.
+
+The startup script binds to `0.0.0.0` on Render's `PORT`. This manual setup reuses
+your database; the root Blueprint's separate Render PostgreSQL resource is not
+needed for this route. Do not apply that Blueprint just to connect Supabase.
+
+Reference: [Docker on Render](https://render.com/docs/docker).
+
 ## Local container build
 
 From the repository root:
