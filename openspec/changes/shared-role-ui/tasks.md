@@ -11,3 +11,8 @@
 
 - [x] 2.1 Extract shared sign-in presentation and apply it to Developer and Maintainer without changing authentication or session behavior.
 - [x] 2.2 Verify both role frontend suites and document Reporter integration; do not claim a shared role-routing login until one exists.
+
+## 3. Common root sign-in
+
+- [ ] 3.1 Verify role-aware routing, inactive denial and no wrong-role queue fetch against a focused Red baseline.
+- [ ] 3.2 Integrate the root entry with existing sessions and verify role routing, permission boundaries and responsive presentation.

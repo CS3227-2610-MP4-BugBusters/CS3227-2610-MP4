@@ -3,7 +3,7 @@
 body {
   margin: 0;
   color: #18212b;
-  background: #f6f8fb;
+  background: #f6f8fa;
   font: 1rem/1.5 system-ui, sans-serif;
 }
 
@@ -16,7 +16,7 @@ main {
 section {
   margin-top: 1rem;
   padding: 1rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #d1d9e0;
   border-radius: .5rem;
   background: white;
 }
@@ -41,7 +41,7 @@ select,
 textarea {
   border: 1px solid #bdcbd0;
   border-radius: .45rem;
-  color: #18343a;
+  color: #1f2328;
   background: #fff;
   font: inherit;
 }
@@ -64,7 +64,7 @@ button {
 }
 
 button:hover:not(:disabled) {
-  border-color: #087c80;
+  border-color: #0969da;
   background: #f2f9f8;
 }
 
@@ -83,7 +83,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid #20a9a7;
+  outline: 3px solid #0969da;
   outline-offset: 2px;
 }
 
@@ -128,9 +128,9 @@ button + button {
   width: 100%;
   min-height: 3.5rem;
   padding: .8rem 1rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #d1d9e0;
   border-radius: .55rem;
-  color: #18343a;
+  color: #1f2328;
   background: #fff;
   text-align: left;
   cursor: pointer;
@@ -142,13 +142,13 @@ button + button {
 }
 
 .developer-report-list__button[aria-pressed="true"] {
-  border-color: #087c80;
+  border-color: #0969da;
   background: #eaf6f5;
-  box-shadow: inset 3px 0 #087c80;
+  box-shadow: inset 3px 0 #0969da;
 }
 
 .developer-report-list__button:focus-visible {
-  outline: 3px solid #20a9a7;
+  outline: 3px solid #0969da;
   outline-offset: 2px;
 }
 
@@ -255,7 +255,7 @@ button + button {
 .developer-checklist__hint { margin: 1rem 0 .65rem; }
 .developer-checklist__actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .developer-checklist__actions button + button { margin-left: 0; }
-button.developer-checklist__primary:not(:disabled) { border-color: #087c80; color: #fff; background: #087c80; }
+button.developer-checklist__primary:not(:disabled) { border-color: #0969da; color: #fff; background: #0969da; }
 button.developer-checklist__primary:hover:not(:disabled) { border-color: #075d60; background: #075d60; }
 .developer-checklist__suggestions { padding: 1rem; border-color: #b9dcd9; background: #f4fbfa; }
 .developer-checklist__choice {
@@ -270,7 +270,7 @@ button.developer-checklist__primary:hover:not(:disabled) { border-color: #075d60
   cursor: pointer;
 }
 .developer-checklist__choice:has(input:checked) { border-color: #52a7a0; background: #eaf7f5; }
-.developer-checklist__choice input { flex: none; width: 1rem; height: 1rem; margin: .25rem 0 0; accent-color: #087c80; }
+.developer-checklist__choice input { flex: none; width: 1rem; height: 1rem; margin: .25rem 0 0; accent-color: #0969da; }
 @media (max-width: 480px) {
   .developer-checklist-step { flex-wrap: wrap; }
   .developer-checklist-step__content { flex-basis: 100%; }
@@ -378,5 +378,41 @@ button.developer-checklist__primary:hover:not(:disabled) { border-color: #075d60
 .developer-notifications__label { flex: 1 1 12rem; font-weight: 650; }
 .developer-notifications__report { color: #086e71; }
 .developer-notifications__read { color: #63777a; font-size: .82rem; }
-.developer-notifications__item.is-unread { border-left: 3px solid #087c80; background: #f4fbfa; }
+.developer-notifications__item.is-unread { border-left: 3px solid #0969da; background: #f4fbfa; }
 .developer-notifications__item button { min-height: 2.2rem; padding: .35rem .65rem; }
+
+/* Match Reporter surfaces and controls in the signed-in workspace. */
+.role-workspace:not(.role-workspace--anonymous) { font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; }
+.role-workspace:not(.role-workspace--anonymous) section { border-radius: 6px; }
+@media (prefers-color-scheme: dark) {
+  .role-workspace:not(.role-workspace--anonymous) section,
+  .role-workspace:not(.role-workspace--anonymous) .developer-resolution,
+  .role-workspace:not(.role-workspace--anonymous) .developer-private-notes,
+  .role-workspace:not(.role-workspace--anonymous) .developer-notifications__item,
+  .role-workspace:not(.role-workspace--anonymous) .developer-checklist__choice { background: #151b23; color: #f0f6fc; border-color: #3d444d; }
+  .role-workspace:not(.role-workspace--anonymous) button,
+  .role-workspace:not(.role-workspace--anonymous) input,
+  .role-workspace:not(.role-workspace--anonymous) select,
+  .role-workspace:not(.role-workspace--anonymous) textarea { background: #0d1117; color: #f0f6fc; border-color: #3d444d; }
+  .role-workspace:not(.role-workspace--anonymous) button:hover:not(:disabled),
+  .role-workspace:not(.role-workspace--anonymous) .developer-report-list__button[aria-pressed="true"],
+  .role-workspace:not(.role-workspace--anonymous) .developer-checklist__choice:has(input:checked) { background: #262c36; }
+  .role-workspace:not(.role-workspace--anonymous) .developer-report-detail__description,
+  .role-workspace:not(.role-workspace--anonymous) .developer-checklist__intro,
+  .role-workspace:not(.role-workspace--anonymous) .developer-checklist__hint,
+  .role-workspace:not(.role-workspace--anonymous) .developer-checklist__suggestions > p,
+  .role-workspace:not(.role-workspace--anonymous) .developer-checklist-step label,
+  .role-workspace:not(.role-workspace--anonymous) .developer-resolution label,
+  .role-workspace:not(.role-workspace--anonymous) .developer-private-notes label,
+  .role-workspace:not(.role-workspace--anonymous) .developer-checklist__steps legend,
+  .role-workspace:not(.role-workspace--anonymous) .developer-checklist__choices legend,
+  .role-workspace:not(.role-workspace--anonymous) .developer-notifications__item time,
+  .role-workspace:not(.role-workspace--anonymous) .developer-notifications__read { color: #b1bac4; }
+  .role-workspace:not(.role-workspace--anonymous) .developer-report-list__status,
+  .role-workspace:not(.role-workspace--anonymous) .developer-report-detail__status { background: #212830; color: #c9d1d9; border-color: #3d444d; }
+  .role-workspace:not(.role-workspace--anonymous) .developer-return-reason { background: #302817; border-color: #9e6a03; }
+  .role-workspace:not(.role-workspace--anonymous) .developer-return-reason h3,
+  .role-workspace:not(.role-workspace--anonymous) .developer-return-reason p { color: #f0e1bd; }
+  .role-workspace:not(.role-workspace--anonymous) .developer-checklist__add,
+  .role-workspace:not(.role-workspace--anonymous) .developer-notifications__report { color: #79c0ff; }
+}

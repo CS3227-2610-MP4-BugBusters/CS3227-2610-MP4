@@ -28,6 +28,7 @@ async function start() {
         queries={queries}
         synthetic={synthetic}
         authActions={synthetic ? undefined : createHttpAuthActions()}
+        sharedEntry={!synthetic}
       />
     </MarkdownParserProvider>,
   );

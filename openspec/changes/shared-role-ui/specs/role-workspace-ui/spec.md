@@ -22,3 +22,14 @@ The workspace SHALL support keyboard navigation, visible focus, labelled control
 #### Scenario: Narrow viewport
 - **WHEN** the workspace is displayed on a narrow viewport
 - **THEN** navigation and content remain reachable without horizontal overflow
+
+### Requirement: Shared role-aware sign-in entry
+The root entry SHALL authenticate using the existing session service and route an active Developer to `/developer/`, an active Reporter to `/reporter/`, and an active Maintainer to the Maintainer queue. Inactive accounts SHALL not be routed. Client routing SHALL NOT replace server-side authorization.
+
+#### Scenario: Active role signs in
+- **WHEN** an active account signs in at the root entry
+- **THEN** it opens its corresponding role workspace without fetching another role's protected data
+
+#### Scenario: Inactive account
+- **WHEN** an inactive account is returned by the session service
+- **THEN** it is denied access and no role dashboard is opened
