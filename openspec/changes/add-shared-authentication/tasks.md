@@ -55,3 +55,5 @@ remaining DTO/handoff, shared integration/routing and human-review criteria.
 ## 5. Browser account management
 
 - [x] 5.1 Seed and protect the shared demo Maintainer; add Maintainer-only browser creation and own-password changes for every non-demo role. Verify real HTTP role/CSRF checks, duplicate rejection, unchanged seed across restart, current-password verification and session revocation; check the shared Account page in a browser. Update only affected feature documentation.
+
+- [ ] 5.2 Restore Developer access to Account, proxy `/account` in local Vite, and implement own display-name changes for active non-demo users. Verify authorization, validation, unchanged other accounts, password changes and local page routing.

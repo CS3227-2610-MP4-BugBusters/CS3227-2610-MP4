@@ -82,3 +82,17 @@ revoke all sessions. Each role SHALL link to the shared page.
 
 - **WHEN** an anonymous or wrong-role caller creates an account, a request lacks CSRF, or a password change supplies another account's identity
 - **THEN** the request fails without account changes
+
+### Requirement: AUTH-10 Own display name
+
+Each active non-demo account SHALL update its own display name through the Account page. The server SHALL derive the account from the session, require CSRF protection, reject identity overrides and accept only a nonblank name of at most 200 UTF-16 units without control characters. The shared demo account SHALL remain immutable. An updated name SHALL be returned by subsequent account and session identity reads without altering other accounts, usernames or roles.
+
+#### Scenario: Change own display name
+
+- **WHEN** an active non-demo account submits a valid new display name
+- **THEN** subsequent identity reads show the new name and other accounts remain unchanged
+
+#### Scenario: Reject unauthorized or invalid updates
+
+- **WHEN** an anonymous, inactive or demo account requests a change, CSRF is missing, an identity override is supplied, or the name is invalid
+- **THEN** the request is rejected and account data is unchanged

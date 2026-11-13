@@ -168,6 +168,17 @@ Only reports currently assigned to you appear. If a report is missing, check the
 
 Open the assigned report, enter your observations under **Private investigation notes**, and save them. These notes are visible only to the assigned Developer. Refresh and reconcile your text if a newer version has been saved elsewhere.
 
+### Share investigation notes with Maintainers
+
+This section describes the shared-notes change in the current working tree; it is not yet confirmed in a deployed release.
+
+1. Open the assigned report and find **Shared investigation notes**. This editor is separate from **Private investigation notes**.
+2. Enter the findings you want Maintainers to see, then select **Save shared draft**.
+3. Select **Share saved note**. The Maintainer can read the last saved and shared version under **Investigation notes**; the Reporter cannot read these notes.
+4. To change the published note, edit and save the draft, then share again. Typing or saving alone does not publish changes. If a conflict occurs, refresh the saved revision, review your text and save it before sharing.
+
+Sharing a changed note during resolution review returns the report to In progress and supersedes the current proposal. Private investigation notes remain private and are never automatically copied into this editor.
+
 ### Create and share an investigation checklist
 
 1. Open the report and find **Investigation checklist**.

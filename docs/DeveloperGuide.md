@@ -87,7 +87,7 @@ To build the packaged application, use the [deployment Dockerfile instructions](
 | --- | --- |
 | Authentication | Operator-provisioned fixed-role accounts, server sessions, sign-in/out and CSRF. Account state is checked on protected access. |
 | Reporter | Create and read own reports, edit while Submitted and unassigned, participate in discussion, and request AI questions about a new draft. |
-| Developer | Access assigned reports, start investigation, save private notes and checklist drafts, share saved checklists, request suggestions and submit resolutions. |
+| Developer | Access assigned reports, start investigation, save private notes, save and share separate Maintainer-visible investigation notes and checklists, request suggestions and submit resolutions. |
 | Maintainer | Browse reports, set priority and assignment, discuss, return or close a resolution, reopen, and request an advisory queue summary. |
 | Shared storage | Versioned report mutations and lifecycle checks protect against stale changes; shared checklist copies are separate from private drafts. |
 
