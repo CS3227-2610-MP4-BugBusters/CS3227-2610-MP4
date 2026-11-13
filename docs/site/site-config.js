@@ -1,5 +1,5 @@
 // Set this to the deployed application's HTTPS URL when it is available.
-const APP_URL = "";
+const APP_URL = "https://cs3227-2610-mp4.onrender.com/";
 
 if (APP_URL) {
   try {
