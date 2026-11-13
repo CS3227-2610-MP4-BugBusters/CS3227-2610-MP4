@@ -33,3 +33,7 @@ The shared-notes files were copied without the separate Account-link change to a
 PR #26's Assigned reports / Java 17 job failed during the auth-only database startup scenario: the cloned fixture retained `developer_shared_note_drafts` after its old shared tables and Flyway history were removed. PostgreSQL `DROP ... CASCADE` removed dependent foreign-key constraints, not the draft table itself. Flyway V8 then correctly rejected the duplicate table.
 
 The explorer identified the fixture cleanup gap. The coordinator reproduced the exact `relation "developer_shared_note_drafts" already exists` failure with `src/backend/shared/test/run-shared-report-storage.sh` against disposable PostgreSQL, then updated only the test fixture cleanup and added assertions that the table is absent before startup and present afterward. The same runner then passed its shared storage and fresh/auth-only/restart/incompatible-schema startup scenarios. Production migrations and existing data were not changed. Local Java was 25; hosted Java 17 confirmation requires CI. Agent and coordinator token usage for this follow-up were unavailable; no token comparison was made.
+
+## Later telemetry correction
+
+A later read-only examination of local session metadata recovered coordinator token counters and identifiable specialist counters. The earlier unavailable statement describes what was exposed during the run, but omitted these recoverable records. See [the sanitized token observations](../evaluation/2026-11-13-session-token-observations.md) for values, attribution and limits.

@@ -1,0 +1,5 @@
+# Product website
+
+Created a static BugBusters product website for GitHub Pages. It describes the three roles and AI-assisted features, links to the repository's user and developer guides, and shows a coming-soon state until the deployed application HTTPS URL is supplied. A Pages workflow deploys `docs/site/` after a main-branch change or manual dispatch. GitHub Pages publication has not been performed.
+
+The coordinator used the Sites, frontend design and Playwright guidance for a static documentation-site task. Desktop and 390-pixel mobile screenshots were inspected; mobile document and viewport widths both measured 390 pixels. Eleven in-page anchors, the two guide paths on GitHub and four application-link configuration cases passed. JavaScript syntax passed. A request to read repository Pages configuration returned HTTP 404, which may mean Pages is not configured or the account lacks access. No hosted Pages run or deployed application was tested. Token counts and elapsed time were unavailable; no CLI JSON run or subagents were used.
