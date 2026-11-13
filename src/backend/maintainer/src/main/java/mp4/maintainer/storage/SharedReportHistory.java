@@ -21,4 +21,18 @@ public final class SharedReportHistory {
             if (insert.executeUpdate() != 1) throw new SQLException("Shared publication history was not recorded");
         }
     }
+
+    public static void developerNotePublished(Connection connection, UUID reportId, UUID actorId,
+                                               long reportVersion, boolean invalidatedProposal) throws SQLException {
+        try (var insert = connection.prepareStatement("INSERT INTO report_history"
+                + "(id,report_id,type,text,actor_id,report_version) VALUES(?,?,?,?,?,?)")) {
+            insert.setObject(1, UUID.randomUUID()); insert.setObject(2, reportId);
+            insert.setString(3, "investigation_note_shared");
+            insert.setString(4, invalidatedProposal
+                    ? "Published an investigation note and superseded the pending resolution"
+                    : "Published an investigation note");
+            insert.setObject(5, actorId); insert.setLong(6, reportVersion);
+            if (insert.executeUpdate() != 1) throw new SQLException("Shared investigation note history was not recorded");
+        }
+    }
 }

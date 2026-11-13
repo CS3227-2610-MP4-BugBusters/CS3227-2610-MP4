@@ -40,7 +40,7 @@ sourceSets.main.java {
     include 'mp4/**', 'AssignedReportStore.java', 'AssignedReportListHttpHandler.java', 'ChecklistDraftStore.java',
             'ChecklistShareService.java', 'JdbcChecklistShareService.java',
             'ChecklistShareHttpHandler.java', 'ChecklistSharedHttpHandler.java',
-            'ChecklistDraftHttpHandler.java', 'ReporterReportStore.java',
+            'ChecklistDraftHttpHandler.java', 'SharedInvestigationNotesStore.java', 'ReporterReportStore.java',
             'ReporterReportsHttpHandler.java', 'socllm/**'
 }
 
@@ -69,6 +69,10 @@ tasks.named('processResources') {
     from('../developer/migrations/create_developer_notifications.sql') {
         into 'db/shared'
         rename { 'V7__create_developer_notifications.sql' }
+    }
+    from('../developer/migrations/create_developer_shared_notes.sql') {
+        into 'db/shared'
+        rename { 'V8__create_developer_shared_notes.sql' }
     }
     from('../socllm/src/main/resources/db/socllm') {
         into 'db/socllm'
