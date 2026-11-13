@@ -18,7 +18,6 @@ export function createRoleWorkspace<Element>(
     identity?: string;
     authenticated: boolean;
     navigation: WorkspaceNavigationItem[];
-    showAccountLink?: boolean;
     accountActions?: Element;
     children: Element;
   },
@@ -30,9 +29,7 @@ export function createRoleWorkspace<Element>(
           className: "role-workspace__navigation",
           "aria-label": `${options.role} navigation`,
         },
-        ...(options.showAccountLink === false ? [] : [
-          createElement("a", { href: "/account/", className: "role-workspace__navigation-link" }, "Account"),
-        ]),
+      createElement("a", { href: "/account/", className: "role-workspace__navigation-link" }, "Account"),
         ...options.navigation.map((item) =>
           createElement(
             "a",

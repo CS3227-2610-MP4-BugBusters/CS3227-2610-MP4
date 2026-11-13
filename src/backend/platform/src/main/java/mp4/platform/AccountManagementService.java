@@ -32,6 +32,21 @@ final class AccountManagementService {
             }
         }
     }
+    void changeDisplayName(AuthProvider.CurrentUser actor,String name) throws SQLException {
+        if(name.isBlank() || name.length()>200 || !StandardCharsets.UTF_8.newEncoder().canEncode(name) || name.codePoints().anyMatch(Character::isISOControl)) throw new IllegalArgumentException();
+        try(var c=ds.getConnection();var s=c.prepareStatement("UPDATE app_accounts SET display_name=? WHERE id=? AND active AND auth_generation=? AND NOT demo_locked AND id<>?")) {
+            s.setString(1,name);s.setObject(2,actor.id());s.setLong(3,actor.generation());s.setObject(4,DemoAccountBootstrap.ID);
+            if(s.executeUpdate()==1) return;
+        }
+        try(var c=ds.getConnection();var s=c.prepareStatement("SELECT active,auth_generation,demo_locked FROM app_accounts WHERE id=?")) {
+            s.setObject(1,actor.id());
+            try(var row=s.executeQuery()) {
+                if(!row.next() || !row.getBoolean("active") || row.getLong("auth_generation")!=actor.generation()) throw new Denied(401,"UNAUTHENTICATED");
+                if(row.getBoolean("demo_locked") || DemoAccountBootstrap.ID.equals(actor.id())) throw new Denied(403,"DEMO_ACCOUNT_LOCKED");
+                throw new Denied(401,"UNAUTHENTICATED");
+            }
+        }
+    }
     Map<String,Object> create(AuthProvider.CurrentUser actor,String username,String name,String role,String secret) throws SQLException {
         if(!"MAINTAINER".equals(actor.role())) throw new Denied(403,"FORBIDDEN");
         username=UsernamePolicy.normalize(username);
