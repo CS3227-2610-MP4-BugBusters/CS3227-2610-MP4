@@ -1,8 +1,9 @@
 import { MarkdownEditor } from "@mp4/markdown";
-import { useState, type FormEvent } from "react";
-import { createReport } from "./api";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { checkReport, createReport } from "./api";
 import { errorMessage, textProblem, TEXT_MAX, titleProblem } from "./format";
 import { Breadcrumbs } from "./Breadcrumbs";
+import { checkErrorMessage, ReportCheckPanel, type CheckState } from "./ReportCheck";
 import { Avatar } from "./ui";
 
 const TEMPLATE = "### What happened?\n\n\n### Steps to reproduce\n1. \n\n### What did you expect?\n\n";
@@ -20,6 +21,37 @@ export function NewReport({
   const [description, setDescription] = useState(TEMPLATE);
   const [problem, setProblem] = useState("");
   const [busy, setBusy] = useState(false);
+  const [check, setCheck] = useState<CheckState>({ kind: "idle" });
+  // Only the newest check may update the panel; Submit and unmount cancel it.
+  const checkAbort = useRef<AbortController | null>(null);
+
+  useEffect(() => () => checkAbort.current?.abort(), []);
+
+  function cancelCheck() {
+    checkAbort.current?.abort();
+    checkAbort.current = null;
+    setCheck({ kind: "idle" });
+  }
+
+  async function runCheck() {
+    cancelCheck();
+    const local = titleProblem(title) ?? textProblem(description, "description");
+    if (local) {
+      setCheck({ kind: "error", message: local });
+      return;
+    }
+    const controller = new AbortController();
+    checkAbort.current = controller;
+    setCheck({ kind: "checking" });
+    try {
+      const result = await checkReport(title, description, controller.signal);
+      if (checkAbort.current === controller) setCheck({ kind: "done", result });
+    } catch (cause) {
+      if (checkAbort.current === controller) setCheck({ kind: "error", message: checkErrorMessage(cause) });
+    } finally {
+      if (checkAbort.current === controller) checkAbort.current = null;
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -28,6 +60,7 @@ export function NewReport({
       setProblem(local);
       return;
     }
+    cancelCheck();
     setBusy(true);
     setProblem("");
     try {
@@ -70,8 +103,17 @@ export function NewReport({
                 {problem}
               </p>
             )}
+            <ReportCheckPanel state={check} onDismiss={cancelCheck} />
           </div>
           <div className="box-footer">
+            <button
+              type="button"
+              className="btn check-button"
+              onClick={() => void runCheck()}
+              disabled={busy || check.kind === "checking"}
+            >
+              {check.kind === "checking" ? "Checking…" : "Check my report"}
+            </button>
             <a className="btn" href={backHref}>
               Cancel
             </a>

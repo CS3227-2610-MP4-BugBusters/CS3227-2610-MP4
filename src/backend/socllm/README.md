@@ -3,9 +3,47 @@
 This is the MP4-native shared SoCLaaS boundary. It provides role-bound Reporter,
 Developer and Maintainer task routing, bounded HTTPS transport and one PostgreSQL
 admission store shared by every configured role key and application instance.
-The only current product consumer is the Maintainer queue summary. Reporter and
-Developer services are backend ports for their owners; this module adds no new
-role endpoints, prompts or user-facing AI features.
+Product consumers: the Maintainer queue summary, Developer checklist suggestions
+(`DEVELOPER_ASSIST`) and the Reporter report check (`REPORTER_ASSIST`,
+`POST /api/reporter/report-clarify`; see
+`workflow/reporter/report-clarify-api-contract.md`). This module provides the
+gateway only. Each feature owns its endpoint and prompt.
+
+## Per-task limits
+
+Each task has a server-owned policy in `SocLlmTaskPolicies.defaults()`. Policies can
+only tighten the transport ceilings in `SocLlmTaskPolicy`. Callers never choose a
+policy.
+
+| Task | Input bytes | Instruction bytes | Output tokens | Deadline | Starts / account | In flight | Reservation |
+| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: |
+| `REPORTER_ASSIST` | 61,440 | 8,192 | 8,192 | 60 s | 3 per 5 min | 1 | 77,824 |
+| `DEVELOPER_ASSIST` | 24,576 | 8,192 | 2,048 | 30 s | 3 per 5 min | 1 | 34,816 |
+| `MAINTAINER_QUEUE_SUMMARY` | 24,576 | 8,192 | 2,048 | 30 s | 3 per 5 min | 1 | 34,816 |
+| Transport ceiling | 61,440 | 8,192 | 8,192 | 60 s | - | - | - |
+
+The request body cap is 384 KiB (393,216 bytes) and the response cap is 64 KiB. The
+request always has exactly `model`, `messages`, `max_tokens`, `stream` and
+`response_format`. No `reasoning_effort` is sent, so the provider default applies.
+Default reasoning has no upper bound, which is why the Reporter output budget is
+large.
+
+`SOC_LLM_TPM` must be at least the largest reservation of any enabled task
+(77,824 with the Reporter key set). Otherwise every call for that task fails closed
+at admission. Roles that share one physical key also share its per-minute budget,
+so one Reporter call can use most of a small budget.
+
+`SOC_LLM_MODEL_REPORTER` and `SOC_LLM_MODEL_DEVELOPER` optionally override
+`SOC_LLM_MODEL` for that role; a blank value falls back. The Reporter check was
+sized against `x-test-2`, a provider test slot whose model can change
+(`logs/reporter-report-clarify/trial-clarify-2026-11-12.md`).
+
+Known limits from security review:
+- The direct Maintainer summary path checks its own fixed limits rather than its
+  task policy, and the transport does not reject `max_tokens` above 8,192 itself.
+  Today no path exceeds it.
+- 60 s Reporter calls on a 2-worker, queue-8 role pool can be saturated by a few
+  active Reporters. They fail closed as busy or timeout.
 
 Live calls are unavailable by default. Configure `SOC_LLM_ENABLED=true`, a nonblank
 `SOC_LLM_MODEL`, positive `SOC_LLM_RPM` and `SOC_LLM_TPM`, and the relevant
@@ -18,7 +56,7 @@ There is no fake or alternate provider fallback.
 The provider destination is fixed to
 `https://soclaas-api.comp.nus.edu.sg/v1/chat/completions`. The client disables
 redirects and retries, bounds request/response bytes and applies a caller timeout
-of at most 30 seconds. Trusted system instructions and untrusted task input use
+of at most 60 seconds (the task policy sets the actual deadline). Trusted system instructions and untrusted task input use
 separate messages. Failures use safe typed codes and clamp `Retry-After` to one hour.
 
 Admission is serialized through PostgreSQL under `mp4_socllm`. It counts every

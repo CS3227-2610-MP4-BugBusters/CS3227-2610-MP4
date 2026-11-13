@@ -8,10 +8,11 @@ import java.time.Duration;
  */
 public record SocLlmTaskPolicy(int maxInputBytes, int maxInstructionBytes, int maxOutputTokens,
         Duration maxDeadline, int startsPerWindow, Duration window, int maxInFlightPerActor) {
-    static final int INPUT_BYTES_CEILING = 24_576;
+    /** Transport ceilings, shared with {@link SocLlmHttpProvider} so the two cannot drift. */
+    static final int INPUT_BYTES_CEILING = 61_440;
     static final int INSTRUCTION_BYTES_CEILING = 8_192;
-    static final int OUTPUT_TOKENS_CEILING = 2_048;
-    static final Duration DEADLINE_CEILING = Duration.ofSeconds(30);
+    static final int OUTPUT_TOKENS_CEILING = 8_192;
+    static final Duration DEADLINE_CEILING = Duration.ofSeconds(60);
     /** Admission rows are retained for 24 hours, so a longer window could not be counted. */
     static final Duration WINDOW_CEILING = Duration.ofHours(24);
 
@@ -30,6 +31,11 @@ public record SocLlmTaskPolicy(int maxInputBytes, int maxInstructionBytes, int m
     /** Initial limits that every task starts with. */
     static SocLlmTaskPolicy initial() {
         return new SocLlmTaskPolicy(24_576, 8_192, 2_048, Duration.ofSeconds(30), 3, Duration.ofMinutes(5), 1);
+    }
+
+    /** Reporter clarification check: raised input, output and deadline limits (design decision 7). */
+    static SocLlmTaskPolicy reporterAssist() {
+        return new SocLlmTaskPolicy(61_440, 8_192, 8_192, Duration.ofSeconds(60), 3, Duration.ofMinutes(5), 1);
     }
 
     /** Largest token reservation a call under this policy can need. */

@@ -39,27 +39,41 @@ class SocLlmTaskPolicyTest {
         assertThrows(IllegalArgumentException.class, () -> policy(24576, 8192, 2048, d, 0, w, 1));
         assertThrows(IllegalArgumentException.class, () -> policy(24576, 8192, 2048, d, 3, Duration.ZERO, 1));
         assertThrows(IllegalArgumentException.class, () -> policy(24576, 8192, 2048, d, 3, w, 0));
-        assertThrows(IllegalArgumentException.class, () -> policy(24576, 8192, 2048, Duration.ofSeconds(31), 3, w, 1));
+        assertThrows(IllegalArgumentException.class, () -> policy(24576, 8192, 2048, Duration.ofSeconds(61), 3, w, 1));
         assertThrows(IllegalArgumentException.class, () -> policy(24576, 8192, 2048, d, 3, Duration.ofHours(24).plusSeconds(1), 1));
-        assertThrows(IllegalArgumentException.class, () -> policy(24577, 8192, 2048, d, 3, w, 1));
+        assertThrows(IllegalArgumentException.class, () -> policy(61441, 8192, 2048, d, 3, w, 1));
         assertThrows(IllegalArgumentException.class, () -> policy(24576, 8193, 2048, d, 3, w, 1));
-        assertThrows(IllegalArgumentException.class, () -> policy(24576, 8192, 2049, d, 3, w, 1));
+        assertThrows(IllegalArgumentException.class, () -> policy(24576, 8192, 8193, d, 3, w, 1));
     }
 
     @Test void TL02_boundaryValuesAccepted() {
         assertDoesNotThrow(() -> policy(24576, 8192, 2048, Duration.ofSeconds(30), 3, Duration.ofHours(24), 1));
     }
 
-    @Test void TL03_initialValuesForEveryTask() {
-        for (Task task : Task.values()) {
-            SocLlmTaskPolicy p = SocLlmTaskPolicies.defaults().forTask(task);
-            assertEquals(24_576, p.maxInputBytes(), task.name());
-            assertEquals(8_192, p.maxInstructionBytes(), task.name());
-            assertEquals(2_048, p.maxOutputTokens(), task.name());
-            assertEquals(Duration.ofSeconds(30), p.maxDeadline(), task.name());
-            assertEquals(3, p.startsPerWindow(), task.name());
-            assertEquals(Duration.ofMinutes(5), p.window(), task.name());
-            assertEquals(1, p.maxInFlightPerActor(), task.name());
+    @Test void TL02_raisedCeilingsAreAcceptedAtTheirBoundary() {
+        assertDoesNotThrow(() -> policy(61_440, 8_192, 8_192, Duration.ofSeconds(60), 3, Duration.ofMinutes(5), 1));
+    }
+
+    private static void assertPolicy(Task task, int in, int instr, int out, Duration deadline, int reservation) {
+        SocLlmTaskPolicy p = SocLlmTaskPolicies.defaults().forTask(task);
+        assertEquals(in, p.maxInputBytes(), task.name());
+        assertEquals(instr, p.maxInstructionBytes(), task.name());
+        assertEquals(out, p.maxOutputTokens(), task.name());
+        assertEquals(deadline, p.maxDeadline(), task.name());
+        assertEquals(3, p.startsPerWindow(), task.name());
+        assertEquals(Duration.ofMinutes(5), p.window(), task.name());
+        assertEquals(1, p.maxInFlightPerActor(), task.name());
+        assertEquals(reservation, p.maxReservation(), task.name());
+    }
+
+    @Test void TL03_developerAndMaintainerKeepInitialValues() {
+        for (Task task : new Task[] {Task.DEVELOPER_ASSIST, Task.MAINTAINER_QUEUE_SUMMARY}) {
+            assertEquals(SocLlmTaskPolicy.initial(), SocLlmTaskPolicies.defaults().forTask(task), task.name());
+            assertPolicy(task, 24_576, 8_192, 2_048, Duration.ofSeconds(30), 34_816);
         }
+    }
+
+    @Test void RC09_reporterAssistPolicyHasRaisedLimits() {
+        assertPolicy(Task.REPORTER_ASSIST, 61_440, 8_192, 8_192, Duration.ofSeconds(60), 77_824);
     }
 }

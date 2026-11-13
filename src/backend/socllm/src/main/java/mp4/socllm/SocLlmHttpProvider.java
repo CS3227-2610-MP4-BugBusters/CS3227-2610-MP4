@@ -27,10 +27,11 @@ import mp4.maintainer.summary.SummaryContracts.SummaryFailure;
 public final class SocLlmHttpProvider {
     public static final URI ENDPOINT = URI.create("https://soclaas-api.comp.nus.edu.sg/v1/chat/completions");
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
-    private static final Duration MAX_REQUEST_TIMEOUT = Duration.ofSeconds(30);
-    private static final int MAX_INPUT_BYTES = 24_576;
-    private static final int MAX_INSTRUCTION_BYTES = 8_192;
-    private static final int MAX_REQUEST_BYTES = 131_072;
+    private static final Duration MAX_REQUEST_TIMEOUT = SocLlmTaskPolicy.DEADLINE_CEILING;
+    private static final int MAX_INPUT_BYTES = SocLlmTaskPolicy.INPUT_BYTES_CEILING;
+    private static final int MAX_INSTRUCTION_BYTES = SocLlmTaskPolicy.INSTRUCTION_BYTES_CEILING;
+    /** 384 KiB: worst-case JSON escaping of the input ceiling plus instructions and framing. */
+    private static final int MAX_REQUEST_BYTES = 393_216;
     private static final int MAX_RESPONSE_BYTES = 65_536;
 
     private final HttpClient client;

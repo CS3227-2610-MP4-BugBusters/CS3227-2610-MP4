@@ -16,7 +16,7 @@ public final class SocLlmTaskPolicies {
         this.policies = policies;
     }
 
-    /** Every task with the initial limits. */
+    /** Every task with the initial limits, except the Reporter task's raised limits. */
     public static SocLlmTaskPolicies defaults() {
         return DEFAULTS;
     }
@@ -40,6 +40,7 @@ public final class SocLlmTaskPolicies {
     private static SocLlmTaskPolicies createDefaults() {
         EnumMap<Task, SocLlmTaskPolicy> initial = new EnumMap<>(Task.class);
         for (Task task : Task.values()) initial.put(task, SocLlmTaskPolicy.initial());
+        initial.put(Task.REPORTER_ASSIST, SocLlmTaskPolicy.reporterAssist());
         return of(initial);
     }
 }

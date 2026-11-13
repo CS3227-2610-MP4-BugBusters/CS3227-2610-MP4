@@ -4,7 +4,11 @@
 
 BugBusters is a programming-related bug tracker with Reporter, Developer and Maintainer workspaces. This guide covers local setup, the application boundaries, verification and deployment preparation. See the [User Guide](UserGuide.md) for role workflows.
 
-This draft describes checkout `26f80a2` on `codex/developer-ai-refinement`. The locally recorded `origin/main` is ahead at `0747a59`; the remote could not be reached during this documentation work, so its current head and any deployment were not verified. Check `git status`, `git log` and the running revision before relying on branch-specific behavior. The shared-login, Developer navigation and workflow-evidence branches seen locally are separate work; do not assume they are merged or deployed.
+The Reporter sections describe the implementation in this checkout, including
+the `reporter-report-clarify` change. They follow MP2's architecture, workflow,
+component-design and verification structure, adapted to MP4's web application.
+Check `git status`, `git log` and the running revision before relying on
+branch-specific behavior. A hosted deployment was not verified for this update.
 
 ## 2. Technology and repository layout
 
@@ -82,12 +86,44 @@ To build the packaged application, use the [deployment Dockerfile instructions](
 | Area | Current responsibility |
 | --- | --- |
 | Authentication | Operator-provisioned fixed-role accounts, server sessions, sign-in/out and CSRF. Account state is checked on protected access. |
-| Reporter | Create and read own reports, edit while Submitted and unassigned, and participate in discussion. |
+| Reporter | Create and read own reports, edit while Submitted and unassigned, participate in discussion, and request AI questions about a new draft. |
 | Developer | Access assigned reports, start investigation, save private notes and checklist drafts, share saved checklists, request suggestions and submit resolutions. |
 | Maintainer | Browse reports, set priority and assignment, discuss, return or close a resolution, reopen, and request an advisory queue summary. |
 | Shared storage | Versioned report mutations and lifecycle checks protect against stale changes; shared checklist copies are separate from private drafts. |
 
-Reporter checklist response and Reporter AI screens, Developer discussion, and AI assessment of responses are not exposed by the screens inspected in this checkout. Planning documents and isolated demos are not proof of a released feature. Verify contracts, current code and the target revision before extending a flow.
+Reporter checklist responses, Developer discussion and AI assessment of responses
+are not exposed by the screens inspected in this checkout. Reporter AI is
+available through **Check my report** on new drafts. Planning documents and
+isolated demos are not proof of a released feature; verify the target revision.
+
+### Reporter components and report workflow
+
+| Component | Responsibility |
+| --- | --- |
+| `src/frontend/reporter/src` | `App` handles sign-in and hash routes; `ReportList`, `NewReport` and `ReportView` handle reports; `ReportCheck` displays AI questions; `api.ts` validates API responses. |
+| `src/frontend/shared/markdown` | Shared Markdown editor, preview and saved-text renderer. |
+| `src/backend/reporter/src` | `ReporterReportsHttpHandler` validates requests and routes to `ReporterReportStore` for JDBC persistence. |
+| `src/backend/discussion` | Shared comment handling, strict JSON and text rules. |
+| `src/backend/platform/src/main/java/mp4/platform` | Authenticated mounting, `ReportClarifyController`, service, rules, configuration and `SocLlmReportClarifyProvider`. |
+| `src/backend/socllm` | Role routing, task policies, PostgreSQL admission and bounded provider transport. |
+
+The server derives the Reporter identity from the session. Creation accepts
+exactly `{title, description}`: a nonblank single-line title up to 200 UTF-16
+code units and a nonblank description up to 20,000 units, with no NUL or unpaired
+surrogates. The source text is stored without Markdown rendering. Creation is
+limited to 3 reports per Reporter per rolling minute. Lists are newest first and
+owner-only; another Reporter's report has the same 404 as a missing report.
+
+Edits also supply `version` and require a Submitted, unassigned report.
+`REPORT_LOCKED` and `VERSION_CONFLICT` prevent invalid or stale updates. Comments
+are stored separately and do not increment the report version. Shared migration
+`002_add_report_timestamps.sql` adds timestamps, and `003_report_comments.sql`
+adds discussion storage; the packaged application uses their corresponding
+Flyway migrations. See the [Reporter README](../src/backend/reporter/README.md)
+for migration ordering and test-runner differences.
+
+Descriptions and comments use the shared Markdown renderer, which escapes raw
+HTML and displays images as alt text. AI results use React text nodes directly.
 
 The session cookie is HttpOnly and SameSite=Lax, and Secure outside local loopback mode. Login rotates the session; clients obtain a CSRF token for writes. Do not trust a client-supplied role or actor identity. Treat report text, comments, checklist text and AI outputs as untrusted input. Consult the relevant contracts and security tests when changing authorization, rendering or AI boundaries.
 
@@ -138,9 +174,151 @@ Using a running integrated application, disposable database and separate synthet
 
 ## 7. AI integration
 
-Live SoC access is disabled unless configured. `.env.example` lists `SOC_LLM_ENABLED`, `SOC_LLM_MODEL`, role-specific keys, `SOC_LLM_RPM` and `SOC_LLM_TPM`, plus optional Developer and Maintainer model overrides. A role without a configured key is unavailable. Check model access, provider connectivity and approved budgets before enabling it. A key or a passing fake-provider test does not prove live availability or quota compliance.
+Live SoC access is disabled unless configured. `.env.example` lists `SOC_LLM_ENABLED`, `SOC_LLM_MODEL`, role-specific keys, `SOC_LLM_RPM` and `SOC_LLM_TPM`, plus Reporter, Developer and Maintainer model overrides. A role without a configured key is unavailable. Check model access, provider connectivity and approved budgets before enabling it. A key or a passing fake-provider test does not prove live availability or quota compliance.
 
-The gateway uses bounded requests, role routing and PostgreSQL admission controls. Its token setting is an application reservation budget, not a measurement of provider billing. The Developer suggestion flow sends the report and saved checklist, excluding unsaved edits and private notes; the Maintainer summary uses bounded selected queue context. Treat prompts and generated content as untrusted; keep credentials and unnecessary private data out of inputs and evidence. Test authorization, stale results, malformed output, limits and provider failures when changing AI behavior. See the [gateway README](../src/backend/socllm/README.md), [Developer AI contract](../workflow/developer/ai-checklist-contract.md), and [Maintainer README](../src/backend/maintainer/README.md). Some gateway documentation predates the Developer consumer; inspect the current endpoint and configuration as well.
+The gateway uses bounded requests, role routing and PostgreSQL admission controls. Its token setting is an application reservation budget, not a measurement of provider billing. The Developer suggestion flow sends the report and saved checklist, excluding unsaved edits and private notes; the Maintainer summary uses bounded selected queue context. Treat prompts and generated content as untrusted; keep credentials and unnecessary private data out of inputs and evidence. Test authorization, stale results, malformed output, limits and provider failures when changing AI behavior. See the [gateway README](../src/backend/socllm/README.md), [Developer AI contract](../workflow/developer/ai-checklist-contract.md), and [Maintainer README](../src/backend/maintainer/README.md).
+
+### Reporter AI design and request flow
+
+The Reporter AI asks clarification questions about a new draft. It does not
+rewrite, submit or persist the draft. Earlier restructuring trials lost content
+on long reports; the question-only design leaves all edits with the Reporter.
+
+```mermaid
+sequenceDiagram
+    actor R as Reporter
+    participant UI as NewReport
+    participant API as ReportClarifyController
+    participant S as ReportClarifyService / Rules
+    participant G as SoC role gateway
+    participant L as SoC LLM
+    R->>UI: Check my report
+    UI->>API: POST title and description + CSRF
+    API->>API: Check active Reporter and fresh session
+    API->>S: Validate draft
+    S->>G: REPORTER_ASSIST
+    G->>G: Apply policy and PostgreSQL admission
+    G->>L: System instructions + untrusted draft
+    L-->>S: JSON through gateway
+    S->>S: Validate quotes, topics and questions
+    S-->>API: Validated result or safe error
+    API->>API: Recheck session/account for success
+    API-->>UI: Result or error
+    R->>UI: Edit draft manually
+```
+
+`POST /api/reporter/report-clarify` requires an authenticated, active Reporter,
+a fresh session and valid CSRF token. The body must be JSON, at most 128 KiB,
+with exactly `{title, description}` and no query string. Report-creation text
+rules apply. Refusals happen before the model call; a successful result is
+discarded if the session or account changed while it ran.
+
+The trusted system message instructs the model to ignore instructions in the
+untrusted title and description, avoid quoting template scaffolding, and never
+request screenshots. The model must return exactly:
+
+```json
+{
+  "unclear": [{"quote": "the second one", "question": "Which action do you mean?"}],
+  "missing": [{"category": "Environment", "question": "Which browser and version did you use?"}]
+}
+```
+
+There are at most 8 unclear items, with unique 1–300-unit quotes copied exactly
+from the submitted title or description. At most 7 topic items use each of
+Summary, Steps to reproduce, Expected behavior, Actual behavior, Environment,
+Frequency, and Error messages and logs once. Questions are 1–300 UTF-16 units on
+one visible line. Empty arrays are valid; extra keys, duplicates, wrong types,
+inexact quotes or invalid text reject the result.
+
+`ReportClarifyRules` normalizes question text before screening URLs, email and
+credential requests. A screened question drops only its item; if all items are
+dropped, the response is invalid. Controls, hidden or blank-rendering characters
+and questions without a letter or digit reject the whole result. Screening is a
+blocklist backstop: lookalike letters and some separator, URL and email variants
+remain known limitations. Plain-text rendering prevents generated links or HTML
+from becoming active.
+
+The frontend clears results on dismiss, another check, valid submission or
+unmount. It cancels its earlier request when appropriate and ignores stale
+responses; browser cancellation does not prove a provider call stopped. Results
+describe the draft sent at click time and are not refreshed by subsequent edits.
+Telemetry records outcomes, model, duration and item counts, without draft text,
+quotes or questions. Gateway token usage is unavailable through this endpoint.
+
+### Reporter AI configuration and limits
+
+Load settings into the backend process environment; `.env` is not loaded
+automatically. The example keeps AI disabled and contains no secrets.
+
+| Setting | Requirement |
+| --- | --- |
+| `SOC_LLM_ENABLED=true` | Enables configured live AI services. |
+| `SOC_LLM_MODEL` | Nonblank shared model; still required with the Reporter override. |
+| `SOC_LLM_MODEL_REPORTER=x-test-2` | Checked-in example choice. Missing or blank falls back to the shared model. |
+| `SOC_LLM_API_KEY_REPORTER` | Team-approved Reporter key; missing key leaves checking unavailable. |
+| `SOC_LLM_RPM` | Positive request budget approved for the configured key. |
+| `SOC_LLM_TPM` | At least 77,824 for Reporter admission. This is an application reservation budget. |
+
+| Policy | Input bytes | Instruction bytes | Output tokens | Deadline | Starts/account | In flight/account | Reservation |
+| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: |
+| `REPORTER_ASSIST` | 61,440 | 8,192 | 8,192 | 60 s | 3 per 5 min | 1 | 77,824 |
+| Developer / Maintainer initial policy | 24,576 | 8,192 | 2,048 | 30 s | 3 per 5 min | 1 | 34,816 |
+
+Transport caps are 384 KiB per provider request and 64 KiB per response. The
+provider request has exactly `model`, `messages`, `max_tokens`, `stream` and
+`response_format`; no `reasoning_effort` is sent. The Reporter budget provides
+headroom for default reasoning. Physical keys shared across roles also share
+admission budgets. The Reporter's 2-worker, queue-8 pool can become busy during
+long calls. The `x-test-2` provider test slot can change, so recheck compatibility
+before live use. Missing AI configuration does not prevent ordinary reporting.
+
+### Reporter errors and verification
+
+| Status | Code / meaning |
+| --- | --- |
+| 400 | `VALIDATION_FAILED`: body, content type, query or text rules. |
+| 401 / 403 | Session/account refusal, wrong role or CSRF refusal. |
+| 409 | `AI_BUSY`. |
+| 429 | `AI_RATE_LIMITED`; observe `Retry-After`. |
+| 502 | `AI_INVALID_OUTPUT`. |
+| 503 | `AI_UNAVAILABLE` or `STORAGE_UNAVAILABLE`. |
+| 504 | `AI_TIMEOUT`. |
+
+See the [Reporter AI contract](../workflow/reporter/report-clarify-api-contract.md)
+for exact shapes and error rules. Requirements are in
+`openspec/changes/reporter-report-clarify`; the endpoint contract remains marked
+draft for owner review.
+
+Run `npm run verify` from `src/frontend/reporter` for type checks, component
+tests and production build. From `src/backend/auth`, run the focused Windows
+command below; use `./gradlew` on macOS/Linux:
+
+```powershell
+.\gradlew.bat --no-daemon test --tests 'mp4.platform.ReportClarify*' --tests mp4.platform.SocLlmRoleConfigurationTest --tests mp4.socllm.SocLlmHttpProviderTest
+```
+
+Real-session integration and admission checks need the disposable PostgreSQL
+setup described in the auth README. Do not count skipped database tests as a
+pass. Run the Reporter API harness separately with
+`python workflow/verify.py --group reporter`, Docker and `POSTGRES_JDBC_JAR`.
+
+For a manual smoke check, sign in as a synthetic Reporter, check a fictional
+vague draft, verify exact quotes and useful questions, edit and dismiss without
+losing text, then submit and confirm the report. Also exercise unavailable AI
+and rate-limit messages. Use another role to confirm refusal before a model
+call. Record revision, setup, latency and outcomes separately for fake-provider,
+real-session and live-provider checks.
+
+Historical [integration evidence](../logs/reporter-report-clarify/group4.md)
+records 23 frontend tests, a 337-test backend run before the later visible-text
+fix, and 10 live synthetic drafts returning successfully in 9.3–34.6 seconds.
+The later review found a visible-character defect; current code adds a guard
+and regression tests, but that earlier review does not approve subsequent code.
+The [model-setting check](../logs/reporter-report-clarify/2026-11-13-model-example.md)
+records 23 passing configuration/loopback tests and no live request. These are
+historical observations, not checks rerun for this documentation edit or proof
+of a hosted deployment.
 
 ## 8. Changes, OpenSpec and evidence
 
