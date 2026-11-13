@@ -116,11 +116,16 @@ def main():
         psql("template1", f'CREATE DATABASE "{incompatible}" TEMPLATE "{fresh}"')
         for database in (auth_only, incompatible):
             psql(database_uri(database),
-                 "DROP TABLE IF EXISTS resolution_proposal_metadata, resolution_proposals, "
+                 "DROP TABLE IF EXISTS developer_shared_note_drafts, resolution_proposal_metadata, resolution_proposals, "
                  "report_history, report_comments, report_shared_notes, report_responses, "
                  "developer_notifications, developer_private_notes, investigation_checklists, reports, "
                  "mp4_shared_schema_history CASCADE; "
                  "DROP FUNCTION IF EXISTS mp4_capture_proposal_author(), mp4_report_version_timestamp()")
+
+        for database in (auth_only, incompatible):
+            leftover = psql(database_uri(database), "SELECT to_regclass('public.developer_shared_note_drafts')")
+            if leftover not in ("", "NULL"):
+                failures.append(f"shared draft table remained in {database} fixture ({leftover!r})")
 
         auth_tables = psql(database_uri(auth_only),
                            "SELECT to_regclass('public.app_accounts'), to_regclass('public.mp4_auth_schema_history')")
@@ -131,8 +136,9 @@ def main():
             failures.append(f"startup rejected the auth-only preprovisioned database: {''.join(migrated_output)[-3000:]}")
         else:
             tables = psql(database_uri(auth_only),
-                          "SELECT to_regclass('public.reports'), to_regclass('public.investigation_checklists')")
-            if tables != "reports|investigation_checklists":
+                          "SELECT to_regclass('public.reports'), to_regclass('public.investigation_checklists'), "
+                          "to_regclass('public.developer_shared_note_drafts')")
+            if tables != "reports|investigation_checklists|developer_shared_note_drafts":
                 failures.append(f"auth-only startup did not install shared tables (found {tables!r})")
         stop_app(migrated)
 
