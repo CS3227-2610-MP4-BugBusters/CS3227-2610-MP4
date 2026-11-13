@@ -5,8 +5,8 @@
     Inter,
     Segoe UI,
     sans-serif;
-  color: #18333b;
-  background: #f3f7f8;
+  color: #1f2328;
+  background: #f6f8fa;
   font-synthesis: none;
 }
 * {
@@ -39,7 +39,7 @@ h3 {
   margin: 24px 0 8px;
 }
 .eyebrow {
-  color: #087c80;
+  color: #0969da;
   letter-spacing: 2px;
   font-size: 12px;
   font-weight: 700;
@@ -48,7 +48,7 @@ button,
 select,
 input {
   font: inherit;
-  border: 1px solid #c8d6da;
+  border: 1px solid #d1d9e0;
   border-radius: 6px;
   background: white;
   padding: 10px;
@@ -62,12 +62,12 @@ button:disabled {
   cursor: default;
 }
 button:hover:not(:disabled) {
-  border-color: #09878b;
+  border-color: #0969da;
 }
 button:focus-visible,
 select:focus-visible,
 input:focus-visible {
-  outline: 3px solid #20b9bb;
+  outline: 3px solid #0969da;
   outline-offset: 2px;
 }
 .banner {
@@ -82,7 +82,7 @@ input:focus-visible {
   flex-wrap: wrap;
   background: white;
   padding: 20px;
-  border: 1px solid #dce5e7;
+  border: 1px solid #d1d9e0;
   border-radius: 10px;
   margin-bottom: 20px;
 }
@@ -103,7 +103,7 @@ select {
 .queue,
 .detail {
   background: white;
-  border: 1px solid #dce5e7;
+  border: 1px solid #d1d9e0;
   border-radius: 10px;
   padding: 20px;
 }
@@ -127,7 +127,7 @@ select {
 }
 .report-list button[aria-pressed="true"] {
   background: #e5f6f5;
-  border-left: 4px solid #087c80;
+  border-left: 4px solid #0969da;
 }
 small {
   color: #536e77;
@@ -164,7 +164,7 @@ dd {
   overflow-wrap: normal;
   white-space: pre;
   padding: 12px;
-  background: #f3f7f8;
+  background: #f6f8fa;
   border-radius: 6px;
 }
 .markdown-view table {
@@ -177,7 +177,7 @@ dd {
 .markdown-view th,
 .markdown-view td {
   padding: 6px 10px;
-  border: 1px solid #c8d6da;
+  border: 1px solid #d1d9e0;
 }
 .detail,
 .detail article,
@@ -189,7 +189,7 @@ dd {
   gap: 10px;
   margin: 16px 0;
   padding: 14px;
-  border: 1px solid #dce5e7;
+  border: 1px solid #d1d9e0;
   border-radius: 8px;
   background: #fff;
 }
@@ -238,4 +238,29 @@ dd {
   .report-list {
     max-height: 45vh;
   }
+}
+
+/* Match Reporter surfaces and controls in the signed-in workspace. */
+.role-workspace:not(.role-workspace--anonymous) { font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; }
+.role-workspace:not(.role-workspace--anonymous) .filters,
+.role-workspace:not(.role-workspace--anonymous) .queue,
+.role-workspace:not(.role-workspace--anonymous) .detail,
+.role-workspace:not(.role-workspace--anonymous) .summary-panel { border-radius: 6px; }
+@media (prefers-color-scheme: dark) {
+  .role-workspace:not(.role-workspace--anonymous) .filters,
+  .role-workspace:not(.role-workspace--anonymous) .queue,
+  .role-workspace:not(.role-workspace--anonymous) .detail,
+  .role-workspace:not(.role-workspace--anonymous) .action-panel,
+  .role-workspace:not(.role-workspace--anonymous) .summary-panel { background: #151b23; color: #f0f6fc; border-color: #3d444d; }
+  .role-workspace:not(.role-workspace--anonymous) button,
+  .role-workspace:not(.role-workspace--anonymous) input,
+  .role-workspace:not(.role-workspace--anonymous) select,
+  .role-workspace:not(.role-workspace--anonymous) textarea { background: #0d1117; color: #f0f6fc; border-color: #3d444d; }
+  .role-workspace:not(.role-workspace--anonymous) .report-list button[aria-pressed="true"] { background: #262c36; }
+  .role-workspace:not(.role-workspace--anonymous) small,
+  .role-workspace:not(.role-workspace--anonymous) dt { color: #b1bac4; }
+  .role-workspace:not(.role-workspace--anonymous) .markdown-view pre { background: #0d1117; }
+  .role-workspace:not(.role-workspace--anonymous) .summary-panel a { color: #79c0ff; }
+  .role-workspace:not(.role-workspace--anonymous) .banner { background: #302817; color: #f0e1bd; }
+  .role-workspace:not(.role-workspace--anonymous) [role="alert"] { background: #25171c; color: #ffb4ad; }
 }

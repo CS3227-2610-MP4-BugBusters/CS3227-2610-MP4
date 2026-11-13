@@ -36,16 +36,21 @@ const failure = (e: unknown) => {
 };
 type ActionName = "updatePriority" | "assignReport" | "returnResolution" | "closeReport" | "reopenReport" | "addComment";
 type ActionInput = Record<string, unknown>;
+const navigateTo = (path: string) => window.location.assign(path);
 export function App({
   queries,
   synthetic = false,
   authActions,
+  sharedEntry = false,
+  navigate = navigateTo,
 }: {
   queries: Queries;
   synthetic?: boolean;
   authActions?: AuthActions;
+  sharedEntry?: boolean;
+  navigate?: (path: string) => void;
 }) {
-  const [auth, setAuth] = useState<"loading" | "ready" | "error">("loading"),
+  const [auth, setAuth] = useState<"loading" | "ready" | "error" | "redirecting">("loading"),
     [authError, setAuthError] = useState<QueryError>(),
     [identity, setIdentity] = useState<{ displayName: string; role: string }>(),
     [session, setSession] = useState(0),
@@ -138,6 +143,11 @@ export function App({
         (u) => {
           if (g !== epoch.current) return;
           setIdentity({ displayName: u.displayName, role: u.role });
+          if (sharedEntry && u.active && (u.role === "DEVELOPER" || u.role === "REPORTER")) {
+            setAuth("redirecting");
+            navigate(u.role === "DEVELOPER" ? "/developer/" : "/reporter/");
+            return;
+          }
           if (!u.active || u.role !== "MAINTAINER") {
             deny(new QueryError("denied"), g);
             return;
@@ -154,7 +164,7 @@ export function App({
       c.abort();
       if (g === epoch.current) epoch.current++;
     };
-  }, [queries, refresh]);
+  }, [queries, refresh, sharedEntry, navigate]);
   useEffect(() => {
     if (auth !== "ready" || session !== epoch.current) return;
     const g = epoch.current,
@@ -401,9 +411,9 @@ export function App({
     <main>
       <header>
         <div>
-          <p className="eyebrow">BUGBUSTERS / MAINTAINER</p>
-          <h1>Report queue</h1>
-          <p>Review reports and investigation evidence.</p>
+          <p className="eyebrow">{sharedEntry && auth !== "ready" ? "BUGBUSTERS" : "BUGBUSTERS / MAINTAINER"}</p>
+          <h1>{sharedEntry && auth !== "ready" ? "Bug Tracker" : "Report queue"}</h1>
+          <p>{sharedEntry && auth !== "ready" ? "Sign in to your workspace." : "Review reports and investigation evidence."}</p>
         </div>
         <button onClick={reload}>Refresh session and queue</button>
       </header>
@@ -412,15 +422,17 @@ export function App({
           Synthetic demonstration data · development only
         </p>
       )}
-      {auth === "loading" ? (
+      {auth === "redirecting" ? (
+        <p role="status">Opening your workspace…</p>
+      ) : auth === "loading" ? (
         <p role="status">Checking access…</p>
       ) : auth === "error" ? (
         authActions && authError?.code === "session" ? (
           createRoleSignIn(
             (type, props, ...children) => createElement(type, props as never, ...(children as ReactNode[])),
             {
-              role: "Maintainer",
-              description: "Review reports and investigation evidence.",
+              role: sharedEntry ? "Bug Tracker" : "Maintainer",
+              description: sharedEntry ? "Sign in with your account." : "Review reports and investigation evidence.",
               username,
               password,
               busy: !!authBusy,
