@@ -8,6 +8,10 @@ export default defineConfig(({ mode }) => ({
   server: {
     fs: { allow: [".."] },
     proxy: {
+      "/account": {
+        target: loadEnv(mode, ".", "MP4_").MP4_AUTH_ORIGIN ?? "http://127.0.0.1:8080",
+        changeOrigin: false,
+      },
       "/developer": { target: "http://127.0.0.1:5174", ws: true },
       "/reporter": { target: "http://127.0.0.1:5175", ws: true },
       "/api": {

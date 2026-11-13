@@ -11,6 +11,10 @@
 <section id="signed-out" hidden><h2>Sign in</h2><p>Open your role’s page to sign in.</p><nav><a href="/">Maintainer</a><a href="/developer/">Developer</a><a href="/reporter/">Reporter</a></nav></section>
 <div id="account" hidden>
 <section><h2>Your account</h2><p id="identity"></p></section>
+<section id="display-name-section" hidden><h2>Change display name</h2><p>Your name appears to other users. Your username and role stay the same.</p>
+<form id="display-name-form">
+<label>Display name<input id="display-name" name="displayName" autocomplete="name" maxlength="200" required></label>
+<button type="submit">Save display name</button></form></section>
 <section id="password-section" hidden><h2>Change password</h2><p>Use 12–72 UTF-8 bytes. Changing your password signs you out of all sessions.</p>
 <form id="password-form">
 <label>Current password<input name="currentPassword" type="password" autocomplete="current-password" required></label>

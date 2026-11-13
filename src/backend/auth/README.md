@@ -2,7 +2,7 @@
 
 Added `/account/`, linked from every role. A signed-in Maintainer can create
 Reporter, Developer and Maintainer accounts with a username, display name and
-initial password. Ordinary accounts can change their own password by supplying
+initial password. Ordinary accounts can update their own display name and change their password by supplying
 the current password and a new 12–72 UTF-8 byte password. A successful change
 invalidates all sessions; sign in again afterward.
 

@@ -8,6 +8,7 @@ export default defineConfig({
     fs: { allow: [".."] },
     proxy: {
       "/api": "http://127.0.0.1:8080",
+      "/account": "http://127.0.0.1:8080",
     },
   },
   resolve: {
