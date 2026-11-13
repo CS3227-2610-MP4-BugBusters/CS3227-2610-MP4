@@ -68,12 +68,16 @@ async function csrfHeaders(): Promise<Record<string, string>> {
   return { "X-CSRF-TOKEN": value.token };
 }
 
-async function send(path: string, method: string, body: unknown): Promise<unknown> {
-  return call(path, {
-    method,
-    headers: { ...(await csrfHeaders()), "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+async function send(path: string, method: string, body: unknown, signal?: AbortSignal): Promise<unknown> {
+  return call(
+    path,
+    {
+      method,
+      headers: { ...(await csrfHeaders()), "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+    signal,
+  );
 }
 
 export async function currentUser(signal?: AbortSignal): Promise<User> {
@@ -130,6 +134,86 @@ export async function postComment(id: string, body: string): Promise<Comment> {
   const value = parseComment(await send(`${reports}/${encodeURIComponent(id)}/comments`, "POST", { body }));
   if (value === null) throw new ApiError(0, "BAD_RESPONSE");
   return value;
+}
+
+// Report check (openspec/changes/reporter-report-clarify, design 3). The server
+// validates the model output; the client re-checks the shape so a bad response
+// can never reach the screen.
+
+export const MISSING_CATEGORIES = [
+  "Summary",
+  "Steps to reproduce",
+  "Expected behavior",
+  "Actual behavior",
+  "Environment",
+  "Frequency",
+  "Error messages and logs",
+] as const;
+
+export type MissingCategory = (typeof MISSING_CATEGORIES)[number];
+export type UnclearPart = { quote: string; question: string };
+export type MissingItem = { category: MissingCategory; question: string };
+export type ReportCheck = { unclear: UnclearPart[]; missing: MissingItem[] };
+
+export async function checkReport(title: string, description: string, signal?: AbortSignal): Promise<ReportCheck> {
+  const result = parseReportCheck(await send("/api/reporter/report-clarify", "POST", { title, description }, signal));
+  if (result.unclear.some(({ quote }) => !title.includes(quote) && !description.includes(quote))) {
+    throw new ApiError(0, "AI_INVALID_OUTPUT");
+  }
+  return result;
+}
+
+function parseReportCheck(value: unknown): ReportCheck {
+  if (!isRecord(value) || !hasOnlyKeys(value, ["unclear", "missing"])) throw new ApiError(0, "BAD_RESPONSE");
+  const { unclear, missing } = value;
+  if (!Array.isArray(unclear) || unclear.length > 8 || !Array.isArray(missing) || missing.length > 7) {
+    throw new ApiError(0, "BAD_RESPONSE");
+  }
+  const quotes = new Set<string>();
+  const parsedUnclear = unclear.map((item): UnclearPart => {
+    if (
+      !isRecord(item) ||
+      !hasOnlyKeys(item, ["quote", "question"]) ||
+      !isBoundedText(item.quote, true) ||
+      !isBoundedText(item.question, false) ||
+      quotes.has(item.quote)
+    ) {
+      throw new ApiError(0, "BAD_RESPONSE");
+    }
+    quotes.add(item.quote);
+    return { quote: item.quote, question: item.question };
+  });
+  const categories = new Set<string>();
+  const parsedMissing = missing.map((item): MissingItem => {
+    if (
+      !isRecord(item) ||
+      !hasOnlyKeys(item, ["category", "question"]) ||
+      typeof item.category !== "string" ||
+      !(MISSING_CATEGORIES as readonly string[]).includes(item.category) ||
+      categories.has(item.category) ||
+      !isBoundedText(item.question, false)
+    ) {
+      throw new ApiError(0, "BAD_RESPONSE");
+    }
+    categories.add(item.category);
+    return { category: item.category as MissingCategory, question: item.question };
+  });
+  return { unclear: parsedUnclear, missing: parsedMissing };
+}
+
+/** 1-300 characters; questions must also be one line. Quotes may span lines. */
+function isBoundedText(value: unknown, multiline: boolean): value is string {
+  return (
+    typeof value === "string" &&
+    value.length >= 1 &&
+    value.length <= 300 &&
+    (multiline || !/[\r\n]/.test(value))
+  );
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, keys: string[]): boolean {
+  const actual = Object.keys(value);
+  return actual.length === keys.length && keys.every((key) => key in value);
 }
 
 function parsePage<T>(value: unknown, item: (v: unknown) => T | null): Page<T> {

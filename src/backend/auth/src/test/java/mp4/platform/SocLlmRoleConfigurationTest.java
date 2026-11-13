@@ -108,6 +108,33 @@ class SocLlmRoleConfigurationTest {
                 });
     }
 
+    private static org.springframework.core.env.Environment env(String... pairs) {
+        var environment = new org.springframework.core.env.StandardEnvironment();
+        Map<String, Object> values = new java.util.HashMap<>();
+        for (int i = 0; i < pairs.length; i += 2) values.put(pairs[i], pairs[i + 1]);
+        environment.getPropertySources().addFirst(new org.springframework.core.env.MapPropertySource("test", values));
+        return environment;
+    }
+
+    @Test void RC09a_reporterModelOverrideIsUsedWhenNonblankAndTrimmed() {
+        var environment = env("SOC_LLM_MODEL", "shared-model", "SOC_LLM_MODEL_REPORTER", "  reporter-model ");
+        assertEquals("reporter-model", SocLlmRoleConfiguration.modelForRole(environment, SocLlmContracts.Role.REPORTER));
+    }
+
+    @Test void RC09b_reporterModelFallsBackToSharedModelWhenOverrideIsBlankOrMissing() {
+        assertEquals("shared-model", SocLlmRoleConfiguration.modelForRole(
+                env("SOC_LLM_MODEL", "shared-model", "SOC_LLM_MODEL_REPORTER", "   "), SocLlmContracts.Role.REPORTER));
+        assertEquals("shared-model", SocLlmRoleConfiguration.modelForRole(
+                env("SOC_LLM_MODEL", "shared-model"), SocLlmContracts.Role.REPORTER));
+    }
+
+    @Test void RC09_reporterOverrideDoesNotAffectDeveloperOrMaintainerModels() {
+        var environment = env("SOC_LLM_MODEL", "shared-model", "SOC_LLM_MODEL_REPORTER", "reporter-model",
+                "SOC_LLM_MODEL_DEVELOPER", "developer-model");
+        assertEquals("developer-model", SocLlmRoleConfiguration.modelForRole(environment, SocLlmContracts.Role.DEVELOPER));
+        assertEquals("shared-model", SocLlmRoleConfiguration.modelForRole(environment, SocLlmContracts.Role.MAINTAINER));
+    }
+
     @Test void blankDeveloperSuggestionModelOverrideFallsBackToSharedModel() {
         contexts.withUserConfiguration(SocLlmRoleConfiguration.class, SuggestionProviderConfiguration.class)
                 .withPropertyValues("SOC_LLM_ENABLED=true", "SOC_LLM_API_KEY_DEVELOPER=developer-placeholder",

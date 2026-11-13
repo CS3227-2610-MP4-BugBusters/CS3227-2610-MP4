@@ -89,4 +89,60 @@ class SocLlmHttpProviderTest {
         assertEquals(FailureCode.AI_INVALID_OUTPUT,assertThrows(SummaryFailure.class,()->large.generate("rules","data",20,Duration.ofSeconds(2))).failureCode());
         assertEquals(FailureCode.AI_INVALID_OUTPUT,assertThrows(SummaryFailure.class,()->large.generate("rules","x".repeat(25_000),20,Duration.ofSeconds(2))).failureCode());
     }
+
+    private static String ok(){return "{\"choices\":[{\"message\":{\"content\":\"{\\\"ok\\\":true}\"}}]}";}
+
+    @Test void RC09c_requestBodyHasExactlyTheFiveExpectedKeysAndNoReasoningEffort() throws Exception {
+        java.util.concurrent.atomic.AtomicReference<String> seen=new java.util.concurrent.atomic.AtomicReference<>();
+        var provider=provider(s->s.createContext("/chat",exchange->{
+            seen.set(new String(exchange.getRequestBody().readAllBytes(),StandardCharsets.UTF_8));reply(exchange,200,ok());}));
+        provider.generate("rules","data",8_192,Duration.ofSeconds(2));
+        var root=new ObjectMapper().readTree(seen.get());
+        java.util.Set<String> keys=new java.util.TreeSet<>();root.fieldNames().forEachRemaining(keys::add);
+        assertEquals(java.util.Set.of("model","messages","max_tokens","stream","response_format"),keys);
+        assertFalse(seen.get().contains("reasoning_effort"));
+        assertEquals(8_192,root.get("max_tokens").asInt());
+    }
+
+    @Test void RC03c_threeByteUtf8DescriptionOfTwentyThousandCharactersIsSent() throws Exception {
+        AtomicInteger calls=new AtomicInteger();
+        var provider=provider(s->s.createContext("/chat",exchange->{calls.incrementAndGet();
+            exchange.getRequestBody().readAllBytes();reply(exchange,200,ok());}));
+        assertEquals("{\"ok\":true}",provider.generate("rules","€".repeat(20_000),8_192,Duration.ofSeconds(2)));
+        assertEquals(1,calls.get());
+    }
+
+    @Test void RC03c_inputCeilingIs61440BytesAndInstructionCeilingStays8192() throws Exception {
+        AtomicInteger calls=new AtomicInteger();
+        var provider=provider(s->s.createContext("/chat",exchange->{calls.incrementAndGet();
+            exchange.getRequestBody().readAllBytes();reply(exchange,200,ok());}));
+        provider.generate("rules","x".repeat(61_440),8_192,Duration.ofSeconds(2));
+        assertEquals(1,calls.get());
+        assertEquals(FailureCode.AI_INVALID_OUTPUT,assertThrows(SummaryFailure.class,
+                ()->provider.generate("rules","x".repeat(61_441),8_192,Duration.ofSeconds(2))).failureCode());
+        assertEquals(FailureCode.AI_INVALID_OUTPUT,assertThrows(SummaryFailure.class,
+                ()->provider.generate("r".repeat(8_193),"data",8_192,Duration.ofSeconds(2))).failureCode());
+        assertEquals(1,calls.get());
+    }
+
+    @Test void RC03c_requestBodyCeilingIs384KiBAfterJsonEscaping() throws Exception {
+        AtomicInteger calls=new AtomicInteger();
+        var provider=provider(s->s.createContext("/chat",exchange->{calls.incrementAndGet();
+            exchange.getRequestBody().readAllBytes();reply(exchange,200,ok());}));
+        // Each U+0001 is escaped to six bytes: about 368,640 body bytes, above the old 128 KiB and under 384 KiB.
+        provider.generate("rules","\u0001".repeat(61_440),8_192,Duration.ofSeconds(2));
+        assertEquals(1,calls.get());
+        // 8,192 + 61,440 escaped characters exceed 393,216 bytes and must be rejected before sending.
+        assertEquals(FailureCode.AI_INVALID_OUTPUT,assertThrows(SummaryFailure.class,
+                ()->provider.generate("\u0001".repeat(8_192),"\u0001".repeat(61_440),8_192,Duration.ofSeconds(2))).failureCode());
+        assertEquals(1,calls.get());
+    }
+
+    @Test void RC03c_deadlineCeilingIsSixtySecondsNotThirty() throws Exception {
+        var provider=provider(s->s.createContext("/chat",exchange->{
+            exchange.getRequestBody().readAllBytes();
+            try{Thread.sleep(32_000);}catch(InterruptedException e){Thread.currentThread().interrupt();}
+            try{reply(exchange,200,ok());}catch(java.io.IOException ignored){}}));
+        assertEquals("{\"ok\":true}",provider.generate("rules","data",8_192,Duration.ofSeconds(50)));
+    }
 }

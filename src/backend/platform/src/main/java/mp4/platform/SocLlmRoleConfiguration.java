@@ -50,6 +50,12 @@ class SocLlmRoleConfiguration {
                 return developerModel.trim();
             }
         }
+        if (role == SocLlmContracts.Role.REPORTER) {
+            String reporterModel = environment.getProperty("SOC_LLM_MODEL_REPORTER");
+            if (SocLlmConfiguration.hasValue(reporterModel)) {
+                return reporterModel.trim();
+            }
+        }
         return sharedModel;
     }
 
