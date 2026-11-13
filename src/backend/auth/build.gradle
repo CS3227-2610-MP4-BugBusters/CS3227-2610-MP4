@@ -51,6 +51,9 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 tasks.named('processResources') {
+    from('../../frontend/shared/role-workspace.css') {
+        into 'static/account'
+    }
     from('../maintainer/src/main/resources/db/shared') {
         into 'db/shared'
     }

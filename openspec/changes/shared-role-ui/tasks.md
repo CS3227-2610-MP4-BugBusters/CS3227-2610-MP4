@@ -6,6 +6,7 @@
 - [x] 1.2 Implement the shared shell and styling, integrate Developer and Maintainer, and provide a Reporter-compatible interface.
 - [x] 1.3 Independently verify both frontend suites and production builds; review narrow viewport and keyboard behavior.
 - [x] 1.4 Document Reporter integration and remaining real-service limitations.
+- [x] 1.5 Consolidate Maintainer identity and sign-out into the workspace header; align Account navigation, surfaces and light/dark colors with the dashboard. Run Maintainer verification and check packaged Account resources and session controls. Presentation follow-up authorized without TDD. Evidence: `logs/maintainer/2026-11-13-account-ui.md`; visual browser inspection remains unavailable.
 
 ## 2. Shared sign-in presentation
 

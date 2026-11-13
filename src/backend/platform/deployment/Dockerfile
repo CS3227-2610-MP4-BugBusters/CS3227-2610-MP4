@@ -36,6 +36,7 @@ RUN npm run build
 FROM eclipse-temurin:17-jdk-jammy AS package
 WORKDIR /workspace/src/backend/auth
 COPY src/backend/auth/ ./
+COPY src/frontend/shared/role-workspace.css /workspace/src/frontend/shared/role-workspace.css
 COPY src/backend/platform/ ../platform/
 COPY src/backend/maintainer/ ../maintainer/
 COPY src/backend/socllm/ ../socllm/

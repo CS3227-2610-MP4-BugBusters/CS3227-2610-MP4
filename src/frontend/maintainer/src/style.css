@@ -20,7 +20,7 @@ main {
   margin: auto;
   padding: 32px;
 }
-header {
+main > header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -132,7 +132,7 @@ select {
 small {
   color: #536e77;
 }
-nav {
+nav[aria-label="Report pages"] {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -213,12 +213,16 @@ dd {
   padding: 14px;
   border-radius: 6px;
 }
-.account-bar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
+.role-workspace__header .workspace-sign-out {
+  font-weight: 600;
+  padding: 5px 12px;
+  color: #f0f6fc;
+  background: transparent;
+  border-color: #6e7781;
+}
+.role-workspace__header .workspace-sign-out:hover:not(:disabled) {
+  background: #3d444d;
+  border-color: #b1bac4;
 }
 @media (max-width: 760px) {
   main {
@@ -227,7 +231,7 @@ dd {
   .workspace {
     grid-template-columns: 1fr;
   }
-  header {
+  main > header {
     align-items: start;
     flex-direction: column;
   }
@@ -252,7 +256,7 @@ dd {
   .role-workspace:not(.role-workspace--anonymous) .detail,
   .role-workspace:not(.role-workspace--anonymous) .action-panel,
   .role-workspace:not(.role-workspace--anonymous) .summary-panel { background: #151b23; color: #f0f6fc; border-color: #3d444d; }
-  .role-workspace:not(.role-workspace--anonymous) button,
+  .role-workspace:not(.role-workspace--anonymous) button:not(.workspace-sign-out),
   .role-workspace:not(.role-workspace--anonymous) input,
   .role-workspace:not(.role-workspace--anonymous) select,
   .role-workspace:not(.role-workspace--anonymous) textarea { background: #0d1117; color: #f0f6fc; border-color: #3d444d; }
