@@ -65,7 +65,8 @@ ENV SERVER_PORT=10000
 COPY --from=package /workspace/src/backend/auth/build/auth-distribution/classes/ ./classes/
 COPY --from=package /workspace/src/backend/auth/build/auth-distribution/lib/ ./lib/
 COPY src/backend/platform/deployment/start.sh ./start.sh
-RUN chmod 0555 /app/start.sh \
+RUN sed -i 's/\r$//' /app/start.sh \
+    && chmod 0555 /app/start.sh \
     && chown -R 10001:10001 /app
 USER 10001:10001
 EXPOSE 10000
