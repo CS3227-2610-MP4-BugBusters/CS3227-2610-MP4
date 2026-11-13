@@ -23,18 +23,19 @@ change a policy.
 
 #### Scenario: TL-02 Invalid policy rejected
 
-- **WHEN** a policy is built with a zero or negative value, a deadline over 30 seconds, a window over 24 hours, or input/instruction/output limits above the transport ceilings (24,576 / 8,192 bytes, 2,048 tokens)
+- **WHEN** a policy is built with a zero or negative value, a deadline over 60 seconds, a window over 24 hours, or input/instruction/output limits above the transport ceilings (61,440 / 8,192 bytes, 8,192 tokens; raised by `reporter-report-clarify`)
 - **THEN** construction fails and no gateway service using it is created
 
 ### Requirement: AI-TASK-INITIAL Initial values preserve current limits
 
-Every task SHALL start with these values: 24,576 input bytes, 8,192 instruction
-bytes, 2,048 output tokens, 30-second max deadline, 3 starts per account per
-rolling 5 minutes, and 1 in-flight call per account.
+Developer assist and Maintainer queue summary SHALL use these values: 24,576 input
+bytes, 8,192 instruction bytes, 2,048 output tokens, 30-second max deadline, 3
+starts per account per rolling 5 minutes, and 1 in-flight call per account. Reporter
+assist has its own policy, defined by `reporter-report-clarify`.
 
 #### Scenario: TL-03 Initial values
 
-- **WHEN** the policies for Reporter assist, Developer assist and Maintainer queue summary are read
+- **WHEN** the policies for Developer assist and Maintainer queue summary are read
 - **THEN** each one has exactly the initial values above
 
 ### Requirement: AI-TASK-CALL-BOUNDS Calls are checked against their task's policy
