@@ -10,6 +10,26 @@ function signedOut() {
   el("account").hidden = true;
   el("signed-out").hidden = false;
   document.querySelectorAll('input[type="password"]').forEach((input) => { input.value = ""; });
+  window.location.replace("/");
+}
+function showAccount(user) {
+  const role = user.role.charAt(0) + user.role.slice(1).toLowerCase();
+  el("identity").textContent = user.displayName;
+  el("username").textContent = user.username;
+  el("account-role").textContent = role;
+  el("workspace-role").textContent = role;
+  el("workspace-role").hidden = false;
+  el("workspace-account").hidden = false;
+  el("workspace-navigation").hidden = false;
+  el("workspace-navigation").setAttribute("aria-label", `${role} navigation`);
+  el("workspace").classList.remove("role-workspace--anonymous");
+  el("demo-notice").hidden = !user.demoLocked;
+  el("display-name").value = user.displayName;
+  el("back").href = routes[user.role] || "/";
+  el("account").hidden = false;
+  el("display-name-section").hidden = user.demoLocked;
+  el("password-section").hidden = user.demoLocked;
+  el("create-section").hidden = user.role !== "MAINTAINER";
 }
 el("sign-out").addEventListener("click", async () => {
   const button = el("sign-out");
@@ -22,7 +42,6 @@ el("sign-out").addEventListener("click", async () => {
     const response = await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "X-CSRF-TOKEN": csrf.token } });
     if (!response.ok) throw new Error("Unable to sign out. Please try again.");
     signedOut();
-    window.location.assign("/");
   } catch (error) {
     status(error.message || "Unable to sign out. Please try again.");
   } finally {
@@ -88,19 +107,12 @@ el("display-name-form").addEventListener("submit", (event) => {
     const fields = Object.fromEntries(new FormData(form));
     await request("/api/account/display-name", { displayName: fields.displayName });
     const user = await request("/api/account");
-    el("identity").textContent = `${user.displayName} · ${user.username} · ${user.role.toLowerCase()}`;
     form.reset();
-    el("display-name").value = user.displayName;
+    showAccount(user);
     status("Display name updated.");
   });
 });
 void request("/api/account").then((user) => {
-  el("identity").textContent = `${user.displayName} · ${user.username} · ${user.role.toLowerCase()}`;
-  el("display-name").value = user.displayName;
-  el("back").href = routes[user.role] || "/";
-  el("account").hidden = false;
-  el("display-name-section").hidden = user.demoLocked;
-  el("password-section").hidden = user.demoLocked;
-  el("create-section").hidden = user.role !== "MAINTAINER";
+  showAccount(user);
   status("");
 }).catch((error) => status(error.message || "Unable to load your account."));

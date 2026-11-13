@@ -17,3 +17,4 @@
 
 - [ ] 3.1 Verify role-aware routing, inactive denial and no wrong-role queue fetch against a focused Red baseline.
 - [ ] 3.2 Integrate the root entry with existing sessions and verify role routing, permission boundaries and responsive presentation.
+- [x] 3.3 Restore Account header, identity and navigation after the profile merge; remove Developer and Reporter credential forms and return signed-out visitors to `/`. Preserve CSRF-protected logout and recoverable errors. Verify both role frontends and Account DOM/session controls. Owner requested direct implementation without TDD. Evidence: `logs/maintainer/2026-11-13-account-root-login.md`; browser inspection unavailable.

@@ -21,6 +21,8 @@ const DEV_COMMENT = {
   createdAt: "2026-11-09T06:00:00.000Z",
 };
 
+const navigate = vi.fn();
+
 let calls: { url: string; init: RequestInit }[] = [];
 
 function serve(handler: Handler) {
@@ -45,6 +47,7 @@ function common(url: string): ReturnType<Handler> | null {
 }
 
 beforeEach(() => {
+  navigate.mockClear();
   window.location.hash = "";
 });
 
@@ -63,15 +66,42 @@ describe("routes", () => {
 });
 
 describe("session", () => {
-  it("shows the sign-in form when there is no session", async () => {
+  it.each([204, 503])("handles logout status %s without a workspace login", async (status) => {
+    serve((url) => {
+      const shared = common(url);
+      if (shared) return shared;
+      if (url === "/api/auth/logout") return { status };
+      if (url.startsWith("/api/reporter/reports?")) return { status: 200, body: { items: [], page: 1, pageSize: 25, totalItems: 0 } };
+      return { status: 404 };
+    });
+    render(<App navigate={navigate} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+    if (status === 204) {
+      await waitFor(() => expect(navigate).toHaveBeenCalledWith("/"));
+      expect(screen.queryByText(ME.displayName)).toBeNull();
+      expect(screen.queryByLabelText("Username")).toBeNull();
+    } else {
+      expect((await screen.findByRole("alert")).textContent).toContain("Unable to sign out");
+      expect(navigate).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
+    }
+    const logout = calls.find((call) => call.url === "/api/auth/logout");
+    expect(logout?.init.method).toBe("POST");
+    expect(new Headers(logout?.init.headers).get("X-CSRF-TOKEN")).toBe("tok");
+  });
+
+  it("returns to the root login when there is no session", async () => {
     serve((url) => (url === "/api/auth/me" ? { status: 401, body: { code: "UNAUTHENTICATED" } } : { status: 404 }));
-    render(<App />);
-    expect(await screen.findByRole("heading", { name: "Sign in to report bugs" })).toBeTruthy();
+    render(<App navigate={navigate} />);
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/"));
+    expect(screen.queryByLabelText("Username")).toBeNull();
+    expect(screen.queryByLabelText("Password")).toBeNull();
+    expect(calls.some((c) => c.url.startsWith("/api/reporter"))).toBe(false);
   });
 
   it("refuses non-Reporter accounts without loading reports", async () => {
     serve((url) => (url === "/api/auth/me" ? { status: 200, body: { ...ME, role: "DEVELOPER" } } : { status: 500 }));
-    render(<App />);
+    render(<App navigate={navigate} />);
     expect((await screen.findByRole("alert")).textContent).toContain("Reporter accounts");
     expect(calls.some((c) => c.url.startsWith("/api/reporter"))).toBe(false);
   });
@@ -95,7 +125,7 @@ describe("report list", () => {
       }
       return { status: 404 };
     });
-    render(<App />);
+    render(<App navigate={navigate} />);
     expect(await screen.findByRole("link", { name: "Login fails" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Old crash" }).getAttribute("href")).toBe("#/reports/55555555-5555-4555-8555-555555555555");
     expect(screen.getByRole("button", { name: /1 Open/ })).toBeTruthy();
@@ -122,7 +152,7 @@ describe("report page", () => {
   it("renders the description and comments as safe Markdown in a timeline", async () => {
     reportServer(() => ({ status: 500 }));
     window.location.hash = `#/reports/${REPORT.id}`;
-    const { container } = render(<App />);
+    const { container } = render(<App navigate={navigate} />);
     expect(await screen.findByText("Dana Dev")).toBeTruthy();
     expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Login fails");
     await waitFor(() => expect(container.querySelector("strong")?.textContent).toBeTruthy());
@@ -136,7 +166,7 @@ describe("report page", () => {
     const posted = { ...DEV_COMMENT, id: "66666666-6666-4666-8666-666666666666", body: "Attached.", author: { id: ME.id, displayName: ME.displayName, role: "REPORTER" } };
     reportServer(() => ({ status: 201, body: posted }));
     window.location.hash = `#/reports/${REPORT.id}`;
-    render(<App />);
+    render(<App navigate={navigate} />);
     fireEvent.change(await screen.findByRole("textbox", { name: "Comment" }), { target: { value: "Attached." } });
     fireEvent.click(screen.getByRole("button", { name: "Comment" }));
     expect(await screen.findByText("Attached.")).toBeTruthy();
@@ -150,7 +180,7 @@ describe("report page", () => {
   it("keeps the draft and shows the wait time when rate limited", async () => {
     reportServer(() => ({ status: 429, body: { code: "RATE_LIMITED", message: "x", requestId: "r" }, headers: { "Retry-After": "17" } }));
     window.location.hash = `#/reports/${REPORT.id}`;
-    render(<App />);
+    render(<App navigate={navigate} />);
     fireEvent.change(await screen.findByRole("textbox", { name: "Comment" }), { target: { value: "secret draft" } });
     fireEvent.click(screen.getByRole("button", { name: "Comment" }));
     const alert = await screen.findByRole("alert");
@@ -162,7 +192,7 @@ describe("report page", () => {
   it("links back to the reports list from the report page", async () => {
     reportServer(() => ({ status: 500 }));
     window.location.hash = `#/reports/${REPORT.id}`;
-    render(<App />);
+    render(<App navigate={navigate} />);
     const crumbs = await screen.findByRole("navigation", { name: "Breadcrumb" });
     expect(crumbs.querySelector("a")?.getAttribute("href")).toBe("#/");
     expect(crumbs.textContent).toContain("Your reports");
@@ -180,7 +210,7 @@ describe("report page", () => {
       return { status: 404 };
     });
     window.location.hash = "#/?page=2";
-    render(<App />);
+    render(<App navigate={navigate} />);
     await screen.findByRole("link", { name: "Login fails" });
     window.location.hash = `#/reports/${REPORT.id}`;
     window.dispatchEvent(new HashChangeEvent("hashchange"));
@@ -191,7 +221,7 @@ describe("report page", () => {
   it("offers editing only while the report is submitted", async () => {
     reportServer(() => ({ status: 500 }));
     window.location.hash = `#/reports/${REPORT.id}`;
-    render(<App />);
+    render(<App navigate={navigate} />);
     expect(await screen.findByRole("button", { name: "Edit description" })).toBeTruthy();
   });
 });

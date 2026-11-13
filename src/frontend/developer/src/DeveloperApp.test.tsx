@@ -12,7 +12,6 @@ vi.mock("./DeveloperChecklist", () => ({
 
 const currentUserPath = "/api/auth/me";
 const csrfPath = "/api/auth/csrf";
-const loginPath = "/api/auth/login";
 const logoutPath = "/api/auth/logout";
 const reportsPath = "/api/developer/reports";
 const assignedReport = {
@@ -21,6 +20,8 @@ const assignedReport = {
   status: "ASSIGNED",
 };
 const csrfToken = "session-bound-csrf-token";
+
+const navigate = vi.fn();
 
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
 let authenticated: boolean;
@@ -54,18 +55,6 @@ function responseFor(path: string, init?: RequestInit): Response {
       : jsonResponse({ code: "UNAUTHENTICATED", message: "Sign in", requestId: "r1" }, 401);
   }
   if (path === csrfPath) return csrfResponse();
-  if (path === loginPath && init?.method === "POST") {
-    authenticated = true;
-    activeDeveloper = new URLSearchParams(String(init.body)).get("username") ?? "developer.one";
-    return jsonResponse({
-      id: activeDeveloper === "developer.two"
-        ? "00000000-0000-4000-8000-000000000002"
-        : "00000000-0000-4000-8000-000000000001",
-      displayName: activeDeveloper === "developer.two" ? "Developer Two" : "Developer One",
-      role: "DEVELOPER",
-      active: true,
-    });
-  }
   if (path === logoutPath && init?.method === "POST") {
     authenticated = false;
     return new Response(null, { status: 204 });
@@ -89,6 +78,7 @@ function headerValue(headers: HeadersInit | undefined, name: string): string | u
 }
 
 beforeEach(() => {
+  navigate.mockClear();
   authenticated = false;
   activeDeveloper = "developer.one";
   listResponse = jsonResponse({ items: [assignedReport], page: 1, pageSize: 20, totalItems: 1 });
@@ -112,7 +102,7 @@ describe("DeveloperApp authenticated report journey", () => {
       { id: "00000000-0000-4000-8000-000000000203", type: "RESOLUTION_RETURNED", createdAt: "2026-11-10T08:02:00Z", read: true, reportId: assignedReport.id },
       { id: "00000000-0000-4000-8000-000000000204", type: "REOPENED", createdAt: "2026-11-10T08:03:00Z", read: false, reportId: null },
     ] });
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
     const region = await screen.findByRole("region", { name: "Notifications" });
     await within(region).findByText("New report assigned");
     expect(region.textContent).toMatch(/assigned/i);
@@ -134,7 +124,7 @@ describe("DeveloperApp authenticated report journey", () => {
       if (String(input) === "/api/developer/notifications") return pending;
       return responseFor(String(input), init);
     });
-    const { unmount } = render(<DeveloperApp />);
+    const { unmount } = render(<DeveloperApp navigate={navigate} />);
     expect(await screen.findByRole("status", { name: /loading notifications/i })).toBeTruthy();
     resolveNotifications(jsonResponse({ items: [] }));
     expect(await screen.findByText(/no notifications/i)).toBeTruthy();
@@ -144,7 +134,7 @@ describe("DeveloperApp authenticated report journey", () => {
       if (String(input) === "/api/developer/notifications") return jsonResponse({ code: "STORAGE_UNAVAILABLE" }, 503);
       return responseFor(String(input), init);
     });
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
     const errorRegion = await screen.findByRole("region", { name: "Notifications" });
     expect(await within(errorRegion).findByRole("alert", { name: "Notification error" })).toBeTruthy();
   });
@@ -155,7 +145,7 @@ describe("DeveloperApp authenticated report journey", () => {
     notificationsResponse = jsonResponse({ items: [
       { id: notificationId, type: "ASSIGNED", createdAt: "2026-11-10T08:00:00Z", read: false, reportId: assignedReport.id },
     ] });
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
     const region = await screen.findByRole("region", { name: "Notifications" });
     fireEvent.click(await within(region).findByRole("button", { name: /mark read/i }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([path, init]) =>
@@ -175,7 +165,7 @@ describe("DeveloperApp authenticated report journey", () => {
       if (String(input) === csrfPath) return pendingCsrf;
       return responseFor(String(input), init);
     });
-    const { unmount } = render(<DeveloperApp />);
+    const { unmount } = render(<DeveloperApp navigate={navigate} />);
     const region = await screen.findByRole("region", { name: "Notifications" });
     fireEvent.click(await within(region).findByRole("button", { name: /mark read/i }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([path]) => String(path) === csrfPath)).toBe(true));
@@ -234,7 +224,7 @@ describe("DeveloperApp authenticated report journey", () => {
       if (path === reportsPath) return jsonResponse({ items: [{ ...assignedReport, status: shared ? "IN_PROGRESS" : "RESOLUTION_PROPOSED" }], page: 1, pageSize: 20, totalItems: 1 });
       return responseFor(path, init);
     });
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
     fireEvent.click(await screen.findByRole("button", { name: /Assigned export failure/ }));
     await screen.findByText("Status: Resolution Proposed");
     shared = true;
@@ -253,7 +243,7 @@ describe("DeveloperApp authenticated report journey", () => {
       if (path.startsWith(reportsPath) && !path.includes(assignedReport.id)) return jsonResponse({ items: submitted ? [] : [{ ...assignedReport, status: "IN_PROGRESS" }], page: 1, pageSize: 20, totalItems: submitted ? 0 : 1 });
       return responseFor(path, init);
     });
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
     await screen.findByRole("button", { name: /Assigned export failure/ });
     fireEvent.change(screen.getByLabelText("Status"), { target: { value: "IN_PROGRESS" } });
     fireEvent.click(await screen.findByRole("button", { name: /Assigned export failure/ }));
@@ -279,7 +269,7 @@ describe("DeveloperApp authenticated report journey", () => {
       if (path === `${reportsPath}/${assignedReport.id}`) return jsonResponse({ ...assignedReport, status: version === 6 ? "RESOLUTION_PROPOSED" : "IN_PROGRESS", description: "Details", version });
       return responseFor(path, init);
     });
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
     fireEvent.click(await screen.findByRole("button", { name: /Assigned export failure/ }));
     fireEvent.change(await screen.findByLabelText("Resolution"), { target: { value: "Restart the service" } });
     fireEvent.click(screen.getByRole("button", { name: "Submit resolution" }));
@@ -307,7 +297,7 @@ describe("DeveloperApp authenticated report journey", () => {
       if (path === reportsPath) return jsonResponse({ items: [{ ...assignedReport, status: started ? "IN_PROGRESS" : "ASSIGNED" }], page: 1, pageSize: 20, totalItems: 1 });
       return responseFor(path, init);
     });
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
     fireEvent.click(await screen.findByRole("button", { name: /Assigned export failure/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Start investigation" }));
     await screen.findByText("Status: In Progress");
@@ -315,50 +305,28 @@ describe("DeveloperApp authenticated report journey", () => {
     expect(screen.getByText(`Checklist for ${assignedReport.id}`)).toBeTruthy();
   });
 
-  it("checks the session, signs in with the session CSRF token, and renders only the assigned list", async () => {
-    render(<DeveloperApp />);
-    const signInRegion = await screen.findByRole("region", { name: "Sign in" });
-    expect(signInRegion.classList.contains("role-sign-in")).toBe(true);
-    expect(within(signInRegion).getByLabelText("Username")).toBeTruthy();
-    expect(within(signInRegion).getByLabelText("Password")).toBeTruthy();
-    expect(within(signInRegion).getByRole("button", { name: "Sign in" })).toBeTruthy();
+  it("returns anonymous visitors to the root login without loading reports", async () => {
+    render(<DeveloperApp navigate={navigate} />);
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/"));
+    expect(screen.queryByLabelText("Username")).toBeNull();
+    expect(screen.queryByLabelText("Password")).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith(currentUserPath, expect.anything());
-    expect(fetchMock.mock.calls.some(([path]) => String(path) === reportsPath)).toBe(false);
+    expect(fetchMock.mock.calls.some(([path]) => String(path).startsWith(reportsPath))).toBe(false);
+  });
 
-    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "developer.one" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password-value" } });
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-
+  it("verifies the existing session before requesting the assigned list", async () => {
+    authenticated = true;
+    render(<DeveloperApp navigate={navigate} />);
     await screen.findByText(assignedReport.title);
-    const csrfCall = fetchMock.mock.calls.find(([path]) => String(path) === csrfPath);
-    const loginCall = fetchMock.mock.calls.find(([path]) => String(path) === loginPath);
-    expect(csrfCall?.[1]).toEqual(expect.objectContaining({ method: "GET", credentials: "same-origin", cache: "no-store" }));
-    expect(loginCall?.[1]).toEqual(expect.objectContaining({
-      method: "POST",
-      credentials: "same-origin",
-      cache: "no-store",
-      headers: expect.objectContaining({ "X-CSRF-TOKEN": csrfToken }),
-    }));
-    expect(new URLSearchParams(String(loginCall?.[1]?.body))).toEqual(
-      new URLSearchParams({ username: "developer.one", password: "password-value" }),
-    );
-
-    const reportCalls = fetchMock.mock.calls.filter(([path]) => String(path).startsWith(reportsPath));
-    expect(reportCalls).toHaveLength(1);
-    expect(String(reportCalls[0][0])).toBe(reportsPath);
-    expect(reportCalls[0][1]).toEqual(expect.objectContaining({ credentials: "same-origin", cache: "no-store" }));
-    const identityCalls = fetchMock.mock.calls
-      .map(([path], index) => (String(path) === currentUserPath ? index : -1))
-      .filter((index) => index >= 0);
-    const reportsIndex = fetchMock.mock.calls.findIndex(([path]) => String(path) === reportsPath);
-    expect(identityCalls).toHaveLength(2);
-    expect(identityCalls[1]).toBeLessThan(reportsIndex);
-    expect(screen.queryByText("Unassigned report owned by another developer")).toBeNull();
+    const identityIndex = fetchMock.mock.calls.findIndex(([path]) => String(path) === currentUserPath);
+    const reportIndex = fetchMock.mock.calls.findIndex(([path]) => String(path) === reportsPath);
+    expect(identityIndex).toBeLessThan(reportIndex);
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it("loads report details for the selected report", async () => {
     authenticated = true;
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
     fireEvent.click(await screen.findByRole("button", { name: /Assigned export failure/ }));
     expect(await screen.findByText("Export fails after submission.")).toBeTruthy();
     expect(screen.getByText("Status: Assigned")).toBeTruthy();
@@ -378,7 +346,7 @@ describe("DeveloperApp authenticated report journey", () => {
 
     render(
       <MarkdownParserProvider runner={inThreadRunner}>
-        <DeveloperApp />
+        <DeveloperApp navigate={navigate} />
       </MarkdownParserProvider>,
     );
     fireEvent.click(await screen.findByRole("button", { name: /\*\*bold\*\*/ }));
@@ -401,7 +369,7 @@ describe("DeveloperApp authenticated report journey", () => {
       description: "Export fails after submission.",
       returnReason: reason,
     });
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
     fireEvent.click(await screen.findByRole("button", { name: /Assigned export failure/ }));
     expect(await screen.findByText(reason)).toBeTruthy();
     expect(screen.getByText(/maintainer returned this resolution/i)).toBeTruthy();
@@ -409,7 +377,7 @@ describe("DeveloperApp authenticated report journey", () => {
 
   it("selects a listed report and renders its DeveloperChecklist", async () => {
     authenticated = true;
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
 
     fireEvent.click(await screen.findByRole("button", { name: new RegExp(assignedReport.title) }));
 
@@ -419,7 +387,7 @@ describe("DeveloperApp authenticated report journey", () => {
   it("renders an empty-assignment state without selecting a report", async () => {
     authenticated = true;
     listResponse = jsonResponse({ items: [], page: 1, pageSize: 20, totalItems: 0 });
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
 
     expect(await screen.findByText(/no assigned reports/i)).toBeTruthy();
     expect(screen.queryByText(/checklist for/i)).toBeNull();
@@ -428,7 +396,7 @@ describe("DeveloperApp authenticated report journey", () => {
   it("renders a recoverable list error without exposing response details", async () => {
     authenticated = true;
     listResponse = jsonResponse({ code: "INTERNAL_ERROR", message: "private database detail", requestId: "r2" }, 500);
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
 
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(screen.queryByText(/private database detail|INTERNAL_ERROR/)).toBeNull();
@@ -437,12 +405,12 @@ describe("DeveloperApp authenticated report journey", () => {
 
   it("logs out with CSRF protection and clears the report view", async () => {
     authenticated = true;
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
     await screen.findByText(assignedReport.title);
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
-    await screen.findByLabelText("Username");
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/"));
     await waitFor(() => expect(screen.queryByText(assignedReport.title)).toBeNull());
     const logoutCall = fetchMock.mock.calls.find(([path]) => String(path) === logoutPath);
     expect(logoutCall?.[1]).toEqual(expect.objectContaining({
@@ -453,10 +421,23 @@ describe("DeveloperApp authenticated report journey", () => {
     expect(headerValue(logoutCall?.[1]?.headers, "X-CSRF-TOKEN")).toBe(csrfToken);
   });
 
+  it("keeps logout failures visible without redirecting", async () => {
+    authenticated = true;
+    fetchMock.mockImplementation(async (input, init) => String(input) === logoutPath
+      ? jsonResponse({ code: "STORAGE_UNAVAILABLE" }, 503)
+      : responseFor(String(input), init));
+    render(<DeveloperApp navigate={navigate} />);
+    await screen.findByText(assignedReport.title);
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("Sign out failed");
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByText(assignedReport.title)).toBeTruthy();
+  });
+
   it("clears one Developer's dashboard query and pagination before another signs in", async () => {
     listResponse = jsonResponse({ items: [assignedReport], page: 1, pageSize: 20, totalItems: 40 });
     authenticated = true;
-    render(<DeveloperApp />);
+    const first = render(<DeveloperApp navigate={navigate} />);
     await screen.findByText(assignedReport.title);
 
     const privateQuery = "private-report-title-or-uuid";
@@ -478,10 +459,13 @@ describe("DeveloperApp authenticated report journey", () => {
     ));
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
-    await screen.findByLabelText("Username");
-    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "developer.two" } });
-    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "password-value" } });
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/"));
+    expect(screen.queryByText(assignedReport.title)).toBeNull();
+    first.unmount();
+    activeDeveloper = "developer.two";
+    authenticated = true;
+    const callsBeforeReturn = fetchMock.mock.calls.length;
+    render(<DeveloperApp navigate={navigate} />);
 
     await screen.findByText(assignedReport.title);
     expect.soft((screen.getByLabelText("Search") as HTMLInputElement).value).toBe("");
@@ -489,11 +473,8 @@ describe("DeveloperApp authenticated report journey", () => {
     expect.soft(screen.getByRole("navigation", { name: "Report pages" }).textContent)
       .toContain("Page 1 of 2");
 
-    const secondLogin = fetchMock.mock.calls.findIndex(
-      ([path, init]) => String(path) === loginPath && String(init?.body).includes("developer.two"),
-    );
     const secondDeveloperReportCalls = fetchMock.mock.calls
-      .slice(secondLogin + 1)
+      .slice(callsBeforeReturn)
       .filter(([path]) => String(path).startsWith(reportsPath));
     expect.soft(secondDeveloperReportCalls).toHaveLength(1);
     expect.soft(String(secondDeveloperReportCalls[0]?.[0])).toBe(reportsPath);

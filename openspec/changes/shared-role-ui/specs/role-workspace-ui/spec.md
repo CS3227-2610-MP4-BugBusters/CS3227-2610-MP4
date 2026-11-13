@@ -33,3 +33,13 @@ The root entry SHALL authenticate using the existing session service and route a
 #### Scenario: Inactive account
 - **WHEN** an inactive account is returned by the session service
 - **THEN** it is denied access and no role dashboard is opened
+
+#### Scenario: Signed-out role workspace
+- **WHEN** a Developer or Reporter workspace has no session, loses its session, or completes logout
+- **THEN** it clears protected content and returns to `/` without displaying a separate credential form
+- **AND** failed logout retains an actionable error without claiming success
+
+#### Scenario: Account presentation and sign-out
+- **WHEN** an authenticated account opens Account or updates its display name
+- **THEN** the shared header displays its name once, the account section displays username and role, and navigation returns to that role's dashboard
+- **AND** Account exposes its sign-out control and successful logout returns to `/`
