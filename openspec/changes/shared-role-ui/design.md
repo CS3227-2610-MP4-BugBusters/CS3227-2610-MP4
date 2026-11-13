@@ -21,3 +21,5 @@ Use a shared presentation-only sign-in component with role-specific introductory
 ## Shared root entry follow-up
 
 The user has requested a role-neutral sign-in at `/`. Use the existing server session identity to route active users to their role frontend. Preserve server-side role authorization, sign-out behavior, the Maintainer Markdown provider and direct role workspace access. Shared presentation remains independent of authentication decisions.
+
+The root is the sole credential entry. Signed-out Developer and Reporter workspaces return to `/`, including after successful logout. Failed logout keeps a recoverable error. Account uses one header identity, separate username and role fields, and visible role navigation and sign-out controls after loading the account; profile edits retain this presentation. Existing server session and CSRF rules apply. The owner requested this follow-up without TDD.

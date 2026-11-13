@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { DeveloperApp } from "./DeveloperApp";
+
+const navigate = vi.fn();
 
 const report = {
   id: "00000000-0000-4000-8000-000000000101",
@@ -17,6 +19,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 beforeEach(() => {
+  navigate.mockClear();
   authenticated = true;
   vi.stubGlobal(
     "fetch",
@@ -47,7 +50,7 @@ afterEach(() => {
 
 describe("Developer role workspace", () => {
   it("provides accessible role navigation while keeping assigned report actions reachable", async () => {
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
 
     expect(await screen.findByText(report.title)).toBeTruthy();
     expect(screen.getByRole("navigation", { name: /developer/i })).toBeTruthy();
@@ -55,19 +58,21 @@ describe("Developer role workspace", () => {
   });
 
   it("keeps existing sign-out and assigned report selection reachable", async () => {
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
 
     expect(await screen.findByText(report.title)).toBeTruthy();
     expect(screen.getByRole("button", { name: /Workspace access report/ })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
-    expect(await screen.findByLabelText("Username")).toBeTruthy();
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/"));
+    expect(screen.queryByLabelText("Username")).toBeNull();
   });
 
   it("does not expose report content or report actions while signed out", async () => {
     authenticated = false;
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
 
-    expect(await screen.findByLabelText("Username")).toBeTruthy();
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/"));
+    expect(screen.queryByLabelText("Username")).toBeNull();
     expect(screen.queryByText(report.title)).toBeNull();
     expect(screen.queryByRole("button", { name: /sign out/i })).toBeNull();
   });

@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { DeveloperApp } from "./DeveloperApp";
+
+const navigate = vi.fn();
 
 const report = {
   id: "00000000-0000-4000-8000-000000000301",
@@ -16,6 +18,7 @@ let reportStatus: number;
 let fetchMock: ReturnType<typeof vi.fn<typeof fetch>>;
 
 beforeEach(() => {
+  navigate.mockClear();
   reportStatus = 200;
   fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const path = String(input);
@@ -39,7 +42,7 @@ afterEach(() => {
 
 describe("Developer shared workspace when the report session expires", () => {
   it("keeps identity and protected navigation for a successful assigned-report read", async () => {
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
 
     expect(await screen.findByText(report.title)).toBeTruthy();
     expect(screen.getByText("Developer One")).toBeTruthy();
@@ -48,14 +51,15 @@ describe("Developer shared workspace when the report session expires", () => {
 
   it("clears identity and protected navigation when assigned reports return 401", async () => {
     reportStatus = 401;
-    render(<DeveloperApp />);
+    render(<DeveloperApp navigate={navigate} />);
 
     const alert = await screen.findByRole("alert");
     expect.soft(alert.textContent).toMatch(/session|sign in/i);
     expect.soft(screen.queryByText("Developer One")).toBeNull();
     expect.soft(screen.queryByRole("navigation", { name: "Developer navigation" })).toBeNull();
     expect.soft(screen.queryByText(report.title)).toBeNull();
-    expect.soft(screen.queryByLabelText("Username")).not.toBeNull();
+    expect.soft(screen.queryByLabelText("Username")).toBeNull();
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/"));
     expect.soft(screen.queryByText(/UNAUTHENTICATED|request-1/)).toBeNull();
     expect(fetchMock).toHaveBeenCalledWith("/api/auth/me", expect.anything());
     expect(fetchMock).toHaveBeenCalledWith("/api/developer/reports", expect.anything());

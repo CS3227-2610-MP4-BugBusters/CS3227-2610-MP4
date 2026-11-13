@@ -4,7 +4,6 @@ import { DeveloperPrivateNotes } from "./DeveloperPrivateNotes";
 import { DeveloperSharedNotes } from "./DeveloperSharedNotes";
 import { DeveloperNotifications } from "./DeveloperNotifications";
 import { createRoleWorkspace } from "../../shared/RoleWorkspace";
-import { createRoleSignIn } from "../../shared/RoleSignIn";
 import { MarkdownView } from "@mp4/markdown";
 
 type User = {
@@ -29,12 +28,13 @@ const reportStatuses = [
 
 const currentUserPath = "/api/auth/me";
 const csrfPath = "/api/auth/csrf";
-const loginPath = "/api/auth/login";
 const logoutPath = "/api/auth/logout";
 const reportsPath = "/api/developer/reports";
 const jsonHeaders = { Accept: "application/json" };
 
-export function DeveloperApp() {
+const navigateToRoot = (path: string) => window.location.replace(path);
+
+export function DeveloperApp({ navigate = navigateToRoot }: { navigate?: (path: string) => void } = {}) {
   const [sessionState, setSessionState] = useState<SessionState>("checking");
   const [user, setUser] = useState<User | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
@@ -55,8 +55,6 @@ export function DeveloperApp() {
   const [resolution, setResolution] = useState("");
   const [submittingResolution, setSubmittingResolution] = useState(false);
   const [startedVersion, setStartedVersion] = useState<{ reportId: string; previous: number; current: number }>();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [sessionAttempt, setSessionAttempt] = useState(0);
   const [listAttempt, setListAttempt] = useState(0);
   const resolutionController = useRef<AbortController | null>(null);
@@ -81,7 +79,6 @@ export function DeveloperApp() {
     if (reason === "report" && selectedReportId !== reportId) return;
     clearDashboardState();
     setUser(null);
-    setPassword("");
     setSessionState("signed-out");
     setError(
       reason === "session"
@@ -147,7 +144,6 @@ export function DeveloperApp() {
         if (cause instanceof SessionExpired) {
           clearDashboardState();
           setUser(null);
-          setPassword("");
           setSessionState("signed-out");
           setError("Your session expired. Please sign in again.");
           return;
@@ -325,49 +321,6 @@ export function DeveloperApp() {
     }
   }
 
-  async function signIn(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      const csrf = await readCsrf();
-      const response = await fetch(loginPath, {
-        method: "POST",
-        credentials: "same-origin",
-        cache: "no-store",
-        headers: {
-          ...jsonHeaders,
-          "Content-Type": "application/x-www-form-urlencoded",
-          [csrf.headerName]: csrf.token,
-        },
-        body: new URLSearchParams({ username, password }).toString(),
-      });
-      if (!response.ok) throw new Error("Sign in failed. Check your credentials and try again.");
-
-      // Verify the new session before requesting any assigned report data.
-      clearDashboardState();
-      const current = await readCurrentUser();
-      if (!current.active || current.role !== "DEVELOPER") {
-        clearDashboardState();
-        setUser(null);
-        setSessionState("denied");
-        return;
-      }
-      setPassword("");
-      setUser(current);
-      setSessionState("active");
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Sign in failed. Check your credentials and try again.",
-      );
-      setSessionState("signed-out");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function signOut() {
     setBusy(true);
     setError("");
@@ -382,7 +335,6 @@ export function DeveloperApp() {
       if (!response.ok) throw new Error("Sign out failed. Please retry.");
       clearDashboardState();
       setUser(null);
-      setPassword("");
       setSessionState("signed-out");
     } catch {
       setError("Sign out failed. Please retry.");
@@ -391,23 +343,20 @@ export function DeveloperApp() {
     }
   }
 
+  useEffect(() => {
+    if (sessionState === "signed-out") navigate("/");
+  }, [sessionState, navigate]);
+
   const appContent = (
     <main>
       <h1>Developer reports</h1>
       {sessionState === "checking" && <p role="status">Checking your session…</p>}
-      {sessionState === "signed-out" && createRoleSignIn(
-        (type, props, ...children) => createElement(type, props as never, ...(children as ReactNode[])),
-        {
-          role: "Developer",
-          description: "Sign in to view and investigate your assigned reports.",
-          username,
-          password,
-          busy,
-          onUsernameChange: setUsername,
-          onPasswordChange: setPassword,
-          onSubmit: (event: FormEvent<HTMLFormElement>) => void signIn(event),
-          feedback: error ? <p role="alert">{error}</p> : null,
-        },
+      {sessionState === "signed-out" && (
+        <section>
+          {error && <p role="alert">{error}</p>}
+          <p role="status">Returning to sign in...</p>
+          <a href="/">Go to sign in</a>
+        </section>
       )}
       {sessionState === "denied" && (
         <section>

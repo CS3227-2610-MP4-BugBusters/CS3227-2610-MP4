@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { ApiError, currentUser, signIn, signOut, type User } from "./api";
+import { useEffect, useState } from "react";
+import { ApiError, currentUser, signOut, type User } from "./api";
 import { BugIcon } from "./icons";
 import { NewReport } from "./NewReport";
 import { ReportList } from "./ReportList";
@@ -32,9 +32,13 @@ function useRoute(): Route {
   return route;
 }
 
-export function App() {
+const navigateToRoot = (path: string) => window.location.replace(path);
+
+export function App({ navigate = navigateToRoot }: { navigate?: (path: string) => void } = {}) {
   const [session, setSession] = useState<Session>({ kind: "checking" });
   const [attempt, setAttempt] = useState(0);
+  const [logoutError, setLogoutError] = useState("");
+  const [leaving, setLeaving] = useState(false);
   const route = useRoute();
   // "Back to your reports" returns to the list page the Reporter came from.
   const [listPage, setListPage] = useState(1);
@@ -59,12 +63,22 @@ export function App() {
   }, [attempt]);
 
   async function leave() {
+    if (leaving) return;
+    setLeaving(true);
+    setLogoutError("");
     try {
       await signOut();
-    } finally {
       setSession({ kind: "signed-out" });
+    } catch {
+      setLogoutError("Unable to sign out. Please try again.");
+    } finally {
+      setLeaving(false);
     }
   }
+
+  useEffect(() => {
+    if (session.kind === "signed-out") navigate("/");
+  }, [session.kind, navigate]);
 
   const user = session.kind === "active" ? session.user : null;
 
@@ -87,7 +101,7 @@ export function App() {
               <Avatar name={user.displayName} id={user.id} size={24} />
               <span className="app-user-name">{user.displayName}</span>
             </span>
-            <button type="button" className="btn btn-header" onClick={() => void leave()}>
+            <button type="button" className="btn btn-header" disabled={leaving} onClick={() => void leave()}>
               Sign out
             </button>
           </nav>
@@ -99,11 +113,17 @@ export function App() {
             <p className="muted" role="status">Checking your session…</p>
           </div>
         )}
-        {session.kind === "signed-out" && <SignIn onSignedIn={() => setAttempt((n) => n + 1)} />}
+        {logoutError && <p role="alert" className="flash flash-error">{logoutError}</p>}
+        {session.kind === "signed-out" && (
+          <div className="container narrow">
+            <p role="status">Returning to sign in...</p>
+            <a href="/">Go to sign in</a>
+          </div>
+        )}
         {session.kind === "denied" && (
           <div className="container narrow">
             <p role="alert" className="flash flash-error">This page is for Reporter accounts. Sign in with an active Reporter account.</p>
-            <button type="button" className="btn" onClick={() => void leave()}>Sign out</button>
+            <button type="button" className="btn" disabled={leaving} onClick={() => void leave()}>Sign out</button>
           </div>
         )}
         {session.kind === "error" && (
@@ -134,44 +154,5 @@ export function App() {
         )}
       </main>
     </>
-  );
-}
-
-function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState("");
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setBusy(true);
-    setProblem("");
-    try {
-      await signIn(username, password);
-      setPassword("");
-      onSignedIn();
-    } catch {
-      setProblem("Incorrect username or password.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="signin">
-      <BugIcon className="signin-logo" />
-      <h1>Sign in to report bugs</h1>
-      <form className="box signin-box" onSubmit={(event) => void submit(event)}>
-        {problem && <p role="alert" className="flash flash-error">{problem}</p>}
-        <label className="field-label" htmlFor="username">Username</label>
-        <input id="username" className="input" autoComplete="username" value={username} disabled={busy} onChange={(event) => setUsername(event.target.value)} />
-        <label className="field-label" htmlFor="password">Password</label>
-        <input id="password" className="input" type="password" autoComplete="current-password" value={password} disabled={busy} onChange={(event) => setPassword(event.target.value)} />
-        <button type="submit" className="btn btn-primary btn-block" disabled={busy}>
-          {busy ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
-    </div>
   );
 }
