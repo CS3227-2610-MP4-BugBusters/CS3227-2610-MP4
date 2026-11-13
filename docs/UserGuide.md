@@ -1,6 +1,6 @@
 # BugBusters user guide
 
-BugBusters helps Reporters submit bugs, Developers investigate them, and Maintainers assign and review work. Open the application address provided by your team. This guide describes the screens in checkout `26f80a2`; the application available to you may differ.
+BugBusters helps Reporters submit bugs, Developers investigate them, and Maintainers assign and review work. Open the application address provided by your team. The Reporter instructions include the **Check my report** AI feature in this checkout; the application available to you may differ.
 
 For a local exercise, ask the operator for a running instance and active Reporter, Developer and Maintainer accounts. Use a disposable database and fictional reports. Do not enter passwords, personal information or real customer data into reports or AI requests. Operators can follow the [account setup](../src/backend/auth/README.md) and [local deployment instructions](../src/backend/platform/deployment/README.md).
 
@@ -24,11 +24,27 @@ Each account has one role. If sign-in fails, check your details and role with th
 
 ## Reporter
 
+### Quick start and interface tour
+
+Use a current browser to open the team's address ending in `/reporter/`. A
+Maintainer creates your Reporter account and gives you the username and initial
+password privately. Sign in with that account; each account has one role.
+
+| Screen | What you can do |
+| --- | --- |
+| Report list | Browse your reports, search titles on the current page, and select **Open**, **Closed** or **All**. |
+| New report | Enter a title and Markdown description, use **Write** and **Preview**, request **Check my report**, and submit. |
+| Report page | Read the description, status, details and discussion; edit an eligible report or add a comment. |
+
+Statuses show progress through **Submitted**, **Assigned**, **In progress**,
+**Resolution proposed** and **Closed**. A Maintainer manages assignment and
+closure. Reporters see only their own reports.
+
 ### Create a report
 
 1. Select **New report**.
-2. Enter a short **Title** and describe the problem in **Description**. Include what happened, steps to reproduce, and what you expected.
-3. Select **Preview** to review the formatting, then select **Submit report**.
+2. Enter a one-line **Title** of up to 200 characters and a **Description** of up to 20,000 characters. Fill in the template with what happened, steps to reproduce, and what you expected. Use Markdown lists or fenced code blocks for steps and logs.
+3. Optionally select **Check my report** and review its questions as described below. Edit the draft yourself, select **Preview** to review the formatting, then select **Submit report**.
 4. Open the new report and note its reference for the Maintainer.
 
 For example, use this fictional report:
@@ -48,7 +64,81 @@ In the sample shop, removing a $5 item leaves the displayed total at $15.
 The displayed total should change to $10.
 ```
 
-A failed submission keeps the draft in the form. If a rate-limit message appears, wait for the displayed time before retrying.
+A failed submission keeps the draft in the form. You can create up to 3 reports
+per minute; if a rate-limit message appears, wait for the displayed time before
+retrying. Unsaved drafts are kept only on the current screen. Copy text you want
+to keep before choosing **Cancel**, reloading or leaving the page. Successfully
+submitted reports remain available when you return.
+
+### Check my report (AI)
+
+**Check my report** asks the team's AI service which parts of your new draft are
+unclear and what details a Developer may still need. It sends the current title
+and description for that check. The application does not save the check's draft
+or questions, and the AI never changes your text or submits a report.
+
+1. On **New report**, enter a title and description.
+2. Select **Check my report**. The button shows **Checking…**, and a progress
+   message explains that the check can take up to a minute.
+3. Read **Questions about your report**. **Unclear parts** quotes exact words
+   from your draft and asks what they mean. **Questions by topic** asks about
+   Summary, Steps to reproduce, Expected behavior, Actual behavior, Environment,
+   Frequency, or Error messages and logs. Only topics returned by the AI appear.
+4. Answer useful questions by editing your draft. Select **Dismiss** to close
+   the panel, or run another check for an updated draft.
+5. Select **Preview**, then **Submit report** when you are ready.
+
+**Worked example:** Start with the fictional title `Checkout total stays unchanged
+after removing an item` and description `the total is wrong after i remove
+something`. The AI may ask which item you removed, what total you expected, or
+which browser you used. Reproduce the issue yourself and add truthful details,
+using the completed report above as an example. The exact questions can vary.
+If the service is unavailable, write these details manually and submit as usual.
+
+The check runs only when you select the button and is available only for new
+reports. It allows up to **3 checks per account in 5 minutes**; shared service
+limits can also require you to wait. An empty result displays **No questions
+found. Your report looks clear.** This is advice, not proof of completeness or
+evidence that anyone tested the bug.
+
+Results are plain text, with no active links or formatting. They disappear on
+**Dismiss**, a new check, submission or leaving the screen. Editing the draft
+does not update earlier questions automatically. Ignore irrelevant or incorrect
+questions; you decide what belongs in the report.
+
+Do not send passwords, private customer information or confidential logs. The
+draft is sent to an external AI service, and the application's decision not to
+store check results does not establish that provider's retention policy.
+
+### If a report check fails
+
+| Message or situation | What to do |
+| --- | --- |
+| **Checking isn't available right now. You can still submit your report.** | Continue manually; ask the operator to check the service if needed. |
+| **You've checked too often. Try again in … seconds.** | Wait the displayed time before retrying. |
+| **A check is already running.** | Wait for it to finish before requesting another check. |
+| **Couldn't check your report. Try again.** | The response could not be accepted. Retry later or submit without checking. |
+| **The check took too long. Try again later.** | Retry later; keep relevant logs concise. |
+| A title or description validation message | Correct the indicated field before checking or submitting. |
+
+### Reporter limitations and frequently asked questions
+
+**Can I check an existing report?** The AI action appears only on **New report**.
+You can edit an existing report while it is Submitted and unassigned, or add
+more information in a comment.
+
+**Why does a topic ask about something I already wrote?** Questions can ask for
+more detail about partly covered topics. Skip any that do not help.
+
+**Does the AI rewrite or save my report?** It returns questions only. You edit
+the text, and **Submit report** saves it. Results are not kept for later visits.
+
+**Why do answers change?** Each check generates a new answer. The locally
+evaluated `x-test-2` model is a provider test slot whose backing model may change.
+The server also removes questions caught by its URL, email or credential screen.
+
+The Reporter screen does not show the Developer checklist or offer per-step
+responses. Title and status filters apply only to the currently loaded page.
 
 ### Find and edit a report
 
@@ -159,7 +249,10 @@ Use three synthetic accounts and the sample report above:
 6. **Maintainer:** Review the proposal and close it, or return it with a reason for another attempt.
 7. **Reporter:** Open the report and check its status.
 
-The Reporter screen in this checkout does not show the checklist or offer per-step responses. Reporter AI report improvement and AI assessment of checklist responses are also not exposed in the inspected screens. The standalone checklist demo uses synthetic in-memory data and does not establish that those features work in the shared application.
+The Reporter can optionally use **Check my report** before step 1. The Reporter
+screen does not show the checklist or offer per-step responses, and AI assessment
+of those responses is not exposed. The standalone checklist demo uses synthetic
+in-memory data and does not establish those features in the shared application.
 
 ## If something goes wrong
 
@@ -171,4 +264,3 @@ The Reporter screen in this checkout does not show the checklist or offer per-st
 | AI is unavailable or limited | Continue manually, or ask the operator to check configuration and quota. |
 | The outcome of an action is unclear | Refresh and inspect the report before submitting again. |
 
-This guide was checked against repository screens, handlers and documentation; the full three-role flow was not run for this revision. The locally recorded `origin/main` includes the Developer AI refinement and is ahead of this checkout, including a later Developer Markdown change. Other branches, the concurrent Developer navigation work and a running deployment may differ; confirm their revision before relying on their features.
