@@ -4,11 +4,7 @@
 
 BugBusters is a programming-related bug tracker with Reporter, Developer and Maintainer workspaces. This guide covers local setup, the application boundaries, verification and deployment preparation. See the [User Guide](UserGuide.md) for role workflows.
 
-The Reporter sections describe the implementation in this checkout, including
-the `reporter-report-clarify` change. They follow MP2's architecture, workflow,
-component-design and verification structure, adapted to MP4's web application.
-Check `git status`, `git log` and the running revision before relying on
-branch-specific behavior. A hosted deployment was not verified for this update.
+This guide describes the integrated main branch at `03b415b` and identifies pending changes where applicable. The local checkout may be older or contain additional uncommitted work. Check `git status`, `git log` and the deployed revision before relying on a feature. A hosted deployment was not verified for this update.
 
 ## 2. Technology and repository layout
 
@@ -50,7 +46,7 @@ Use a **new disposable database** and synthetic accounts. Do not point test runn
 2. For HTTP on a loopback-only local backend, set `MP4_AUTH_LOCAL=true`. The backend defaults to `127.0.0.1:8080`; local cookies are rejected on non-loopback binds. Do not use this setting for a deployed service.
 3. For an optional local AI configuration, copy `.env.example` to `.env` **only if you do not already have one**, then fill in the settings you need. The example defaults AI to disabled and contains no credentials. `.env` is ignored by Git and is not loaded automatically. Source only a trusted file; use shell quoting for values with special characters. The backend README shows how to load it into the shell. Keep real credentials out of commands, logs and version control.
 
-The operator must provide database access and secrets; this repository does not supply default accounts or passwords. See [authentication configuration](../src/backend/auth/README.md) and [SoC setup](#7-ai-integration).
+The operator must provide database access and secrets. Main also seeds a publicly documented, immutable demo Maintainer for synthetic-data demonstrations; see [authentication configuration](../src/backend/auth/README.md). This public credential is unsuitable for an environment containing real or sensitive data. For AI settings see [SoC setup](#7-ai-integration).
 
 ### Provision accounts
 
@@ -79,6 +75,8 @@ npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 
 For Developer or Maintainer, instead run `npm ci` in `src/frontend/developer` or `src/frontend/maintainer`, then use `npm run dev -- --host 127.0.0.1 --port 5173 --strictPort` for Developer or `npm start -- --host 127.0.0.1 --port 5173 --strictPort` for Maintainer. Open the URL Vite prints; Reporter and Developer use `/reporter/` and `/developer/` bases respectively. The Developer checklist demo component and the explicitly selected Maintainer demo are isolated synthetic previews, not evidence of authenticated persistence. Use the normal entry with the backend for integration testing.
 
+For an integrated local Vite session, run the normal Maintainer frontend at `127.0.0.1:5173`, Developer at `127.0.0.1:5174`, Reporter at `127.0.0.1:5175`, and the backend at `127.0.0.1:8080`; open the root URL on port 5173. The Maintainer Vite configuration proxies the two role routes to the matching ports. Set the backend public origin to the root browser origin. Main does not yet proxy `/account` in these Vite configurations; PR #27 proposes that fix and a display-name update. The packaged application serves `/account/` directly.
+
 To build the packaged application, use the [deployment Dockerfile instructions](../src/backend/platform/deployment/README.md). The Dockerfile builds all three frontend bundles and the Java distribution; the packaged routes are `/`, `/developer/` and `/reporter/`. Its runtime binds to all interfaces and uses secure cookies; use an HTTPS setup rather than enabling loopback-only cookies in that container.
 
 ## 4. Application and security boundaries
@@ -87,7 +85,7 @@ To build the packaged application, use the [deployment Dockerfile instructions](
 | --- | --- |
 | Authentication | Operator-provisioned fixed-role accounts, server sessions, sign-in/out and CSRF. Account state is checked on protected access. |
 | Reporter | Create and read own reports, edit while Submitted and unassigned, participate in discussion, and request AI questions about a new draft. |
-| Developer | Access assigned reports, start investigation, save private notes and checklist drafts, share saved checklists, request suggestions and submit resolutions. |
+| Developer | Access assigned reports, start investigation, save private notes and checklist drafts, share saved checklists, request suggestions and submit resolutions. A separate shared investigation-note draft and publication flow is proposed in PR #26 and is not part of this baseline. |
 | Maintainer | Browse reports, set priority and assignment, discuss, return or close a resolution, reopen, and request an advisory queue summary. |
 | Shared storage | Versioned report mutations and lifecycle checks protect against stale changes; shared checklist copies are separate from private drafts. |
 
@@ -95,6 +93,14 @@ Reporter checklist responses, Developer discussion and AI assessment of response
 are not exposed by the screens inspected in this checkout. Reporter AI is
 available through **Check my report** on new drafts. Planning documents and
 isolated demos are not proof of a released feature; verify the target revision.
+
+### Maintainer components and shared boundaries
+
+The Maintainer frontend in `src/frontend/maintainer` uses typed same-origin HTTP adapters. `src/backend/maintainer` contains workflow rules, DTOs, JDBC repositories and bounded queue-summary processing; Spring controllers and session integration are under `src/backend/platform`. The summary uses the shared SoC gateway and database-backed admission controls. See the [Maintainer backend README](../src/backend/maintainer/README.md) for configuration.
+
+Preserve the existing Developer checklist Save/Share contract when changing lifecycle behavior. Account-eligibility locks precede report locks; version checks, state changes and history are committed together. Private checklist saves do not change the report version. Auth and shared report migrations have separate histories; package the canonical SQL sources rather than maintaining duplicates.
+
+Maintainer report descriptions use `src/frontend/shared/markdown` through `MarkdownParserProvider` and the shared Vite plugin. Other fields remain escaped text. Install the shared Markdown package's dependencies before the Maintainer package; tables and code blocks scroll within the description on narrow screens. See the [Maintainer frontend README](../src/frontend/maintainer/README.md).
 
 ### Reporter components and report workflow
 
@@ -320,6 +326,10 @@ records 23 passing configuration/loopback tests and no live request. These are
 historical observations, not checks rerun for this documentation edit or proof
 of a hosted deployment.
 
+### Maintainer summary evaluation
+
+The Maintainer model can be selected with `SOC_LLM_MODEL_MAINTAINER`; an absent or blank override falls back to the required shared model. The local repair preserved the response contract, deadline and shared limits while revising context selection. Three final synthetic Qwen cases returned valid summaries and recognized facts in descriptions; earlier trials included timeouts, format failures and incorrect missing-information claims. These were small diagnostic trials rather than a completed model comparison or proof of live quotas. See [summary repair evidence](../logs/maintainer/2026-11-12-summary-live-repair.md) and [release checks](../logs/maintainer/2026-11-12-release-checks.md).
+
 ## 8. Changes, OpenSpec and evidence
 
 1. Check the branch and uncommitted work. Identify the matching OpenSpec change and task; read its spec, design, tasks and relevant contracts. For Developer checklist work also read the [storage contract](../workflow/developer/checklist-storage-contract.md). Resolve disagreements between spec, contract and tests with the feature owner.
@@ -352,4 +362,4 @@ This guide is a draft. The commands were checked against repository scripts and 
 
 ## 11. Acknowledgements
 
-The application uses the frameworks and libraries declared in its Gradle and npm manifests, including Spring, PostgreSQL, Flyway, React and Vite. The repository's [security guidance](../workflow/security/README.md) identifies its scanning tools and their upstream documentation. Review dependency licenses and the project reuse inventory before submission; this guide does not claim a complete attribution audit.
+The application uses the frameworks and libraries declared in its Gradle and npm manifests, including Spring, PostgreSQL, Flyway, React and Vite. Maintainer documentation consulted earlier MP2/MP3 framework and deployment documentation; the contribution states that no prior application implementation was copied. OpenSpec and Codex specialist agents supported development and review. The repository's [security guidance](../workflow/security/README.md) identifies its scanning tools and their upstream documentation. Review dependency licenses and the project reuse inventory before submission; this guide does not claim a complete attribution audit.

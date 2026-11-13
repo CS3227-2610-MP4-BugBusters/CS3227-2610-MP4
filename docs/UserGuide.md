@@ -1,6 +1,6 @@
 # BugBusters user guide
 
-BugBusters helps Reporters submit bugs, Developers investigate them, and Maintainers assign and review work. Open the application address provided by your team. The Reporter instructions include the **Check my report** AI feature in this checkout; the application available to you may differ.
+BugBusters helps Reporters submit bugs, Developers investigate them, and Maintainers assign and review work. Open the application address provided by your team. The instructions describe the integrated main-branch features; the application available to you may differ. The shared-notes section is a pending change, identified below.
 
 For a local exercise, ask the operator for a running instance and active Reporter, Developer and Maintainer accounts. Use a disposable database and fictional reports. Do not enter passwords, personal information or real customer data into reports or AI requests. Operators can follow the [account setup](../src/backend/auth/README.md) and [local deployment instructions](../src/backend/platform/deployment/README.md).
 
@@ -8,7 +8,7 @@ For a local exercise, ask the operator for a running instance and active Reporte
 
 A Maintainer creates accounts for Reporters, Developers and other Maintainers. Ask a Maintainer for your username and initial password. Each account has one role, and credentials should be shared privately.
 
-**For public demo visitors:** In a deployment that includes the account-management feature, use the shared demo Maintainer account described in the [account setup documentation](../src/backend/auth/README.md) to try the application without contacting the team. Open **Account** and create separate Reporter, Developer and Maintainer accounts. Sign out and sign in with each account to try its role. Ordinary accounts can change their own password from the **Account** page.
+**For public demo visitors:** In a deployment that includes the account-management feature, use the shared demo Maintainer account described in the [account setup documentation](../src/backend/auth/README.md) to try the application without contacting the team. Open **Account** and create separate Reporter, Developer and Maintainer accounts. Sign out and sign in with each account to try its role. Ordinary accounts can change their own password from the **Account** page. A display-name update and local Account-page routing fix are proposed in PR #27 and require a build that includes it.
 
 **Public demo limitation:** Anyone with the published demo credentials can sign in as a Maintainer, view or change demo data, and create accounts. Use only fictional, disposable data; do not enter personal, confidential or real customer information. Keep the demo database and secrets separate from environments containing real data.
 
@@ -16,9 +16,9 @@ This shared account is an intentional convenience for an open demo. A production
 
 ## Sign in and sign out
 
-1. Open the address for your role: `/reporter/`, `/developer/`, or `/` for Maintainer.
-2. Enter the username and password supplied by your operator, then select **Sign in**.
-3. Select **Sign out** when finished or before switching roles. Separate browser profiles can be used to test roles at the same time.
+1. Open the application root (`/`) and enter your account credentials.
+2. Select **Sign in**. The app directs Reporter and Developer accounts to `/reporter/` and `/developer/`; Maintainers remain at `/`.
+3. Select **Sign out** when finished or before switching roles. Separate browser profiles can be used to test roles at the same time. Direct role addresses remain available.
 
 Each account has one role. If sign-in fails, check your details and role with the operator. There is no public self-service registration or password reset; an account holder can change their password from the Account page where account management is available. After repeated failed attempts, wait before retrying.
 
@@ -168,6 +168,17 @@ Only reports currently assigned to you appear. If a report is missing, check the
 
 Open the assigned report, enter your observations under **Private investigation notes**, and save them. These notes are visible only to the assigned Developer. Refresh and reconcile your text if a newer version has been saved elsewhere.
 
+### Share investigation notes with Maintainers
+
+**Pending PR #26:** These shared-note controls are present in the local feature work and are available only in a build that includes that change. They have not been verified in a deployed release.
+
+1. Open the assigned report and find **Shared investigation notes**. This editor is separate from **Private investigation notes**.
+2. Enter the findings you want Maintainers to see, then select **Save shared draft**.
+3. Select **Share saved note**. The Maintainer can read the last saved and shared version under **Investigation notes**; the Reporter cannot read these notes.
+4. To change the published note, edit and save the draft, then share again. Typing or saving alone does not publish changes. If a conflict occurs, refresh the saved revision, review your text and save it before sharing.
+
+Sharing a changed note during resolution review returns the report to In progress and supersedes the current proposal. Private investigation notes remain private and are never automatically copied into this editor.
+
 ### Create and share an investigation checklist
 
 1. Open the report and find **Investigation checklist**.
@@ -201,7 +212,7 @@ If the Maintainer returns the proposal, read **Maintainer returned this resoluti
 
 ### Find and inspect a report
 
-Open **Report queue** and select a report. Use the status, priority and assignee filters to narrow the queue. The report view includes its description, shared checklist, discussion, current proposal and history. Private Developer notes and unshared checklist drafts are not shown.
+Open **Report queue** and select a report. Use the status, priority and assignee filters to narrow the queue. The report view includes its description, shared checklist, discussion, current proposal and history. Private Developer notes and unshared checklist drafts are not shown. Report descriptions support Markdown lists, tables and code blocks; HTML is displayed literally, images are not loaded and links are not clickable. Titles and other fields remain plain text.
 
 ### Set priority and assign a Developer
 
@@ -235,7 +246,7 @@ Open a Closed report, enter a **Reopen reason**, and select **Reopen**. The repo
 3. Review the findings, their report references, and the included and excluded reports. Open the source reports before acting.
 4. Select **Regenerate summary** if you need another result.
 
-Summary generation is unavailable for the Closed filter. An empty matching queue does not require an AI call. A configured and available provider, model, Maintainer key and budget are needed for a live summary; see [Maintainer configuration](../src/backend/maintainer/README.md). If generation fails, ordinary report actions remain available.
+Summary generation is unavailable for the Closed filter. An empty matching queue does not require an AI call. A configured and available provider, model, Maintainer key and budget are needed for a live summary; see [Maintainer configuration](../src/backend/maintainer/README.md). If generation fails, ordinary report actions remain available. A timeout or rate-limit error does not change report state; review the source reports before acting on a summary.
 
 ## Try the complete workflow
 
@@ -263,4 +274,3 @@ in-memory data and does not establish those features in the shared application.
 | A report or checklist has changed | Preserve any unsaved text, refresh, review the current version and retry the intended change. |
 | AI is unavailable or limited | Continue manually, or ask the operator to check configuration and quota. |
 | The outcome of an action is unclear | Refresh and inspect the report before submitting again. |
-
