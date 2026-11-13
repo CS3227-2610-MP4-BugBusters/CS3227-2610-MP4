@@ -588,6 +588,7 @@ export function DeveloperApp() {
       identity: user?.displayName,
       authenticated: sessionState === "active" && user !== null,
       navigation: [{ label: "Dashboard", href: "#workspace-content", current: true }],
+      showAccountLink: false,
       accountActions: user ? createElement(
         "button",
         {

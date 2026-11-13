@@ -51,6 +51,8 @@ describe("Developer role workspace", () => {
 
     expect(await screen.findByText(report.title)).toBeTruthy();
     expect(screen.getByRole("navigation", { name: /developer/i })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Account" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Dashboard" }).getAttribute("href")).toBe("#workspace-content");
     expect(screen.getByRole("heading", { name: /developer reports/i })).toBeTruthy();
   });
 
