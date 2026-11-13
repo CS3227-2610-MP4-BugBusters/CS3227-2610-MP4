@@ -27,6 +27,10 @@ Removed the Account link from the Developer sidebar because it led to an unloade
 
 The lightweight path avoided a specialist handoff for a small reversible UI change while retaining a behavioral regression and cross-consumer frontend checks. This is not a controlled efficiency comparison. Test start times shown by Vitest were approximately 09:04 local time on 13 November 2026; the shell clock at review was 09:05:11 +0800. Exact task elapsed time and coordinator model/effort were not exposed. Per-agent/coordinator input, cached input, output, reasoning and total tokens, as well as cost, were unavailable in the exposed tooling; they are not zero and no token savings are inferred. No sanitized trace location was exposed.
 
+## Integration review
+
+This change was separated onto `0271d05` for review. Developer `npm run verify` passed 63 tests, typecheck and build. Current main includes the Account page, while the Developer Vite server does not proxy `/account/`; removing the link also removes the obvious route to password changes in the packaged application. This draft requires a product decision and a browser check before merging. Token usage for this integration step was unavailable.
+
 ## Later telemetry correction
 
 A later read-only examination of local session metadata recovered coordinator token counters. The earlier unavailable statement describes what was exposed during the run, but omitted these recoverable records. See [the sanitized token observations](../evaluation/2026-11-13-session-token-observations.md) for values, attribution and limits.

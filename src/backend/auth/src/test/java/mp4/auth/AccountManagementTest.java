@@ -61,4 +61,53 @@ class AccountManagementTest {
         Browser owner=authenticated(account("MAINTAINER"));
         status(403,owner.request("POST","/api/maintainer/accounts",body,"Content-Type","application/json"),"CSRF required");
     }
+
+    @Test void activeAccountCanChangeOnlyItsOwnDisplayNameAndIdentityReadsTheNewName() throws Exception {
+        Account reporter=account("REPORTER"), other=account("DEVELOPER");
+        Browser browser=authenticated(reporter);
+        String twoHundredUtf16Units="🙂".repeat(100);
+
+        status(204,post(browser,"/api/account/display-name","{\"displayName\":\""+twoHundredUtf16Units+"\"}"),"200 UTF-16 units accepted");
+        for(String path:List.of("/api/account","/api/auth/me")) {
+            var response=browser.get(path);
+            status(200,response,"updated identity from "+path);
+            var data=json(response);
+            assertEquals(reporter.id().toString(),data.get("id"));
+            assertEquals(twoHundredUtf16Units,data.get("displayName"));
+            assertEquals("REPORTER",data.get("role"));
+            if(path.equals("/api/auth/me")) assertEquals(true,data.get("active"));
+        }
+
+        for(String invalid:List.of("", " ", "x".repeat(201)))
+            status(400,post(browser,"/api/account/display-name","{\"displayName\":\""+invalid+"\"}"),"invalid display name rejected");
+        status(400,post(browser,"/api/account/display-name","{\"displayName\":\"bad\\u0001name\"}"),"control character rejected");
+        status(400,post(browser,"/api/account/display-name","{\"displayName\":\"Attacker\",\"username\":\""+other.username()+"\"}"),"identity override rejected");
+        assertEquals(twoHundredUtf16Units,json(browser.get("/api/account")).get("displayName"),"rejected writes preserve the current name");
+        try(var c=connection();var s=c.prepareStatement("SELECT display_name FROM app_accounts WHERE id=?")) {
+            s.setObject(1,other.id()); try(var rows=s.executeQuery()) { assertTrue(rows.next()); assertEquals("Acceptance DEVELOPER",rows.getString(1)); }
+        }
+    }
+
+    @Test void displayNameChangeRequiresCsrfAndDemoAccountRemainsLocked() throws Exception {
+        Account reporter=account("REPORTER"); Browser browser=authenticated(reporter);
+        status(403,browser.request("POST","/api/account/display-name","{\"displayName\":\"Changed\"}","Content-Type","application/json"),"display name requires CSRF");
+        assertEquals("Acceptance REPORTER",json(browser.get("/api/account")).get("displayName"));
+
+        Browser demoBrowser=authenticated(demo());
+        status(403,post(demoBrowser,"/api/account/display-name","{\"displayName\":\"Changed demo\"}"),"demo identity is immutable");
+        assertEquals("Demo Maintainer",json(demoBrowser.get("/api/account")).get("displayName"));
+        assertEquals("Demo Maintainer",json(demoBrowser.get("/api/auth/me")).get("displayName"));
+    }
+
+    @Test void anonymousAndInactiveAccountsCannotChangeDisplayName() throws Exception {
+        Browser anonymous=new Browser(app);
+        status(401,post(anonymous,"/api/account/display-name","{\"displayName\":\"Anonymous edit\"}"),"anonymous account denied");
+
+        Account inactive=account("DEVELOPER"); Browser browser=authenticated(inactive);
+        update(inactive,"active=false");
+        status(403,post(browser,"/api/account/display-name","{\"displayName\":\"Inactive edit\"}"),"inactive account denied");
+        try(var c=connection();var s=c.prepareStatement("SELECT display_name FROM app_accounts WHERE id=?")) {
+            s.setObject(1,inactive.id()); try(var rows=s.executeQuery()) { assertTrue(rows.next()); assertEquals("Acceptance DEVELOPER",rows.getString(1)); }
+        }
+    }
 }

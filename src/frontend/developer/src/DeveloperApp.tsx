@@ -1,6 +1,7 @@
 import { createElement, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { DeveloperChecklist } from "./DeveloperChecklist";
 import { DeveloperPrivateNotes } from "./DeveloperPrivateNotes";
+import { DeveloperSharedNotes } from "./DeveloperSharedNotes";
 import { DeveloperNotifications } from "./DeveloperNotifications";
 import { createRoleWorkspace } from "../../shared/RoleWorkspace";
 import { createRoleSignIn } from "../../shared/RoleSignIn";
@@ -257,6 +258,7 @@ export function DeveloperApp() {
   }
 
   async function refreshAfterShare(reportId: string, previous: number, current: number) {
+    if (previous !== current) setStartedVersion({ reportId, previous, current });
     setDetail((report) => report?.id === reportId && report.version === previous
       ? { ...report, version: current } : report);
     const view = currentView.current;
@@ -561,6 +563,15 @@ export function DeveloperApp() {
                     reportId={selectedReportId}
                     status={detail.status}
                     onAccessLost={handleChecklistAccessLoss}
+                  />
+                  <DeveloperSharedNotes
+                    reportId={selectedReportId}
+                    status={detail.status}
+                    onAccessLost={handleChecklistAccessLoss}
+                    startedVersion={startedVersion?.reportId === selectedReportId ? startedVersion : undefined}
+                    onReportVersionChange={(previous, current) => {
+                      void refreshAfterShare(selectedReportId, previous, current);
+                    }}
                   />
                 </>
               )}

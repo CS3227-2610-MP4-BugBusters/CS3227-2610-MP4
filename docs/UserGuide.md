@@ -1,6 +1,6 @@
 # BugBusters user guide
 
-BugBusters helps Reporters submit bugs, Developers investigate them, and Maintainers assign and review work. Open the application address provided by your team. The instructions describe the integrated main-branch features; the application available to you may differ. The shared-notes section is a pending change, identified below.
+BugBusters helps Reporters submit bugs, Developers investigate them, and Maintainers assign and review work. Open the application address provided by your team. The instructions describe the integrated main-branch features; the application available to you may differ.
 
 For a local exercise, ask the operator for a running instance and active Reporter, Developer and Maintainer accounts. Use a disposable database and fictional reports. Do not enter passwords, personal information or real customer data into reports or AI requests. Operators can follow the [account setup](../src/backend/auth/README.md) and [local deployment instructions](../src/backend/platform/deployment/README.md).
 
@@ -8,7 +8,7 @@ For a local exercise, ask the operator for a running instance and active Reporte
 
 A Maintainer creates accounts for Reporters, Developers and other Maintainers. Ask a Maintainer for your username and initial password. Each account has one role, and credentials should be shared privately.
 
-**For public demo visitors:** In a deployment that includes the account-management feature, use the shared demo Maintainer account described in the [account setup documentation](../src/backend/auth/README.md) to try the application without contacting the team. Open **Account** and create separate Reporter, Developer and Maintainer accounts. Sign out and sign in with each account to try its role. Ordinary accounts can change their own password from the **Account** page. A display-name update and local Account-page routing fix are proposed in PR #27 and require a build that includes it.
+**For public demo visitors:** In a deployment that includes the account-management feature, use the shared demo Maintainer account described in the [account setup documentation](../src/backend/auth/README.md) to try the application without contacting the team. Open **Account** and create separate Reporter, Developer and Maintainer accounts. Sign out and sign in with each account to try its role. Ordinary accounts can change their own password from the **Account** page. Account holders can also update their display name.
 
 **Public demo limitation:** Anyone with the published demo credentials can sign in as a Maintainer, view or change demo data, and create accounts. Use only fictional, disposable data; do not enter personal, confidential or real customer information. Keep the demo database and secrets separate from environments containing real data.
 
@@ -170,7 +170,7 @@ Open the assigned report, enter your observations under **Private investigation 
 
 ### Share investigation notes with Maintainers
 
-**Pending PR #26:** These shared-note controls are present in the local feature work and are available only in a build that includes that change. They have not been verified in a deployed release.
+Shared investigation notes are available in builds containing this feature; verify the deployed revision.
 
 1. Open the assigned report and find **Shared investigation notes**. This editor is separate from **Private investigation notes**.
 2. Enter the findings you want Maintainers to see, then select **Save shared draft**.

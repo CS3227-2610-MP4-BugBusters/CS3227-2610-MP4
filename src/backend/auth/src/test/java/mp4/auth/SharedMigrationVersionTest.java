@@ -57,12 +57,13 @@ class SharedMigrationVersionTest {
         try (Database db = Database.create()) {
             var flyway = db.flyway();
             db.flyway().migrate();
-            assertEquals("7", flyway.info().current().getVersion().getVersion());
+            assertEquals("8", flyway.info().current().getVersion().getVersion());
             try (Connection c = db.connect(); Statement s = c.createStatement()) {
                 assertTrue(tableExists(c, "reports"));
                 assertTrue(tableExists(c, "report_comments"));
                 assertTrue(tableExists(c, "developer_private_notes"));
                 assertTrue(tableExists(c, "developer_notifications"));
+                assertTrue(tableExists(c, "developer_shared_note_drafts"));
                 s.execute("INSERT INTO reports(id,title,description,reporter_id) VALUES ('" + UUID.randomUUID()
                         + "','t','d','" + UUID.randomUUID() + "')");
             }
@@ -94,6 +95,15 @@ class SharedMigrationVersionTest {
                 insert.setString(5, "preserve this Reporter V5 comment");
                 insert.executeUpdate();
             }
+            UUID sharedNoteId = UUID.randomUUID();
+            try (Connection c = db.connect(); var insert = c.prepareStatement(
+                    "INSERT INTO report_shared_notes(id,report_id,author_id,text) VALUES (?,?,?,?)")) {
+                insert.setObject(1, sharedNoteId);
+                insert.setObject(2, reportId);
+                insert.setObject(3, commentAuthorId);
+                insert.setString(4, "preserve existing shared evidence");
+                insert.executeUpdate();
+            }
 
             db.flyway().migrate();
 
@@ -123,8 +133,17 @@ class SharedMigrationVersionTest {
                 }
                 assertTrue(tableExists(c, "developer_private_notes"));
                 assertTrue(tableExists(c, "developer_notifications"));
+                assertTrue(tableExists(c, "developer_shared_note_drafts"));
+                try (var note = c.prepareStatement("SELECT text FROM report_shared_notes WHERE id=?")) {
+                    note.setObject(1, sharedNoteId);
+                    try (var row = note.executeQuery()) {
+                        assertTrue(row.next());
+                        assertEquals("preserve existing shared evidence", row.getString(1));
+                        assertFalse(row.next());
+                    }
+                }
             }
-            assertEquals("7", flyway.info().current().getVersion().getVersion());
+            assertEquals("8", flyway.info().current().getVersion().getVersion());
         }
     }
 

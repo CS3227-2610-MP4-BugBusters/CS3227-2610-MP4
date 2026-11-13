@@ -304,3 +304,7 @@ increments generation, preserving active/inactive state. Return safe JSON
 commit. An unknown account returns ACCOUNT_NOT_FOUND/exit 6 with no mutation; invalid
 commands remain VALIDATION_FAILED/2 and storage errors STORAGE_UNAVAILABLE/4. No web
 account-management or public password-reset endpoint is added.
+
+## Own display-name update
+
+Provide a CSRF-protected account endpoint and form that updates only the active session actor's display name. Validate the same display-name rules as account creation. Preserve the fixed demo identity. Read the latest name from storage on session identity reads; do not change username, role, password or authentication generation.

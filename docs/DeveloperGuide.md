@@ -4,7 +4,7 @@
 
 BugBusters is a programming-related bug tracker with Reporter, Developer and Maintainer workspaces. This guide covers local setup, the application boundaries, verification and deployment preparation. See the [User Guide](UserGuide.md) for role workflows.
 
-This guide describes the integrated main branch at `03b415b` and identifies pending changes where applicable. The local checkout may be older or contain additional uncommitted work. Check `git status`, `git log` and the deployed revision before relying on a feature. A hosted deployment was not verified for this update.
+This guide describes the integrated application and identifies pending changes where applicable. The local checkout may be older or contain additional uncommitted work. Check `git status`, `git log` and the deployed revision before relying on a feature. A hosted deployment was not verified for this update.
 
 ## 2. Technology and repository layout
 
@@ -75,7 +75,7 @@ npm run dev -- --host 127.0.0.1 --port 5173 --strictPort
 
 For Developer or Maintainer, instead run `npm ci` in `src/frontend/developer` or `src/frontend/maintainer`, then use `npm run dev -- --host 127.0.0.1 --port 5173 --strictPort` for Developer or `npm start -- --host 127.0.0.1 --port 5173 --strictPort` for Maintainer. Open the URL Vite prints; Reporter and Developer use `/reporter/` and `/developer/` bases respectively. The Developer checklist demo component and the explicitly selected Maintainer demo are isolated synthetic previews, not evidence of authenticated persistence. Use the normal entry with the backend for integration testing.
 
-For an integrated local Vite session, run the normal Maintainer frontend at `127.0.0.1:5173`, Developer at `127.0.0.1:5174`, Reporter at `127.0.0.1:5175`, and the backend at `127.0.0.1:8080`; open the root URL on port 5173. The Maintainer Vite configuration proxies the two role routes to the matching ports. Set the backend public origin to the root browser origin. Main does not yet proxy `/account` in these Vite configurations; PR #27 proposes that fix and a display-name update. The packaged application serves `/account/` directly.
+For an integrated local Vite session, run the normal Maintainer frontend at `127.0.0.1:5173`, Developer at `127.0.0.1:5174`, Reporter at `127.0.0.1:5175`, and the backend at `127.0.0.1:8080`; open the root URL on port 5173. The Maintainer Vite configuration proxies the two role routes to the matching ports. Set the backend public origin to the root browser origin. The Developer and Maintainer Vite configurations proxy `/account` to the backend. The packaged application serves `/account/` directly.
 
 To build the packaged application, use the [deployment Dockerfile instructions](../src/backend/platform/deployment/README.md). The Dockerfile builds all three frontend bundles and the Java distribution; the packaged routes are `/`, `/developer/` and `/reporter/`. Its runtime binds to all interfaces and uses secure cookies; use an HTTPS setup rather than enabling loopback-only cookies in that container.
 
@@ -85,7 +85,7 @@ To build the packaged application, use the [deployment Dockerfile instructions](
 | --- | --- |
 | Authentication | Operator-provisioned fixed-role accounts, server sessions, sign-in/out and CSRF. Account state is checked on protected access. |
 | Reporter | Create and read own reports, edit while Submitted and unassigned, participate in discussion, and request AI questions about a new draft. |
-| Developer | Access assigned reports, start investigation, save private notes and checklist drafts, share saved checklists, request suggestions and submit resolutions. A separate shared investigation-note draft and publication flow is proposed in PR #26 and is not part of this baseline. |
+| Developer | Access assigned reports, start investigation, save private notes, save and share separate Maintainer-visible investigation notes and checklists, request suggestions and submit resolutions. |
 | Maintainer | Browse reports, set priority and assignment, discuss, return or close a resolution, reopen, and request an advisory queue summary. |
 | Shared storage | Versioned report mutations and lifecycle checks protect against stale changes; shared checklist copies are separate from private drafts. |
 

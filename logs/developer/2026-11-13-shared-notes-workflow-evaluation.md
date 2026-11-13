@@ -24,6 +24,16 @@ A fresh `candidate_verifier` (configured `gpt-6-luna`, low effort) independently
 
 The configured model and effort above are taken from `.codex/agents/`; the worker and coordinator runtime identity and exact per-agent input, cached input, output, reasoning tokens, total tokens, elapsed times and cost were not exposed to the coordinator. They are **unavailable**, not zero. Reported test durations, when available, measure test execution, not agent token use. No token-efficiency or cost-savings conclusion can be drawn without comparable runs with attributable measurements and equivalent task scope. Timing from an individual run also includes repeated reviews and sandbox escalation and is not a controlled comparison.
 
+## Integration on current main
+
+The shared-notes files were copied without the separate Account-link change to an isolated worktree based on `0271d05`. The Reporter guide changes already on main were preserved. On that worktree, `npm run verify` passed 68 Developer tests plus typecheck/build. The disposable PostgreSQL runner passed 16 shared-notes integration tests, 2 request-body tests and 3 migration tests. Strict OpenSpec validation and `git diff --check` passed. Live browser and deployed checks remain open. Token usage for this integration step was unavailable.
+
+## CI startup-fixture correction
+
+PR #26's Assigned reports / Java 17 job failed during the auth-only database startup scenario: the cloned fixture retained `developer_shared_note_drafts` after its old shared tables and Flyway history were removed. PostgreSQL `DROP ... CASCADE` removed dependent foreign-key constraints, not the draft table itself. Flyway V8 then correctly rejected the duplicate table.
+
+The explorer identified the fixture cleanup gap. The coordinator reproduced the exact `relation "developer_shared_note_drafts" already exists` failure with `src/backend/shared/test/run-shared-report-storage.sh` against disposable PostgreSQL, then updated only the test fixture cleanup and added assertions that the table is absent before startup and present afterward. The same runner then passed its shared storage and fresh/auth-only/restart/incompatible-schema startup scenarios. Production migrations and existing data were not changed. Local Java was 25; hosted Java 17 confirmation requires CI. Agent and coordinator token usage for this follow-up were unavailable; no token comparison was made.
+
 ## Later telemetry correction
 
 A later read-only examination of local session metadata recovered coordinator token counters and identifiable specialist counters. The earlier unavailable statement describes what was exposed during the run, but omitted these recoverable records. See [the sanitized token observations](../evaluation/2026-11-13-session-token-observations.md) for values, attribution and limits.

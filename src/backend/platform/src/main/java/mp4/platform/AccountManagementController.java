@@ -44,6 +44,13 @@ final class AccountManagementController {
             return service.info(actor());
         });
     }
+    @PostMapping(value="/api/account/display-name",consumes="application/json") Object displayName(HttpServletRequest req,HttpServletResponse res) throws IOException {
+        return execute(res,()-> {
+            var f=input(req,Set.of("displayName"));
+            service.changeDisplayName(actor(),f.get("displayName"));
+            res.setStatus(204);return null;
+        });
+    }
     @PostMapping(value="/api/maintainer/accounts",consumes="application/json") Object create(HttpServletRequest req,HttpServletResponse res) throws IOException {
         return execute(res,()-> {
             var f=input(req,Set.of("username","displayName","role","password"));
@@ -68,7 +75,7 @@ final class AccountManagementController {
             case "ACCOUNT_EXISTS" -> "Username is already in use";
             default -> "Access denied";
         }); }
-        catch(IllegalArgumentException e) { AuthHttp.error(response,400,"VALIDATION_FAILED","Check the account fields and password length (12–72 UTF-8 bytes)"); }
+        catch(IllegalArgumentException e) { AuthHttp.error(response,400,"VALIDATION_FAILED","Check the display name and account fields; passwords must be 12–72 UTF-8 bytes"); }
         catch(java.sql.SQLException e) { AuthHttp.error(response,503,"STORAGE_UNAVAILABLE","Account service is temporarily unavailable"); }
         return null;
     }
