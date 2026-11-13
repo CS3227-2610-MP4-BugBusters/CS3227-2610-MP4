@@ -3,10 +3,33 @@ const el = (id) => document.getElementById(id);
 const routes = { MAINTAINER: "/", DEVELOPER: "/developer/", REPORTER: "/reporter/" };
 const status = (message) => { el("status").textContent = message; };
 function signedOut() {
+  el("workspace").classList.add("role-workspace--anonymous");
+  el("workspace-account").hidden = true;
+  el("workspace-navigation").hidden = true;
+  el("workspace-role").hidden = true;
   el("account").hidden = true;
   el("signed-out").hidden = false;
   document.querySelectorAll('input[type="password"]').forEach((input) => { input.value = ""; });
 }
+el("sign-out").addEventListener("click", async () => {
+  const button = el("sign-out");
+  button.disabled = true;
+  button.textContent = "Signing out…";
+  try {
+    const bootstrap = await fetch("/api/auth/csrf", { credentials: "same-origin", cache: "no-store" });
+    if (!bootstrap.ok) throw new Error("Unable to check your session. Please try again.");
+    const csrf = await bootstrap.json();
+    const response = await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "X-CSRF-TOKEN": csrf.token } });
+    if (!response.ok) throw new Error("Unable to sign out. Please try again.");
+    signedOut();
+    window.location.assign("/");
+  } catch (error) {
+    status(error.message || "Unable to sign out. Please try again.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Sign out";
+  }
+});
 async function request(path, body) {
   const headers = {};
   if (body) {
@@ -59,7 +82,17 @@ el("password-form").addEventListener("submit", (event) => {
   });
 });
 void request("/api/account").then((user) => {
-  el("identity").textContent = `${user.displayName} · ${user.username} · ${user.role.toLowerCase()}`;
+  const role = user.role.charAt(0) + user.role.slice(1).toLowerCase();
+  el("identity").textContent = user.displayName;
+  el("username").textContent = user.username;
+  el("account-role").textContent = role;
+  el("workspace-role").textContent = role;
+  el("workspace-role").hidden = false;
+  el("workspace-account").hidden = false;
+  el("workspace-navigation").hidden = false;
+  el("workspace-navigation").setAttribute("aria-label", `${role} navigation`);
+  el("workspace").classList.remove("role-workspace--anonymous");
+  el("demo-notice").hidden = !user.demoLocked;
   el("back").href = routes[user.role] || "/";
   el("account").hidden = false;
   el("password-section").hidden = user.demoLocked;

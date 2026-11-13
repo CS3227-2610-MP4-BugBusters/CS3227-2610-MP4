@@ -470,14 +470,6 @@ export function App({
         )
       ) : (
         <>
-          {authActions && (
-            <div className="account-bar">
-              <span>{identity?.displayName} · Maintainer</span>
-              <button onClick={signOut} disabled={!!authBusy}>
-                {authBusy === "signOut" ? "Signing out…" : "Sign out"}
-              </button>
-            </div>
-          )}
           <section className="filters" aria-label="Queue filters">
             <label>
               Status
@@ -666,7 +658,12 @@ export function App({
       role: "Maintainer",
       identity: identity?.displayName,
       authenticated: auth === "ready" && identity?.role === "MAINTAINER",
-      navigation: [{ label: "Dashboard", href: "#workspace-content", current: true }],
+      navigation: [{ label: "Dashboard", href: "/", current: true }],
+      accountActions: authActions ? (
+        <button className="workspace-sign-out" onClick={signOut} disabled={!!authBusy}>
+          {authBusy === "signOut" ? "Signing out…" : "Sign out"}
+        </button>
+      ) : undefined,
       children: appContent,
     },
   );

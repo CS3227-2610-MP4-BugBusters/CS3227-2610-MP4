@@ -3,14 +3,23 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Account · Bug Tracker</title>
-<link rel="stylesheet" href="/account/style.css"><script src="/account/account.js" defer></script>
+<link rel="stylesheet" href="/account/role-workspace.css"><link rel="stylesheet" href="/account/style.css"><script src="/account/account.js" defer></script>
 </head>
-<body><main>
-<header><a id="back" href="/">← Back to reports</a><h1>Account</h1></header>
+<body><div id="workspace" class="role-workspace role-workspace--anonymous">
+<a class="role-workspace__skip-link" href="#workspace-content">Skip to main content</a>
+<header class="role-workspace__header">
+<div class="role-workspace__brand"><span class="role-workspace__brand-name">Bug Tracker</span><span id="workspace-role" class="role-workspace__role" hidden></span></div>
+<div id="workspace-account" class="role-workspace__account" hidden><span id="identity"></span><button id="sign-out" class="workspace-sign-out" type="button">Sign out</button></div>
+</header>
+<nav id="workspace-navigation" class="role-workspace__navigation" aria-label="Workspace navigation" hidden>
+<a class="role-workspace__navigation-link" href="/account/" aria-current="page">Account</a><a id="back" class="role-workspace__navigation-link" href="/">Dashboard</a>
+</nav>
+<div id="workspace-content" class="role-workspace__content" tabindex="-1"><main>
+<div class="page-heading"><p class="eyebrow">SETTINGS</p><h1>Account</h1><p>Manage your account and workspace access.</p></div>
 <p id="status" role="status">Checking your session…</p>
-<section id="signed-out" hidden><h2>Sign in</h2><p>Open your role’s page to sign in.</p><nav><a href="/">Maintainer</a><a href="/developer/">Developer</a><a href="/reporter/">Reporter</a></nav></section>
+<section id="signed-out" hidden><h2>Sign in</h2><p>Sign in to manage your account.</p><a href="/">Go to sign in</a></section>
 <div id="account" hidden>
-<section><h2>Your account</h2><p id="identity"></p></section>
+<section><h2>Your account</h2><dl><div><dt>Username</dt><dd id="username"></dd></div><div><dt>Role</dt><dd id="account-role"></dd></div></dl><p id="demo-notice" class="muted" hidden>This shared demo account has fixed credentials. You can create a personal account below.</p></section>
 <section id="password-section" hidden><h2>Change password</h2><p>Use 12–72 UTF-8 bytes. Changing your password signs you out of all sessions.</p>
 <form id="password-form">
 <label>Current password<input name="currentPassword" type="password" autocomplete="current-password" required></label>
@@ -25,4 +34,4 @@
 <label>Initial password<input name="password" type="password" autocomplete="new-password" required></label>
 <button type="submit">Create account</button></form></section>
 </div>
-</main></body></html>
+</main></div></div></body></html>
